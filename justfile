@@ -9,7 +9,7 @@ push: build
 
 deploy src exp bin_size ks method="default":
     #! /usr/bin/env bash
-    export JOB_NAME={{src}}-$(echo {{exp}} | tr _ -)-{{bin_size}}-{{ks}}-{{method}}
+    export JOB_NAME={{src}}-$(echo {{exp}} | tr _[:upper:] -[:lower:])-{{bin_size}}-{{ks}}-{{method}}
     export HMM_DATA_SOURCE={{src}}
     export HMM_EXPERIMENT={{exp}}
     export HMM_BIN_SIZE_MS={{bin_size}}
