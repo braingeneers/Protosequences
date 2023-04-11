@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: $JOB_NAME
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      containers:
+      - name: run-notebook
+        image: atspaeth/prpnb
+        imagePullPolicy: Always
+        envFrom:
+            - configMapRef:
+                name: $JOB_NAME-config
+        volumeMounts:
+          - mountPath: /root/.aws
+            name: s3-credentials
+        resources:
+          requests:
+            cpu: 1
+            memory: "16Gi"
+            nvidia.com/gpu: 0
+          limits:
+            cpu: 1
+            memory: "24Gi"
+            nvidia.com/gpu: 0
+        command: ["python3", "stash_hmm.py"]
+        args:
+          - $(HMM_DATA_SOURCE)
+          - $(HMM_EXPERIMENT)
+      restartPolicy: Never
+      volumes:
+        - name: s3-credentials
+          secret:
+            secretName: prpnb-s3-config
