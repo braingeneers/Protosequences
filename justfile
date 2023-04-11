@@ -15,7 +15,7 @@ deploy src exp bin_size ks method="default":
     export HMM_BIN_SIZE_MS={{bin_size}}
     export HMM_K_RANGE={{ks}}
     export HMM_METHOD={{method}}
-    envsubst < job.yml kubectl apply -f -
+    envsubst < job.yml | kubectl apply -f -
 
 local src exp bin_size ks method="default":
     python stash_hmms.py {{src}} {{exp}} {{bin_size}} {{ks}} {{method}}
