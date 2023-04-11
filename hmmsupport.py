@@ -2,7 +2,6 @@ import os
 import numpy as np
 import scipy.io
 from scipy import stats, signal, sparse, ndimage
-import matplotlib.pyplot as plt
 from contextlib import contextmanager
 import itertools
 import functools
@@ -52,8 +51,7 @@ class Cache:
             with self.cache_file('rb', source, exp, bin_size_ms,
                                  n_states, surrogate) as f:
                 return True
-        except Exception as e:
-            print('Missing from cache:', e)
+        except Exception:
             return False
 
     def get_cached(self, source, exp, bin_size_ms, n_states, surrogate):
@@ -360,6 +358,7 @@ def _cache_models(needs_run, library='default'):
 
 @contextmanager
 def figure(name, save_args={}, save_exts=['png'], **kwargs):
+    import matplotlib.pyplot as plt
     'Create a named figure and save it when done.'
     f = plt.figure(name, **kwargs)
     try:
