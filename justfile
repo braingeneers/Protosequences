@@ -9,13 +9,23 @@ push: build
 
 deploy src exp bin_size ks method="default":
     #! /usr/bin/env bash
-    export JOB_NAME={{src}}-$(echo {{exp}} | tr _[:upper:] -[:lower:])-{{bin_size}}-{{ks}}-{{method}}
-    export HMM_DATA_SOURCE={{src}}
-    export HMM_EXPERIMENT={{exp}}
-    export HMM_BIN_SIZE_MS={{bin_size}}
-    export HMM_K_RANGE={{ks}}
-    export HMM_METHOD={{method}}
-    envsubst < job.yml | kubectl apply -f -
+    export HMM_DATA_SOURCE="{{src}}"
+    export HMM_EXPERIMENT="{{exp}}"
+    export HMM_BIN_SIZE_MS="{{bin_size}}"
+    export HMM_K_RANGE="{{ks}}"
+    export HMM_METHOD="{{method}}"
+    if [ "$HMM_EXPERIMENT" = "*" ]; then
+        s3dir=s3://braingeneers/personal/atspaeth/data/{{src}}/
+        s3files=$(aws s3 ls "$s3dir" | grep '[^ ]*\.mat' -o)
+        for file in $s3files; do
+            exp=$(basename "$file" .mat)
+            just deploy {{src}} $exp {{bin_size}} {{ks}} {{method}}
+        done
+    else
+        exp=$(echo {{exp}} | tr _[:upper:] -[:lower:])
+        export JOB_NAME="{{src}}-$exp-{{bin_size}}-{{ks}}-{{method}}"
+        envsubst < job.yml | kubectl apply -f -
+    fi
 
 local src exp bin_size ks method="default":
     python stash_hmms.py {{src}} {{exp}} {{bin_size}} {{ks}} {{method}}
