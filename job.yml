@@ -1,36 +1,32 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: $JOB_NAME
+  name: atspaeth-hmms-$HMM_DATA_SOURCE-$HMM_EXPERIMENT-$HMM_BIN_SIZE_MS-$HMM_K_RANGE-$HMM_METHOD
 spec:
   backoffLimit: 0
   template:
     spec:
       containers:
-      - name: run-notebook
-        image: atspaeth/prpnb
+      - name: fit-hmms
+        image: atspaeth/organoid-hmm
         imagePullPolicy: Always
-        envFrom:
-            - configMapRef:
-                name: $JOB_NAME-config
         volumeMounts:
           - mountPath: /root/.aws
-            name: s3-credentials
+            name: prp-s3-credential
         resources:
-          requests:
+          limits:
             cpu: 1
             memory: "16Gi"
             nvidia.com/gpu: 0
-          limits:
-            cpu: 1
-            memory: "24Gi"
-            nvidia.com/gpu: 0
-        command: ["python3", "stash_hmm.py"]
+        command: ["python", "stash_hmms.py"]
         args:
-          - $(HMM_DATA_SOURCE)
-          - $(HMM_EXPERIMENT)
+          - $HMM_DATA_SOURCE
+          - $HMM_EXPERIMENT
+          - $HMM_BIN_SIZE_MS
+          - $HMM_K_RANGE
+          - $HMM_METHOD
       restartPolicy: Never
       volumes:
-        - name: s3-credentials
+        - name: prp-s3-credential
           secret:
-            secretName: prpnb-s3-config
+            secretName: prp-s3-credential
