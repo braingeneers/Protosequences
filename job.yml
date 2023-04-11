@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: atspaeth-hmms-$HMM_DATA_SOURCE-$HMM_EXPERIMENT-$HMM_BIN_SIZE_MS-$HMM_K_RANGE-$HMM_METHOD
+  name: atspaeth-hmms-$JOB_NAME
 spec:
   backoffLimit: 0
   template:
@@ -9,22 +9,29 @@ spec:
       containers:
       - name: fit-hmms
         image: atspaeth/organoid-hmm
+        env:
+          - name: S3_USER
+            value: atspaeth
         imagePullPolicy: Always
         volumeMounts:
           - mountPath: /root/.aws
             name: prp-s3-credential
         resources:
-          limits:
+          requests:
             cpu: 1
             memory: "16Gi"
             nvidia.com/gpu: 0
+          limits:
+            cpu: 1
+            memory: "18Gi"
+            nvidia.com/gpu: 0
         command: ["python", "stash_hmms.py"]
         args:
-          - $HMM_DATA_SOURCE
-          - $HMM_EXPERIMENT
-          - $HMM_BIN_SIZE_MS
-          - $HMM_K_RANGE
-          - $HMM_METHOD
+          - "$HMM_DATA_SOURCE"
+          - "$HMM_EXPERIMENT"
+          - "$HMM_BIN_SIZE_MS"
+          - "$HMM_K_RANGE"
+          - "$HMM_METHOD"
       restartPolicy: Never
       volumes:
         - name: prp-s3-credential

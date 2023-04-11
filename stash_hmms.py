@@ -14,7 +14,7 @@ if __name__ == '__main__':
         bin_size_ms = int(bin_size_str)
         nhses = nhs_str.split('-')
         if len(nhses) == 1:
-            n_stateses = [int(nheses[0])]
+            n_stateses = [int(nhses[0])]
         else:
             nhsmin, nhsmax = nhses
             n_stateses = np.arange(int(nhsmin), int(nhsmax)+1)
@@ -22,4 +22,7 @@ if __name__ == '__main__':
         print('Invalid arguments.', e)
         sys.exit(1)
 
-    cache_models(source, exp, bin_size_ms, n_stateses, library=method)
+    print(f'Caching HMMs for {source}/{exp} using {bin_size_ms}ms bins')
+    print('Will use K in', n_stateses)
+    cache_models(source, exp, bin_size_ms, n_stateses, library=method,
+                 verbose=True)

@@ -21,12 +21,12 @@ except ImportError:
     from builtins import open as _open
 
 
-DATA_DIR = ('data' if os.path.isdir('data') else
+DATA_DIR = ('./data' if os.path.isdir('data') else
             's3://braingeneers/personal/atspaeth/data')
 
 S3_USER = os.environ.get('S3_USER')
 CACHE_IS_LOCAL = S3_USER is None
-CACHE_DIR = ('.cache' if CACHE_IS_LOCAL else
+CACHE_DIR = ('./.cache' if CACHE_IS_LOCAL else
              f's3://braingeneers/personal/{S3_USER}/cache')
 
 
@@ -220,12 +220,14 @@ else:
 
 
 def get_fitted_hmm(source, exp, bin_size_ms, n_states, surrogate='real',
-                   recompute_ok=False, library='default'):
+                   recompute_ok=False, library='default', verbose=False):
+    if verbose:
+        print(f'Running {source}/{exp}:{bin_size_ms}ms, K={n_states}')
     params = (np.str_(source), np.str_(exp), np.int64(bin_size_ms),
               np.int64(n_states), np.str_(surrogate))
     method = _HMM_METHODS[library][0]
     if recompute_ok or method.is_cached(*params):
-        return method(*params)
+        return method(*params, verbose=verbose)
 
 
 class Model:
@@ -299,7 +301,8 @@ class Model:
 
 
 def cache_models(source, experiments, bin_size_mses, n_stateses,
-                 surrogates='real', library='default', n_jobs=None):
+                 surrogates='real', library='default', n_jobs=None,
+                 verbose=False):
     '''
     Cache HMMs for all combinations of given parameters.
 
@@ -308,48 +311,30 @@ def cache_models(source, experiments, bin_size_mses, n_stateses,
     the complexity now comes from getting a progress bar with a proper
     count of the total of models that need fitted.
     '''
+    if verbose:
+        print('Loading data from', DATA_DIR)
+        print('Caching models computed by method', library, 'to', CACHE_DIR)
+
     argses = source, experiments, bin_size_mses, n_stateses, surrogates
     needs_run = []
     for p in itertools.product(*[np.atleast_1d(x) for x in argses]):
         if get_fitted_hmm(*p, library=library) is None:
             needs_run.append(p)
 
+    if verbose:
+        print(f'Need to re-run for {len(needs_run)} parameter values:')
+        for p in needs_run:
+            print('\t', *p)
+
     if not needs_run:
         return
-    elif n_jobs == 'single':
-        _cache_models(needs_run, library=library)
-    else:
-        _parallel_cache_models(needs_run, library=library, n_jobs=n_jobs)
 
-
-class ProgressParallel(joblib.Parallel):
-    def __init__(self, total=None, *args, **kwargs):
-        self._total = total
-        super().__init__(*args, **kwargs)
-
-    def __call__(self, *args, **kwargs):
-        with tqdm(total=self._total) as self._pbar:
-            return super().__call__(*args, **kwargs)
-
-    def print_progress(self):
-        if self._total is None:
-            self._pbar.total = self.n_dispatched_tasks
-        self._pbar.n = self.n_completed_tasks
-        self._pbar.refresh()
-
-
-def _parallel_cache_models(needs_run, library='default', n_jobs=None):
-    ProgressParallel(n_jobs=n_jobs, total=len(needs_run))(
-        joblib.delayed(get_fitted_hmm)(
-            *p, recompute_ok=True, library=library)
-        for p in needs_run)
-
-
-def _cache_models(needs_run, library='default'):
-    # Turn needs_run into a progress bar, unless it is empty.
-    for p in tqdm(needs_run):
+    # Turn needs_run into a progress bar, but verbose breaks the bar, so
+    # instead just let get_fitted_hmm print the parameters.
+    for p in needs_run if verbose else tqdm(needs_run):
         try:
-            get_fitted_hmm(*p, recompute_ok=True, library=library)
+            get_fitted_hmm(*p, recompute_ok=True, library=library,
+                           verbose=verbose)
         except ZeroDivisionError:
             s, e, bsms, n, surr = p
             surr = '' if surr == 'real' else f'({surr})'
