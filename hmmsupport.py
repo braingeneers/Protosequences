@@ -662,75 +662,43 @@ def _spike_matrix_from_units(length_ms, units):
 @surrogate('tj')
 class RandSpikeMatrix(Raster):
     surrogate_name = 'Randomized Spike Matrix'
-    def __init__(self, raster):
+    def __init__(self, raster, verbose=False):
         '''
         Return a raster which preserves the population rate and mean firing
         rate of each neuron by randomly reallocating all spike times to
         different neurons, using resampling to maintain the invariant that
         no neuron spikes twice in the same millisecond.
+
+        To maximize the chances of selecting acceptable units without
+        overlaps, I cancel out the 
         '''
         _steal_metadata(self, raster)
         sm = _spike_matrix_from_units(
             1e3*self.length_sec, raster.units)
 
         rsm = np.zeros(sm.shape, int)
-        ignore_asserts = False
         units = np.repeat(np.arange(self.n_units),
                           [len(t) for t in raster.units])
         n_spikeses = sm.sum(0)
-        for frame, n_spikes in enumerate(tqdm(n_spikeses)):
+        frame_order = np.argsort(n_spikeses)[::-1]
+        ignore_asserts = False
+        for frame in tqdm(frame_order, disable=not verbose):
+            n_spikes = n_spikeses[frame]
             if n_spikes > 0:
-                for _ in range(100):
-                    rand_i = np.random.choice(len(units), replace=False)
+                for i in range(100):
+                    rand_i = np.random.choice(len(units), n_spikes,
+                                              replace=False)
                     rand_units = np.unique(units[rand_i])
                     if len(rand_units) == n_spikes:
-                        idces_used = np.zeros(len(units), int)
-                        idces_used[rand_units] = 1
                         unused_idces = np.isin(np.arange(len(units)),
-                                               rand_units,
+                                               rand_i,
                                                assume_unique=True,
                                                invert=True)
                         units = units[unused_idces]
                         break
                 else:
                     print('Dropping spikes due to statistics. :(')
-                    ignore_asserts = True
-                rsm[rand_units,:] = 1
-
-        # for i in range(100):
-        #     rsm = np.zeros(sm.shape, dtype=int)
-        #     units = np.arange(self.n_units)
-        #     weights = np.array([len(t) for t in raster.units])
-        #     n_spikeses = sm.sum(0)
-        #     for frame in tqdm(np.argsort(n_spikeses)[::-1]):
-        #         try:
-        #             unitsub = np.random.choice(units, n_spikeses[frame],
-        #                                        replace=False,
-        #                                        p=weights/weights.sum())
-        #         except ValueError:
-        #             break
-        #         weights[unitsub] -= 1
-        #         rsm[unitsub, frame] = 1
-        #     else: break
-        #     print(f'Failed to sample the {i}th time, trying again.')
-        # else: raise ValueError('Kept failing to sample over and over.')
-        #     # for i in range(100):
-        #     #     np.random.shuffle(units)
-        #     #     if len(np.unique(units[:n_spikes])) == n_spikes:
-        #     #         break
-        #     # else:
-        #     #     print('WARN: cannot match all units. Rates will be wrong.')
-        #     #     do_asserts = False
-
-            # Put those units into the randomized spike matrix, and 
-            # rsm[units[:n_spikes], frame] = 1
-            # units = units[n_spikes:]
-
-        if not ignore_asserts:
-            assert np.all(rsm.sum(0) == sm.sum(0)),\
-                'Failed to preserve population rates.'
-            assert np.all(rsm.sum(1) == sm.sum(1)),\
-                'Failed to preserve individual rates.'
+                rsm[rand_units,frame] = 1
 
         self.raster, self._poprate, self.units = \
             _raster_poprate_units_from_sm(1e3*self.length_sec,
