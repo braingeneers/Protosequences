@@ -4,7 +4,6 @@ import scipy.io
 from scipy import stats, signal, sparse, ndimage
 import matplotlib.pyplot as plt
 from contextlib import contextmanager
-import s3fs
 import itertools
 import functools
 import pickle
@@ -14,32 +13,70 @@ import re
 
 try:
     from smart_open import open as _open
+    import boto3
+    boto3.setup_default_session(profile_name='nautilus')
+    client = boto3.Session().client('s3', endpoint_url=os.environ.get(
+        'AWS_ENDPOINT', 'https://s3-west.nrp-nautilus.io'))
+    _open = functools.partial(_open, transport_params=dict(client=client))
 except ImportError:
     from builtins import open as _open
 
 
-memory = None
-
 DATA_DIR = ('data' if os.path.isdir('data') else
             's3://braingeneers/personal/atspaeth/data')
 
-_user = os.environ.get('S3_USER', '')
-if _user:
-    try:
-        from joblibs3 import register_s3fs_store_backend
-        from aiobotocore.session import AioSession
-        register_s3fs_store_backend()
-        session = AioSession(profile='nautilus')
-        memory = joblib.Memory(f'personal/{_user}/joblib-cache',
-                               backend='s3', verbose=100, compress=True,
-                               backend_options=dict(
-                                   session=session, bucket='braingeneers',
-                                   endpoint_url='https://s3-west.nrp-nautilus.io'))
-    except ImportError as e:
-        print('Failed to import S3 access:', e)
+S3_USER = os.environ.get('S3_USER')
+CACHE_IS_LOCAL = S3_USER is None
+CACHE_DIR = ('.cache' if CACHE_IS_LOCAL else
+             f's3://braingeneers/personal/{S3_USER}/cache')
 
-if memory is None:
-    memory = joblib.Memory('.cache', verbose=0)
+
+class Cache:
+    def __init__(self, func):
+        self.wrapped = func
+        functools.update_wrapper(self, func)
+
+    @contextmanager
+    def cache_file(self, mode, source, exp, bin_size_ms, n_states, surrogate):
+        key = f'{source}_{exp}_{bin_size_ms}ms_{n_states}S_{surrogate}.pkl'
+        path = os.path.join(CACHE_DIR, self.__name__, key)
+        if CACHE_IS_LOCAL:
+            directory = os.path.join(CACHE_DIR, self.__name__)
+            if not os.path.isdir(directory):
+                os.mkdir(directory)
+        with _open(path, mode) as f:
+            yield f
+
+    def is_cached(self, source, exp, bin_size_ms, n_states, surrogate):
+        try:
+            with self.cache_file('rb', source, exp, bin_size_ms,
+                                 n_states, surrogate) as f:
+                return True
+        except Exception as e:
+            print('Missing from cache:', e)
+            return False
+
+    def get_cached(self, source, exp, bin_size_ms, n_states, surrogate):
+        try:
+            with self.cache_file('rb', source, exp, bin_size_ms,
+                                 n_states, surrogate) as f:
+                return pickle.load(f)
+        except:
+            return None
+
+    def __call__(self, source, exp, bin_size_ms, n_states, surrogate, **kw):
+        ret = self.get_cached(source, exp, bin_size_ms, n_states, surrogate)
+
+        if ret is None:
+            ret = self.wrapped(source, exp, bin_size_ms, n_states, surrogate, **kw)
+            try:
+                with self.cache_file('wb', source, exp, bin_size_ms,
+                                     n_states, surrogate) as f:
+                    pickle.dump(ret, f)
+            except Exception as e:
+                print('Failed to write to cache. :(', e)
+
+        return ret
 
 
 def figdir(path=None):
@@ -84,7 +121,7 @@ _HMM_METHODS = {}
 try:
     from ssm import HMM as SSMHMM
 
-    @memory.cache(ignore=['verbose'])
+    @Cache
     def _ssm_hmm(source, exp, bin_size_ms, n_states, surrogate,
                  verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
         'Fit an HMM to data with SSM and return the model.'
@@ -108,7 +145,7 @@ try:
     from dynamax.hidden_markov_model import PoissonHMM as DynamaxHMM
     import jax.random as jr
 
-    @memory.cache(ignore=['verbose', 'atol'])
+    @Cache
     def _dynamax_hmm(source, exp, bin_size_ms, n_states, surrogate,
                      verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
         'Fit an HMM to data with Dynamax and return the model.'
@@ -130,7 +167,7 @@ except ImportError:
 try:
     from hmmlearn.hmm import PoissonHMM as HMMLearnHMM
 
-    @memory.cache(ignore=['verbose'])
+    @Cache
     def _hmmlearn_hmm(source, exp, bin_size_ms, n_states, surrogate,
                       verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
         'Fit an HMM to data with HMMLearn and return the model.'
@@ -154,7 +191,7 @@ try:
     from juliacall import Main as jl
     jl.seval('using Pkg; Pkg.activate("NeuroHMM"); using NeuroHMM')
 
-    @memory.cache(ignore=['verbose'])
+    @Cache
     def _hmmbase_hmm(source, exp, bin_size_ms, n_states, surrogate,
                      verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
         'Fit an HMM to data with NeuroHMM and return the model.'
@@ -189,7 +226,7 @@ def get_fitted_hmm(source, exp, bin_size_ms, n_states, surrogate='real',
     params = (np.str_(source), np.str_(exp), np.int64(bin_size_ms),
               np.int64(n_states), np.str_(surrogate))
     method = _HMM_METHODS[library][0]
-    if recompute_ok or method.check_call_in_cache(*params):
+    if recompute_ok or method.is_cached(*params):
         return method(*params)
 
 
