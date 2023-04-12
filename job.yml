@@ -31,6 +31,7 @@ spec:
           - "$HMM_EXPERIMENT"
           - "$HMM_BIN_SIZE_MS"
           - "$HMM_K_RANGE"
+          - "$HMM_SURROGATE"
           - "$HMM_METHOD"
       restartPolicy: Never
       volumes:
