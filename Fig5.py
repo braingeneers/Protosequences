@@ -107,7 +107,7 @@ for exp in good_experiments:
 
 n_states = 16
 r = rasters[experiments[0]][0]
-model = Model(source, experiments[0], bin_size_ms, n_states,
+model = Model(source, experiments[0], bin_size_ms, n_states, 'rsm',
               library=hmm_library)
 h = model.states(r.raster)
 

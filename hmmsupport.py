@@ -301,8 +301,7 @@ class Model:
 
 
 def cache_models(source, experiments, bin_size_mses, n_stateses,
-                 surrogates='real', library='default', n_jobs=None,
-                 verbose=False):
+                 surrogates='real', library='default', verbose=False):
     '''
     Cache HMMs for all combinations of given parameters.
 
@@ -703,7 +702,7 @@ class RandSpikeMatrix(Raster):
             _raster_poprate_units_from_sm(1e3*self.length_sec,
                                           self.bin_size_ms, rsm)
 
-@surrogate('rsm-mine')
+@surrogate('rsm')
 class RandSpikeMatrix2(Raster):
     surrogate_name = 'Randomized Spike Matrix'
     def __init__(self, raster):

@@ -9,8 +9,11 @@ from hmmsupport import cache_models
 if __name__ == '__main__':
     try:
         if len(sys.argv) == 5:
+            sys.argv += ['real']
+        if len(sys.argv) == 6:
             sys.argv += ['ssm']
-        _, source, exp, bin_size_str, nhs_str, method = sys.argv
+        _, source, exp, bin_size_str, nhs_str, surr, method = sys.argv
+
         bin_size_ms = int(bin_size_str)
         nhses = nhs_str.split('-')
         if len(nhses) == 1:
@@ -18,11 +21,12 @@ if __name__ == '__main__':
         else:
             nhsmin, nhsmax = nhses
             n_stateses = np.arange(int(nhsmin), int(nhsmax)+1)
+
     except Exception as e:
         print('Invalid arguments.', e)
         sys.exit(1)
 
-    print(f'Caching HMMs for {source}/{exp} using {bin_size_ms}ms bins')
+    print(f'Caching HMMs for {source}/{exp}[{surr}] '
+          f'using {bin_size_ms}ms bins')
     print('Will use K in', n_stateses)
-    cache_models(source, exp, bin_size_ms, n_stateses, library=method,
-                 verbose=True)
+    cache_models(source, exp, bin_size_ms, n_stateses, surr, method, True)
