@@ -681,7 +681,6 @@ class RandSpikeMatrix(Raster):
                           [len(t) for t in raster.units])
         n_spikeses = sm.sum(0)
         frame_order = np.argsort(n_spikeses)[::-1]
-        ignore_asserts = False
         for frame in tqdm(frame_order, disable=not verbose):
             n_spikes = n_spikeses[frame]
             if n_spikes > 0:
@@ -699,6 +698,36 @@ class RandSpikeMatrix(Raster):
                 else:
                     print('Dropping spikes due to statistics. :(')
                 rsm[rand_units,frame] = 1
+
+        self.raster, self._poprate, self.units = \
+            _raster_poprate_units_from_sm(1e3*self.length_sec,
+                                          self.bin_size_ms, rsm)
+
+@surrogate('rsm-mine')
+class RandSpikeMatrix2(Raster):
+    surrogate_name = 'Randomized Spike Matrix'
+    def __init__(self, raster):
+        _steal_metadata(self, raster)
+        sm = _spike_matrix_from_units(
+            1e3*self.length_sec, raster.units)
+
+        rsm = np.zeros(sm.shape, int)
+        units = np.arange(self.n_units)
+        weights = np.array([len(t) for t in raster.units])
+
+        # Iterate over the frames in order of how many spikes they have,
+        # skipping all the frames with none.
+        n_spikeses = sm.sum(0)
+        frame_order = np.argsort(n_spikeses)[::-1]
+        frame_order = frame_order[n_spikeses[frame_order] != 0]
+
+        for frame in frame_order:
+            n_spikes = n_spikeses[frame]
+            p = weights/weights.sum()
+            rand_units = np.random.choice(units, n_spikes,
+                                          replace=False, p=p)
+            weights[rand_units] -= 1
+            rsm[rand_units,frame] = 1
 
         self.raster, self._poprate, self.units = \
             _raster_poprate_units_from_sm(1e3*self.length_sec,
