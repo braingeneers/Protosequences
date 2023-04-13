@@ -7,6 +7,13 @@ import numpy as np
 from hmmsupport import cache_models
 
 
+def maybe_list(str_str):
+    if ',' in str_str:
+        return str_str.split(',')
+    else:
+        return str_str
+
+
 def parse_range_str(range_str):
     if ',' in range_str:
         return np.array([int(x) for x in range_str.split(',')])
@@ -39,4 +46,5 @@ if __name__ == '__main__':
     print(f'Caching HMMs for {source}/{exp}[{surr}] using `{method}`.')
     print('Will use K in', n_stateses)
     print('Will use T in', bin_sizes)
-    cache_models(source, exp, bin_sizes, n_stateses, surr, method, True)
+    cache_models(source, maybe_list(exp), bin_sizes, n_stateses,
+                 maybe_list(surr), method, True)
