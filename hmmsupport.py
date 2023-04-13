@@ -9,6 +9,7 @@ import pickle
 import joblib
 from tqdm.auto import tqdm
 import re
+import glob
 
 try:
     from smart_open import open as _open
@@ -23,6 +24,16 @@ except ImportError:
 
 DATA_DIR = ('./data' if os.path.isdir('data') else
             's3://braingeneers/personal/atspaeth/data')
+
+def all_experiments(source):
+    if DATA_DIR.startswith('s3://'):
+        bucket, prefix = DATA_DIR[5:].split('/', 1)
+        paths = [x['Key'] for x in client.list_objects(
+            Bucket=bucket, Prefix=prefix+'/'+source)['Contents']]
+    else:
+        paths = glob.glob(os.path.join(DATA_DIR, source, '*'))
+    return [os.path.basename(x).removesuffix('.mat').removesuffix('.zip')
+            for x in paths]
 
 S3_USER = os.environ.get('S3_USER')
 CACHE_IS_LOCAL = S3_USER is None

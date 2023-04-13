@@ -12,7 +12,6 @@ import matplotlib.colors as plc
 import hmmsupport
 from hmmsupport import Raster, figure, figdir, load_raw, cache_models, Model
 from sklearn.decomposition import PCA
-import glob
 import warnings
 from tqdm import tqdm
 import re

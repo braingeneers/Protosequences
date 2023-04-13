@@ -10,7 +10,7 @@ from scipy import stats, signal, sparse, interpolate
 import matplotlib.pyplot as plt
 import matplotlib.colors as plc
 from hmmsupport import Raster, figure, figdir, open, load_raw
-from hmmsupport import cache_models, Model
+from hmmsupport import cache_models, Model, all_experiments
 from sklearn.decomposition import PCA
 import glob
 import warnings
@@ -27,11 +27,8 @@ n_states = [15]
 n_stateses = np.arange(n_states[0], n_states[-1]+1)
 
 source = 'mouse'
-all_experiments = [
-    os.path.basename(f).removesuffix('.mat')
-    for f in glob.glob(f'data/{source}/*.mat')]
 just_rasters = {exp: Raster(bin_size_ms, source, exp)
-                for exp in all_experiments}
+                for exp in all_experiments(source)}
 
 if source == 'mouse':
     exp_age = {
