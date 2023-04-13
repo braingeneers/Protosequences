@@ -17,12 +17,19 @@ import warnings
 from tqdm import tqdm
 import re
 
+
+randomize = False
+surr = 'rsm' if randomize else 'real'
+
 if 'HMM_METHOD' in os.environ:
     hmm_library = os.environ['HMM_METHOD']
     figure_name = 'Fig5 ' + hmm_library
 else:
     hmm_library = 'default'
     figure_name = 'Fig5'
+
+if randomize:
+    figure_name += ' Surrogate'
 
 plt.ion()
 figdir('paper')
@@ -42,17 +49,17 @@ experiments = list(organoids_ages.keys())
 
 
 print('Fitting HMMs.')
-cache_models(source, experiments, bin_size_ms, n_stateses,
+cache_models(source, experiments, bin_size_ms, n_stateses, surr,
              library=hmm_library)
 
 print('Loading fitted HMMs and calculating entropy.')
 with tqdm(total=len(experiments)*len(n_stateses)) as pbar:
     rasters = {}
     for exp in experiments:
-        rasters[exp] = get_raster(source, exp, bin_size_ms), []
+        rasters[exp] = get_raster(source, exp, bin_size_ms, surr), []
         for n in n_stateses:
             rasters[exp][1].append(Model(source, exp, bin_size_ms, n,
-                                         library=hmm_library))
+                                         surr, library=hmm_library))
             pbar.update()
 
 # I can't read the Matlab file perfectly, so instead of TJ's experiment
@@ -107,7 +114,7 @@ for exp in good_experiments:
 
 n_states = 16
 r = rasters[experiments[0]][0]
-model = Model(source, experiments[0], bin_size_ms, n_states, 'rsm',
+model = Model(source, experiments[0], bin_size_ms, n_states, surr,
               library=hmm_library)
 h = model.states(r.raster)
 
@@ -192,7 +199,8 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
 
     # states = [9, 10, 11]   # for the currently saved SSM model
     # states = [8, 9, 10]   # for the currently saved HMMLearn model
-    states = [8, 9, 10]   # for the currently saved HMMBase.jl model
+    # states = [8, 9, 10]   # for the currently saved HMMBase.jl model
+    states = [7, 8, 9]   # for the SSM model trained on surrogate data
     for axS, axH, s in zip(examples, rates, states):
         data = r.raster[h == state_order[s], :][:60, :]
         axS.set_title(f'State {s+1}')

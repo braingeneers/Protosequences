@@ -29,7 +29,7 @@ def all_experiments(source):
     if DATA_DIR.startswith('s3://'):
         bucket, prefix = DATA_DIR[5:].split('/', 1)
         paths = [x['Key'] for x in client.list_objects(
-            Bucket=bucket, Prefix=prefix+'/'+source)['Contents']]
+            Bucket=bucket, Prefix=prefix+'/'+source+'/')['Contents']]
     else:
         paths = glob.glob(os.path.join(DATA_DIR, source, '*'))
     return [os.path.basename(x).removesuffix('.mat').removesuffix('.zip')
@@ -465,6 +465,7 @@ class Raster:
             self.raster, self._poprate, self.units = \
                 _raster_poprate_units_from_sm(sm.shape[1], bin_size_ms, sm)
             self.length_sec = sm.shape[1] / 1000
+            self._burst_default_rms = 6.0
 
         # Tal and TJ's data is organized as units instead, and fs is stored.
         # The actual duration isn't stored, so just assume the recording was
@@ -476,6 +477,7 @@ class Raster:
                 unit.max() for unit in self.units)/1e3)
             self.raster, self._poprate = _raster_poprate_from_units(
                 1e3*self.length_sec, self.bin_size_ms, self.units)
+            self._burst_default_rms = 3.0
 
         self.n_units = len(self.units)
 
@@ -522,18 +524,18 @@ class Raster:
     def get_surrogate(self, which):
         return Raster.surrogates[which](self)
 
-    def average_burst_bounds_ms(self):
+    def average_burst_bounds_ms(self, rms=None):
         "Average peak-relative start and end across all bursts."
-        _, edges = self.find_burst_edges()
+        _, edges = self.find_burst_edges(rms=rms)
         return edges.mean(0)
 
-    def find_burst_edges(self, use_rms=False):
+    def find_burst_edges(self, rms=None):
         "Find the edges of the bursts in units of ms."
         # Find the peaks of the coarse rate.
         r_coarse = self.coarse_rate()
-        peak_size_rms = 3 * np.sqrt(np.mean(r_coarse**2))
-        peak_size_max = 0.5 * r_coarse.max()
-        height = peak_size_rms if use_rms else peak_size_max
+        if rms is None:
+            rms = self._burst_default_rms
+        height = rms * np.sqrt(np.mean(r_coarse**2))
         peaks_ms = signal.find_peaks(r_coarse, height=height,
                                      distance=700)[0]
 
@@ -551,13 +553,13 @@ class Raster:
                 edges[i,1] += 1
         return peaks_ms, edges
 
-    def find_bursts(self, margins=None, use_rms=False):
+    def find_bursts(self, margins=None, rms=None):
         '''
         Find the locations of burst peaks in units of bins, filtered to only
         those with the desired margins.
         '''
         r_fine = self.fine_rate()
-        peaks, edges = self.find_burst_edges(use_rms=use_rms)
+        peaks, edges = self.find_burst_edges(rms=rms)
         peaks = np.array([
             peaks[i] + edges[i,0] + np.argmax(
                 r_fine[peaks[i] + edges[i,0]:peaks[i] + edges[i,1]])
@@ -575,7 +577,8 @@ class Raster:
 
         return peaks
 
-    def observed_state_probs(self, h, burst_margins, n_states=None):
+    def observed_state_probs(self, h, burst_margins, rms=None,
+                             n_states=None):
         '''
         Return a probability distribution of the states in h over time
         relative to each of this Raster's burst peaks. Automatically
@@ -584,7 +587,7 @@ class Raster:
         '''
         if n_states is None:
             n_states = h.max()+1
-        peaks = self.find_bursts(margins=burst_margins)
+        peaks = self.find_bursts(margins=burst_margins, rms=rms)
         lmargin, rmargin = burst_margins
         state_prob = np.zeros((n_states, rmargin-lmargin+1))
 
