@@ -68,8 +68,6 @@ scaf_units = load_raw('scaf', 'scaf_unit_numbers')
 scaf_unit_counts = [scaf_units['scaf_units'][0,i].shape[0]
                     + scaf_units['non_scaf_units'][0,i].shape[0]
                     for i in range(4)]
-experiment_idces = {e: scaf_unit_counts.index(rasters[e][0].n_units)
-                    for e in experiments}
 organoid_names = {e: re.search('_\d\d\d\d_', e).group(0)[1:-1]
                   for e in experiments}
 scafs = {e: load_raw('scaf', f'{n}_cos_sim')['scaf_window'][0,:]/1e3
@@ -112,7 +110,7 @@ for exp in good_experiments:
 
 # %%
 
-n_states = 16
+n_states = 15
 r = rasters[experiments[0]][0]
 model = Model(source, experiments[0], bin_size_ms, n_states, surr,
               library=hmm_library)
@@ -197,10 +195,8 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
     A.set_ylabel('Neuron Unit ID')
     A.set_yticks([1, rsub.shape[1]])
 
-    # states = [9, 10, 11]   # for the currently saved SSM model
-    # states = [8, 9, 10]   # for the currently saved HMMLearn model
-    # states = [8, 9, 10]   # for the currently saved HMMBase.jl model
-    states = [7, 8, 9]   # for the SSM model trained on surrogate data
+    states = [8, 9, 10]   # for the currently saved SSM model
+    # states = [7, 8, 9]   # for the SSM model trained on surrogate data
     for axS, axH, s in zip(examples, rates, states):
         data = r.raster[h == state_order[s], :][:60, :]
         axS.set_title(f'State {s+1}')

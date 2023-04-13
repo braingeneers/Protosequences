@@ -434,8 +434,10 @@ def _raster_poprate_units_from_sm(length_ms, bin_size_ms, sm):
 
 
 @functools.lru_cache
-def get_raster(source, experiment, bin_size_ms, surrogate='real'):
-    return Raster(source, experiment, bin_size_ms).get_surrogate(surrogate)
+def get_raster(source, experiment, bin_size_ms, surrogate=None):
+    if surrogate is None:
+        return Raster(source, experiment, bin_size_ms)
+    return get_raster(source, experiment, bin_size_ms).get_surrogate(surrogate)
 
 
 class Raster:
@@ -620,6 +622,7 @@ def _steal_metadata(dest, src, add_to_tag=None):
     dest.experiment = src.experiment
     dest.length_sec = src.length_sec
     dest.n_units = src.n_units
+    dest._burst_default_rms = src._burst_default_rms
     if add_to_tag is None:
         dest.tag = src.tag
     else:
