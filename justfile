@@ -30,7 +30,9 @@ deploy src exp bin_size ks surrogate="real" method="default":
         stamp=$(printf '%(%m%d%H%M%S)T\n' -1)
         export JOB_NAME="atspaeth-hmms-{{src}}-$exp-$stamp"
         envsubst < job.yml | kubectl apply -f -
-        kubectl label job $JOB_NAME user=atspaeth app=organoid-hmm data-source=$HMM_DATA_SOURCE surrogate=$HMM_SURROGATE method=$HMM_METHOD
+        kubectl label job $JOB_NAME user=atspaeth app=organoid-hmm \
+            data-source=$HMM_DATA_SOURCE surrogate=$HMM_SURROGATE \
+            hmm-method=$HMM_METHOD
     fi
 
 local src exp bin_size ks surrogate="real" method="default":

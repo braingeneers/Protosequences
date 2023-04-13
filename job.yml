@@ -12,6 +12,8 @@ spec:
         env:
           - name: S3_USER
             value: atspaeth
+          - name: AWS_ENDPOINT
+            value: http://rook-ceph-rgw-nautiluss3.rook
         imagePullPolicy: Always
         volumeMounts:
           - mountPath: /root/.aws
