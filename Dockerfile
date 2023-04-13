@@ -18,5 +18,4 @@ COPY NeuroHMM/src NeuroHMM/src
 COPY *.py .
 
 # Define the variables used by the scripts.
-ENV AWS_PROFILE nautilus
 ENV AWS_ENDPOINT https://s3-west.nrp-nautilus.io

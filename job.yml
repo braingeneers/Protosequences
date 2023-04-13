@@ -17,7 +17,7 @@ spec:
         imagePullPolicy: Always
         volumeMounts:
           - mountPath: /root/.aws
-            name: prp-s3-credential
+            name: s3-credentials
         resources:
           requests:
             cpu: 1
@@ -37,6 +37,6 @@ spec:
           - "$HMM_METHOD"
       restartPolicy: Never
       volumes:
-        - name: prp-s3-credential
+        - name: s3-credentials
           secret:
-            secretName: prp-s3-credential
+            secretName: prp-s3-credentials

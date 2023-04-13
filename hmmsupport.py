@@ -14,7 +14,7 @@ import glob
 try:
     from smart_open import open as _open
     import boto3
-    boto3.setup_default_session(profile_name='nautilus')
+    boto3.setup_default_session()
     client = boto3.Session().client('s3', endpoint_url=os.environ.get(
         'AWS_ENDPOINT', 'https://s3-west.nrp-nautilus.io'))
     _open = functools.partial(_open, transport_params=dict(client=client))
