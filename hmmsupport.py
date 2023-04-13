@@ -325,16 +325,19 @@ def cache_models(source, experiments, bin_size_mses, n_stateses,
         print('Loading data from', DATA_DIR)
         print('Caching models computed by method', library, 'to', CACHE_DIR)
 
-    argses = source, experiments, bin_size_mses, n_stateses, surrogates
+    argses = experiments, bin_size_mses, n_stateses, surrogates
     needs_run = []
     for p in itertools.product(*[np.atleast_1d(x) for x in argses]):
-        if get_fitted_hmm(*p, library=library) is None:
+        if get_fitted_hmm(source, *p, library=library) is None:
             needs_run.append(p)
 
     if verbose:
-        print(f'Need to re-run for {len(needs_run)} parameter values:')
-        for p in needs_run:
-            print('\t', *p)
+        if needs_run:
+            print(f'Need to re-run for {len(needs_run)} parameter values:')
+            for p in needs_run:
+                print('\t', *p)
+        else:
+            print('All models already cached.')
 
     if not needs_run:
         return
@@ -343,12 +346,12 @@ def cache_models(source, experiments, bin_size_mses, n_stateses,
     # instead just let get_fitted_hmm print the parameters.
     for p in needs_run if verbose else tqdm(needs_run):
         try:
-            get_fitted_hmm(*p, recompute_ok=True, library=library,
-                           verbose=verbose)
+            get_fitted_hmm(source, *p, recompute_ok=True,
+                           library=library, verbose=verbose)
         except ZeroDivisionError:
-            s, e, bsms, n, surr = p
-            surr = '' if surr == 'real' else f'({surr})'
-            print(f'Failed to fit hmm to {s}:{e}{surr} with T={bsms}ms, K={n}.')
+            e, bsms, n, surr = p
+            print(f'Failed to fit hmm to {source}/{e}[{surr}] '
+                  f'with T={bsms}ms, K={n}.')
 
 
 @contextmanager
