@@ -6,6 +6,21 @@ import sys
 import numpy as np
 from hmmsupport import cache_models
 
+
+def parse_range_str(range_str):
+    if ',' in range_str:
+        return np.array([int(x) for x in range_str.split(',')])
+    elif ':' in range_str:
+        parts = range_str.split(':', 2)
+        step = int(parts[2]) if len(parts) == 3 else None
+        return np.arange(int(parts[0]), int(parts[1])+1, step)
+    elif '-' in range_str:
+        start, end = range_str.split('-')
+        return np.arange(int(start), int(end)+1)
+    else:
+        return np.array([int(range_str)])
+
+
 if __name__ == '__main__':
     try:
         if len(sys.argv) == 5:
@@ -14,19 +29,14 @@ if __name__ == '__main__':
             sys.argv += ['ssm']
         _, source, exp, bin_size_str, nhs_str, surr, method = sys.argv
 
-        bin_size_ms = int(bin_size_str)
-        nhses = nhs_str.split('-')
-        if len(nhses) == 1:
-            n_stateses = [int(nhses[0])]
-        else:
-            nhsmin, nhsmax = nhses
-            n_stateses = np.arange(int(nhsmin), int(nhsmax)+1)
+        bin_sizes = parse_range_str(bin_size_str)
+        n_stateses = parse_range_str(nhs_str)
 
     except Exception as e:
         print('Invalid arguments.', e)
         sys.exit(1)
 
-    print(f'Caching HMMs for {source}/{exp}[{surr}] '
-          f'using {bin_size_ms}ms bins')
+    print(f'Caching HMMs for {source}/{exp}[{surr}] using `{method}`.')
     print('Will use K in', n_stateses)
-    cache_models(source, exp, bin_size_ms, n_stateses, surr, method, True)
+    print('Will use T in', bin_sizes)
+    cache_models(source, exp, bin_sizes, n_stateses, surr, method, True)
