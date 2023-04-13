@@ -29,7 +29,7 @@ def all_experiments(source):
     if DATA_DIR.startswith('s3://'):
         bucket, prefix = DATA_DIR[5:].split('/', 1)
         paths = [x['Key'] for x in client.list_objects(
-            Bucket=bucket, Prefix=prefix+'/'+source)['Contents']]
+            Bucket=bucket, Prefix=prefix+'/'+source+'/')['Contents']]
     else:
         paths = glob.glob(os.path.join(DATA_DIR, source, '*'))
     return [os.path.basename(x).removesuffix('.mat').removesuffix('.zip')
