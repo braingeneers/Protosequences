@@ -10,7 +10,8 @@ from scipy import stats, signal, sparse, interpolate
 import matplotlib.pyplot as plt
 import matplotlib.colors as plc
 import hmmsupport
-from hmmsupport import Raster, figure, figdir, load_raw, cache_models, Model
+from hmmsupport import get_raster, figure, figdir, load_raw
+from hmmsupport import cache_models, Model
 from sklearn.decomposition import PCA
 import warnings
 from tqdm import tqdm
@@ -48,7 +49,7 @@ print('Loading fitted HMMs and calculating entropy.')
 with tqdm(total=len(experiments)*len(n_stateses)) as pbar:
     rasters = {}
     for exp in experiments:
-        rasters[exp] = Raster(bin_size_ms, source, exp), []
+        rasters[exp] = get_raster(source, exp, bin_size_ms), []
         for n in n_stateses:
             rasters[exp][1].append(Model(source, exp, bin_size_ms, n,
                                          library=hmm_library))

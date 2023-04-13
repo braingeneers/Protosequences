@@ -134,7 +134,7 @@ try:
     def _ssm_hmm(source, exp, bin_size_ms, n_states, surrogate,
                  verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
         'Fit an HMM to data with SSM and return the model.'
-        r = get_raster(bin_size_ms, source, exp, surrogate)
+        r = get_raster(source, exp, bin_size_ms, surrogate)
         hmm = SSMHMM(K=n_states, D=r.raster.shape[1],
                      observations='poisson')
         hmm.fit(r.raster, verbose=2 if verbose else 0,
@@ -158,7 +158,7 @@ try:
     def _dynamax_hmm(source, exp, bin_size_ms, n_states, surrogate,
                      verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
         'Fit an HMM to data with Dynamax and return the model.'
-        r = get_raster(bin_size_ms, source, exp, surrogate)
+        r = get_raster(source, exp, bin_size_ms, surrogate)
         hmm = DynamaxHMM(num_states=n_states, emission_dim=r.raster.shape[1])
         hmm.params, props = hmm.initialize(jr.PRNGKey(np.random.randint(2**32)))
         hmm.params, lls = hmm.fit_em(hmm.params, props, r.raster,
@@ -180,7 +180,7 @@ try:
     def _hmmlearn_hmm(source, exp, bin_size_ms, n_states, surrogate,
                       verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
         'Fit an HMM to data with HMMLearn and return the model.'
-        r = get_raster(bin_size_ms, source, exp, surrogate)
+        r = get_raster(source, exp, bin_size_ms, surrogate)
         hmm = HMMLearnHMM(n_components=n_states, verbose=False,
                           n_iter=n_iter, tol=atol)
         hmm.fit(r.raster)
@@ -204,7 +204,7 @@ try:
     def _hmmbase_hmm(source, exp, bin_size_ms, n_states, surrogate,
                      verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
         'Fit an HMM to data with NeuroHMM and return the model.'
-        r = get_raster(bin_size_ms, source, exp, surrogate)
+        r = get_raster(source, exp, bin_size_ms, surrogate)
         display = jl.Symbol('iter' if verbose else 'none')
         hmm, _ = jl.NeuroHMM.fit_hmm(n_states, r.raster, tol=atol,
                                      maxiter=n_iter, display=display)
@@ -248,7 +248,7 @@ class Model:
         # Get all the (hopefully cached) heavy computations.
         self._hmm = get_fitted_hmm(source, exp, bin_size_ms, n_states,
                                    surrogate, library=library)
-        self.r = get_raster(bin_size_ms, source, exp, surrogate)
+        self.r = get_raster(source, exp, bin_size_ms, surrogate)
 
         # Save metadata.
         self.source = source
@@ -434,15 +434,15 @@ def _raster_poprate_units_from_sm(length_ms, bin_size_ms, sm):
 
 
 @functools.lru_cache
-def get_raster(bin_size_ms, source, experiment, surrogate='real'):
-    return Raster(bin_size_ms, source, experiment).get_surrogate(surrogate)
+def get_raster(source, experiment, bin_size_ms, surrogate='real'):
+    return Raster(source, experiment, bin_size_ms).get_surrogate(surrogate)
 
 
 class Raster:
     surrogates: dict[str, type] = {}
     surrogate_name = 'Real Data'
 
-    def __init__(self, bin_size_ms, source, experiment):
+    def __init__(self, source, experiment, bin_size_ms):
         self.bin_size_ms = bin_size_ms
         self.source = source
         self.experiment = experiment
