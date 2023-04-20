@@ -11,6 +11,7 @@ from tqdm.auto import tqdm
 import re
 import glob
 
+
 try:
     from smart_open import open as _open
     import boto3
@@ -35,9 +36,9 @@ def all_experiments(source):
     return [os.path.basename(x).removesuffix('.mat').removesuffix('.zip')
             for x in paths]
 
+
 S3_USER = os.environ.get('S3_USER')
-CACHE_IS_LOCAL = S3_USER is None
-CACHE_DIR = ('./.cache' if CACHE_IS_LOCAL else
+CACHE_DIR = ('./.cache' if S3_USER is None else
              f's3://braingeneers/personal/{S3_USER}/cache')
 
 
@@ -52,9 +53,10 @@ class Cache:
 
     @contextmanager
     def cache_file(self, mode, source, exp, bin_size_ms, n_states, surrogate):
-        path = os.path.join(CACHE_DIR, self.__name__, key)
+        path = self.cache_filename(source, exp, bin_size_ms, n_states,
+                                   surrogate)
         if CACHE_IS_LOCAL:
-            directory = os.path.join(CACHE_DIR, self.__name__)
+            directory = os.path.dirname(path)
             if not os.path.isdir(directory):
                 os.mkdir(directory)
         with _open(path, mode) as f:

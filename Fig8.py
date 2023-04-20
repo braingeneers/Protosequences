@@ -19,7 +19,7 @@ import joblib
 
 randomize = False
 surr = 'rsm' if randomize else 'real'
-age_subset = None
+age_subset = {10}
 
 if 'HMM_METHOD' in os.environ:
     hmm_library = os.environ['HMM_METHOD']
@@ -63,7 +63,7 @@ cache_models(source, experiments, bin_size_ms, n_stateses, surr,
 print('Loading fitted HMMs and calculating entropy.')
 rasters = {
     exp: (get_raster(source, exp, bin_size_ms, surr),
-          joblib.Parallel(n_jobs=24)(
+          joblib.Parallel(n_jobs=12)(
               joblib.delayed(Model)(source, exp, bin_size_ms, n,
                                     library=hmm_library)
               for n in n_stateses))
