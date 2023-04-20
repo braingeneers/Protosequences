@@ -46,9 +46,12 @@ class Cache:
         self.wrapped = func
         functools.update_wrapper(self, func)
 
+    def cache_filename(self, source, exp, bin_size_ms, n_states, surrogate):
+        key = f'{source}_{exp}_{bin_size_ms}ms_{n_states}S_{surrogate}.pkl'
+        return os.path.join(CACHE_DIR, self.__name__, key)
+
     @contextmanager
     def cache_file(self, mode, source, exp, bin_size_ms, n_states, surrogate):
-        key = f'{source}_{exp}_{bin_size_ms}ms_{n_states}S_{surrogate}.pkl'
         path = os.path.join(CACHE_DIR, self.__name__, key)
         if CACHE_IS_LOCAL:
             directory = os.path.join(CACHE_DIR, self.__name__)
@@ -58,12 +61,16 @@ class Cache:
             yield f
 
     def is_cached(self, source, exp, bin_size_ms, n_states, surrogate):
-        try:
-            with self.cache_file('rb', source, exp, bin_size_ms,
-                                 n_states, surrogate) as f:
+        item = self.cache_filename(source, exp, bin_size_ms, n_states, surrogate)
+        if item.startswith('s3://'):
+            bucket, key = item[5:].split('/', 1)
+            try:
+                client.head_object(Bucket=bucket, Key=key)
                 return True
-        except Exception:
-            return False
+            except:
+                return False
+        else:
+            return os.path.isfile(item)
 
     def get_cached(self, source, exp, bin_size_ms, n_states, surrogate):
         try:
@@ -328,7 +335,7 @@ def cache_models(source, experiments, bin_size_mses, n_stateses,
     argses = experiments, bin_size_mses, n_stateses, surrogates
     needs_run = []
     for p in itertools.product(*[np.atleast_1d(x) for x in argses]):
-        if get_fitted_hmm(source, *p, library=library) is None:
+        if not _HMM_METHODS[library][0].is_cached(source, *p):
             needs_run.append(p)
 
     if verbose:
