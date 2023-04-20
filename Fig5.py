@@ -1,7 +1,5 @@
-#  Entropy.py
-#
-# Train the HMM for a collection of conditions and plot their entropy graphs
-# on the same axes for comparison.
+#  Fig5.py
+# Generate most of figure 5 of the final manuscript.
 import os
 import sys
 import numpy as np

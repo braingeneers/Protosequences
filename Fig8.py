@@ -1,8 +1,6 @@
 # Fig8.py
-# Gives the performance of HMMs on mouse data instead of organoids.
+# Generate my part of figure 8 of the final manuscript.
 import os
-os.environ['OMP_NUM_THREADS'] = '1'
-os.environ['OPENBLAS_NUM_THREADS'] = '1'
 import sys
 import numpy as np
 import scipy.io
@@ -16,50 +14,60 @@ import glob
 import warnings
 from tqdm import tqdm
 import re
+import joblib
 
-hmm_library = 'default'
+
+randomize = False
+surr = 'rsm' if randomize else 'real'
+age_subset = None
+
+if 'HMM_METHOD' in os.environ:
+    hmm_library = os.environ['HMM_METHOD']
+    figure_name = 'Fig8 ' + hmm_library
+else:
+    hmm_library = 'default'
+    figure_name = 'Fig8'
+
+if randomize:
+    figure_name += ' Surrogate'
 
 plt.ion()
 figdir('paper')
 
-bin_size_ms = 50
-n_states = [15]
+bin_size_ms = 30
+n_states = 10, 50
 n_stateses = np.arange(n_states[0], n_states[-1]+1)
 
 source = 'mouse'
-just_rasters = {exp: get_raster(source, exp, bin_size_ms)
-                for exp in all_experiments(source)}
+experiments = all_experiments(source)
 
 if source == 'mouse':
-    exp_age = {
-        exp: r.mat['SUA'][0,0]['age'][0,0]
-        for exp,r in just_rasters.items()
-    }
+    exp_age = {exp: load_raw(source, exp)['SUA'][0,0]['age'][0,0]
+               for exp in experiments}
     def mouse_name(exp):
         return exp.split('-')[0]
 elif source == 'adult-mouse':
-    exp_age = {exp: int(exp[7:9]) for exp in just_rasters}
+    exp_age = {exp: int(exp[7:9]) for exp in experiments}
     def mouse_name(exp):
         return exp.split('[')[0][10:]
-age_exp = {age: [exp for exp in just_rasters if exp_age[exp] == age]
-             for age in exp_age.values()}
 
 # Choose a subset of the experiments.
-experiments = age_exp[10]
+if age_subset is not None:
+    experiments = [exp for exp in experiments
+                   if exp_age[exp] in age_subset]
 
 print('Fitting HMMs.')
-cache_models(source, experiments, bin_size_ms, n_stateses,
-             library=hmm_library, n_jobs=12)
+cache_models(source, experiments, bin_size_ms, n_stateses, surr,
+             library=hmm_library)
 
 print('Loading fitted HMMs and calculating entropy.')
-with tqdm(total=len(experiments)*len(n_stateses)) as pbar:
-    rasters = {}
-    for exp in experiments:
-        rasters[exp] = get_raster(source, exp, bin_size_ms), []
-        for n in n_stateses:
-            rasters[exp][1].append(Model(source, exp, bin_size_ms, n,
-                                         library=hmm_library))
-            pbar.update()
+rasters = {
+    exp: (get_raster(source, exp, bin_size_ms, surr),
+          joblib.Parallel(n_jobs=24)(
+              joblib.delayed(Model)(source, exp, bin_size_ms, n,
+                                    library=hmm_library)
+              for n in n_stateses))
+    for exp in tqdm(experiments)}
 
 mice = {}
 for exp in rasters:
