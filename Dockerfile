@@ -13,6 +13,9 @@ COPY NeuroHMM/Manifest.toml NeuroHMM/Manifest.toml
 COPY NeuroHMM/Project.toml NeuroHMM/Project.toml
 RUN python -c "from juliacall import Main as jl; jl.seval('using Pkg'); jl.Pkg.activate('NeuroHMM'); jl.Pkg.instantiate()"
 
+# We use braingeneers.analysis in hmmsupport.
+RUN pip install "git+https://github.com/braingeneers/braingeneerspy#egg=braingeneerspy[analysis]"
+
 # Now copy over the actual source files.
 COPY NeuroHMM/src NeuroHMM/src
 COPY *.py .
