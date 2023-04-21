@@ -26,13 +26,18 @@ deploy src exp bin_size ks surrogate="real" method="default":
         done
 
     else
-        exp=$(echo {{exp}} | tr _[:upper:] -[:lower:])
+        function cleanup_name() {
+            echo "$1" | tr '_[:upper:]\,' '-[:lower:].'
+        }
+        exp=$(cleanup_name $HMM_EXPERIMENT)
+        surr=$(cleanup_name $HMM_SURROGATE)
+        src=$(cleanup_name $HMM_DATA_SOURCE)
         stamp=$(printf '%(%m%d%H%M%S)T\n' -1)
-        export JOB_NAME="atspaeth-hmms-{{src}}-$exp-$stamp"
-        envsubst < job.yml | kubectl apply -f -
+        export JOB_NAME=atspaeth-hmms-$stamp-$src
+        envsubst < job.yml | kubectl apply -f - || exit 1
         kubectl label job $JOB_NAME user=atspaeth app=organoid-hmm \
-            data-source=$HMM_DATA_SOURCE surrogate=$HMM_SURROGATE \
-            hmm-method=$HMM_METHOD
+            data-source=$src surrogate=$surr \
+            hmm-method=$method experiment=$exp
     fi
 
 local src exp bin_size ks surrogate="real" method="default":
