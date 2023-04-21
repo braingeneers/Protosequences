@@ -26,18 +26,46 @@ client = boto3.Session().client('s3', endpoint_url=os.environ.get(
 _open = functools.partial(_open, transport_params=dict(client=client))
 
 
-DATA_DIR = ('./data' if os.path.isdir('data') else
-            's3://braingeneers/personal/atspaeth/data')
+def s3_list_objects(path):
+    bucket, prefix = path.removeprefix('s3://').split('/', 1)
+    if not prefix.endswith('/'):
+        prefix += '/'
+    return client.list_objects(Bucket=bucket, Prefix=prefix)
+
+
+def s3_isdir(path):
+    return 'Contents' in s3_list_objects(path)
+
+
+DATA_DIR = './data'
+
+
+@functools.lru_cache
+def data_dir(source):
+    path = os.path.join(DATA_DIR, source)
+    if os.path.isdir(path):
+        return path
+    elif path.startswith('s3://') and s3_isdir(path):
+        return path
+
+    personal_s3 = 's3://braingeneers/personal/atspaeth/data/' + source
+    if s3_isdir(personal_s3):
+        return personal_s3
+
+    main_s3 = f's3://braingeneers/ephys/{source}/derived/kilosort2'
+    if s3_isdir(main_s3):
+        return main_s3
+
+    raise FileNotFoundError(f'Could not find data for {source}')
+
 
 def all_experiments(source):
-    if DATA_DIR.startswith('s3://'):
-        bucket, prefix = DATA_DIR[5:].split('/', 1)
-        paths = [x['Key'] for x in client.list_objects(
-            Bucket=bucket, Prefix=prefix+'/'+source+'/')['Contents']]
+    path = data_dir(source)
+    if path.startswith('s3://'):
+        paths = [x['Key'] for x in s3_list_objects(path)['Contents']]
     else:
-        paths = glob.glob(os.path.join(DATA_DIR, source, '*'))
-    return [os.path.basename(x).removesuffix('.mat').removesuffix('.zip')
-            for x in paths]
+        paths = glob.glob(os.path.join(path, '*'))
+    return [os.path.splitext(os.path.basename(x))[0] for x in paths]
 
 
 S3_USER = os.environ.get('S3_USER')
@@ -320,7 +348,7 @@ def cache_models(source, experiments, bin_size_mses, n_stateses,
     count of the total of models that need fitted.
     '''
     if verbose:
-        print('Loading data from', DATA_DIR)
+        print('Loading data from', data_dir(source))
         print('Caching models computed by method', library, 'to', CACHE_DIR)
 
     argses = experiments, bin_size_mses, n_stateses, surrogates
@@ -375,9 +403,7 @@ def figure(name, save_args={}, save_exts=['png'], **kwargs):
 
 def load_raw(source, experiment):
     'Load raw data from a file.'
-    path = os.path.join(DATA_DIR, source,
-                        experiment.removesuffix('.mat') + '.mat')
-    with _open(path, 'rb') as f:
+    with _open(data_dir(source) + '/' + experiment, 'rb') as f:
         return scipy.io.loadmat(f)
 
 
@@ -488,15 +514,15 @@ class Raster:
         # zips. This can't work if the data is in a mat format, though.
         except (OSError, FileNotFoundError):
             try:
-                self.sd = read_phy_files(
-                    os.path.join(DATA_DIR, source, experiment + '.zip'))
-                if sl:
-                    self.sd = self.sd[sl]
-            except AssertionError:
+                sd = read_phy_files(f'{data_dir(source)}/{experiment}.zip')
+            except AssertionError as e:
                 raise FileNotFoundError(
-                    f'No data found for {source} {experiment}') from None
-            self.data = self.sd.raster(bin_size_ms).T
-            self.length_sec = self.sd.length / 1000
+                    f'Failed to load {source} {experiment}: {e}') from None
+            self.units = sd.train
+            self.length_sec = sd.length / 1000
+            self.raster = sd.raster(bin_size_ms).T
+            self._poprate = sd.binned(1)
+            self._burst_default_rms = None
 
         self.n_units = len(self.units)
 
@@ -539,6 +565,8 @@ class Raster:
         r_coarse = self.coarse_rate()
         if rms is None:
             rms = self._burst_default_rms
+            if self._burst_default_rms is None:
+                raise ValueError('No default rms value set for this data.')
         height = rms * np.sqrt(np.mean(r_coarse**2))
         peaks_ms = signal.find_peaks(r_coarse, height=height,
                                      distance=700)[0]
