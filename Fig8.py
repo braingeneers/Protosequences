@@ -19,7 +19,7 @@ import joblib
 
 randomize = False
 surr = 'rsm' if randomize else 'real'
-age_subset = {10}
+age_subset = None
 
 if 'HMM_METHOD' in os.environ:
     hmm_library = os.environ['HMM_METHOD']
@@ -67,6 +67,7 @@ for exp in tqdm(experiments):
     def process_model(n):
         m = Model(source, exp, bin_size_ms, n, surr, library=hmm_library)
         m.compute_entropy(r)
+        return m
     models = joblib.Parallel(n_jobs=12)(
         joblib.delayed(process_model)(n)
         for n in n_stateses)
@@ -110,17 +111,20 @@ for exp in good_experiments:
 n_states = 15
 base_exp = '497-3'
 r = rasters[base_exp][0]
-model = Model(source, base_exp, bin_size_ms, n_states, library=hmm_library)
+model = rasters[base_exp][1][np.where(n_stateses == n_states)[0][0]]
+h = model.states(r)
 burst_margins = lmargin_h, rmargin_h = -10, 20
 peaks = r.find_bursts(margins=burst_margins)
-state_prob = r.observed_state_probs(model.h, burst_margins=burst_margins)
+state_prob = r.observed_state_probs(h, burst_margins=burst_margins)
 state_order = np.argsort(np.argmax(state_prob, axis=1))
 lmargin, rmargin = model.burst_margins
+
+mat = load_raw(source, base_exp)
 
 with figure('Fig8', figsize=(8.5, 8.5)) as f:
 
     # Subfigure A: example burst rasters.
-    idces, times_ms = np.nonzero(r.mat['spike_matrix'])
+    idces, times_ms = np.nonzero(mat['SUA'][0,0]['spike_matrix'])
     axes = f.subplots(
         1, 3, gridspec_kw=dict(wspace=0.1,
                                top=0.995, bottom=0.82,
@@ -131,7 +135,7 @@ with figure('Fig8', figsize=(8.5, 8.5)) as f:
         peak = int(round(peak_float))
         when = slice(peak+lmargin_h, peak+rmargin_h+1)
         rsub = r.raster[when, :] / bin_size_ms
-        hsub = np.array([np.nonzero(state_order == s)[0][0] for s in model.h[when]])
+        hsub = np.array([np.nonzero(state_order == s)[0][0] for s in h[when]])
         t_sec = (np.ogrid[when] - peak) * bin_size_ms / 1000
         ax.imshow(hsub.reshape((1,-1)), cmap='gist_rainbow',
                   aspect='auto', alpha=0.3, vmin=0, vmax=n_states-1,
@@ -192,7 +196,7 @@ with figure('Fig8', figsize=(8.5, 8.5)) as f:
 
     states = np.subtract([8, 10, 11], 1)
     for axS, axH, s in zip(examples, rates, states):
-        data = r.raster[model.h == state_order[s], :][:60, :]
+        data = r.raster[h == state_order[s], :][:60, :]
         axS.set_title(f'State {s+1}')
         axS.imshow(data.T, aspect='auto', interpolation='none',
                    extent=[0, 1, r.raster.shape[1]+0.5, 0.5])
@@ -202,8 +206,8 @@ with figure('Fig8', figsize=(8.5, 8.5)) as f:
                  alpha=0.3)
 
     for ax, s0, s1 in zip(deltas, states[:-1], states[1:]):
-        mu0 = r.raster[model.h == state_order[s0], :].mean(0)
-        mu1 = r.raster[model.h == state_order[s1], :].mean(0)
+        mu0 = r.raster[h == state_order[s0], :].mean(0)
+        mu1 = r.raster[h == state_order[s1], :].mean(0)
         delta = mu1 - mu0
         ax.plot(delta, np.arange(r.raster.shape[1])+1,
                 c='C3', alpha=0.3)
