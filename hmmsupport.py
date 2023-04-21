@@ -55,7 +55,7 @@ class Cache:
     def cache_file(self, mode, source, exp, bin_size_ms, n_states, surrogate):
         path = self.cache_filename(source, exp, bin_size_ms, n_states,
                                    surrogate)
-        if CACHE_IS_LOCAL:
+        if not path.startswith('s3://'):
             directory = os.path.dirname(path)
             if not os.path.isdir(directory):
                 os.mkdir(directory)
@@ -69,7 +69,7 @@ class Cache:
             try:
                 client.head_object(Bucket=bucket, Key=key)
                 return True
-            except:
+            except Exception as e:
                 return False
         else:
             return os.path.isfile(item)
@@ -79,7 +79,7 @@ class Cache:
             with self.cache_file('rb', source, exp, bin_size_ms,
                                  n_states, surrogate) as f:
                 return pickle.load(f)
-        except:
+        except Exception as e:
             return None
 
     def __call__(self, source, exp, bin_size_ms, n_states, surrogate, **kw):

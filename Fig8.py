@@ -65,7 +65,7 @@ rasters = {
     exp: (get_raster(source, exp, bin_size_ms, surr),
           joblib.Parallel(n_jobs=12)(
               joblib.delayed(Model)(source, exp, bin_size_ms, n,
-                                    library=hmm_library)
+                                    surr, library=hmm_library)
               for n in n_stateses))
     for exp in tqdm(experiments)}
 
