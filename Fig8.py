@@ -61,13 +61,16 @@ cache_models(source, experiments, bin_size_ms, n_stateses, surr,
              library=hmm_library)
 
 print('Loading fitted HMMs and calculating entropy.')
-rasters = {
-    exp: (get_raster(source, exp, bin_size_ms, surr),
-          joblib.Parallel(n_jobs=12)(
-              joblib.delayed(Model)(source, exp, bin_size_ms, n,
-                                    surr, library=hmm_library)
-              for n in n_stateses))
-    for exp in tqdm(experiments)}
+rasters = {}
+for exp in tqdm(experiments):
+    r = get_raster(source, exp, bin_size_ms, surr)
+    def process_model(n):
+        m = Model(source, exp, bin_size_ms, n, surr, library=hmm_library)
+        m.compute_entropy(r)
+    models = joblib.Parallel(n_jobs=12)(
+        joblib.delayed(process_model)(n)
+        for n in n_stateses)
+    rasters[exp] = r, models
 
 mice = {}
 for exp in rasters:

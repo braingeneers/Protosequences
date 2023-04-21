@@ -243,8 +243,7 @@ def get_fitted_hmm(source, exp, bin_size_ms, n_states, surrogate='real',
                    recompute_ok=False, library='default', verbose=False):
     if verbose:
         print(f'Running {source}/{exp}:{bin_size_ms}ms, K={n_states}')
-    params = (np.str_(source), np.str_(exp), np.int64(bin_size_ms),
-              np.int64(n_states), np.str_(surrogate))
+    params = source, exp, bin_size_ms, n_states, surrogate
     method = _HMM_METHODS[library][0]
     if recompute_ok or method.is_cached(*params):
         return method(*params, verbose=verbose)
@@ -254,10 +253,11 @@ class Model:
     def __init__(self, source, exp, bin_size_ms, n_states,
                  surrogate='real', lmargin_sec=-1.0, rmargin_sec=1.0,
                  library='default'):
-        # Get all the (hopefully cached) heavy computations.
+
+        # Retrieve the (hopefully cached) model.
         self._hmm = get_fitted_hmm(source, exp, bin_size_ms, n_states,
-                                   surrogate, library=library)
-        self.r = get_raster(source, exp, bin_size_ms, surrogate)
+                                   surrogate, library=library,
+                                   recompute_ok=True)
 
         # Save metadata.
         self.source = source
@@ -267,32 +267,18 @@ class Model:
         self.surrogate = surrogate
         self.library = library
 
-        # These are parameters for several other methods, where they need to
-        # be in units of bins, not seconds.
-        lmargin = int(lmargin_sec * 1000 / bin_size_ms)
-        rmargin = int(rmargin_sec * 1000 / bin_size_ms)
+    def states(self, raster):
+        return _HMM_METHODS[self.library][1](self._hmm, raster.raster)
+
+    def compute_entropy(self, raster=None, lmargin_sec=-1.0, rmargin_sec=1.0):
+        # Save the burst margins in units of bins.
+        lmargin = int(lmargin_sec * 1000 / self.bin_size_ms)
+        rmargin = int(rmargin_sec * 1000 / self.bin_size_ms)
         self.burst_margins = (lmargin, rmargin)
 
-    def states(self, raster=None):
-        return _HMM_METHODS[self.library][1](
-            self._hmm, raster if raster is not None else self.r.raster)
-
-    @property
-    def burst_margins(self):
-        '''
-        The duration over which bursts are considered, expressed as a tuple
-        of start and end time in bins relative to burst peak.
-        '''
-        return self._burst_margins
-
-    @burst_margins.setter
-    def burst_margins(self, value):
-        # Actually set the margins.
-        self._burst_margins = value
-
         # Recompute all the entropy measurements based on them.
-        h = self.states()
-        self.obs_state_prob = self.r.observed_state_probs(
+        h = self.states(raster)
+        self.obs_state_prob = raster.observed_state_probs(
             h, n_states=self.n_states,
             burst_margins=self.burst_margins)
 
