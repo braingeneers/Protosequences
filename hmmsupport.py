@@ -13,14 +13,17 @@ import glob
 
 
 try:
-    from smart_open import open as _open
-    import boto3
-    boto3.setup_default_session()
-    client = boto3.Session().client('s3', endpoint_url=os.environ.get(
-        'AWS_ENDPOINT', 'https://s3-west.nrp-nautilus.io'))
-    _open = functools.partial(_open, transport_params=dict(client=client))
+    from braingeneers.analysis import read_phy_files
 except ImportError:
-    from builtins import open as _open
+    def read_phy_files(path):
+        raise ImportError('braingeneers.analysis not installed')
+
+from smart_open import open as _open
+import boto3
+boto3.setup_default_session()
+client = boto3.Session().client('s3', endpoint_url=os.environ.get(
+    'AWS_ENDPOINT', 'https://s3-west.nrp-nautilus.io'))
+_open = functools.partial(_open, transport_params=dict(client=client))
 
 
 DATA_DIR = ('./data' if os.path.isdir('data') else
@@ -454,47 +457,48 @@ class Raster:
 
         # First try loading the data from .mat files, in either Mattia's or
         # Tal's format...
-        mat = load_raw(source, experiment)
-        if 'SUA' in mat:
-            mat['spike_matrix'] = mat['SUA'][0,0]['spike_matrix']
+        try:
+            mat = load_raw(source, experiment)
+            if 'SUA' in mat:
+                mat['spike_matrix'] = mat['SUA'][0,0]['spike_matrix']
 
-        # Mattia's data is formatted with something called a SUA, with
-        # fixed sample rate of 1 kHz.
-        if 'spike_matrix' in mat:
-            sm = mat['spike_matrix']
-            self.raster, self._poprate, self.units = \
-                _raster_poprate_units_from_sm(sm.shape[1], bin_size_ms, sm)
-            self.length_sec = sm.shape[1] / 1000
-            self._burst_default_rms = 6.0
+            # Mattia's data is formatted with something called a SUA, with
+            # fixed sample rate of 1 kHz.
+            if 'spike_matrix' in mat:
+                sm = mat['spike_matrix']
+                self.raster, self._poprate, self.units = \
+                    _raster_poprate_units_from_sm(sm.shape[1], bin_size_ms, sm)
+                self.length_sec = sm.shape[1] / 1000
+                self._burst_default_rms = 6.0
 
-        # Tal and TJ's data is organized as units instead, and fs is stored.
-        # The actual duration isn't stored, so just assume the recording was
-        # a whole number of seconds long by rounding up the last spike time.
-        else:
-            self.units = [(unit[0][0]['spike_train']/mat['fs']*1e3)[0,:]
-                          for unit in mat['units'][0]]
-            self.length_sec = np.ceil(max(
-                unit.max() for unit in self.units)/1e3)
-            self.raster, self._poprate = _raster_poprate_from_units(
-                1e3*self.length_sec, self.bin_size_ms, self.units)
-            self._burst_default_rms = 3.0
-
-        self.n_units = len(self.units)
+            # Tal and TJ's data is organized as units instead, and fs is
+            # stored. The actual duration isn't stored, so just assume the
+            # recording was a whole number of seconds long by rounding up
+            # the last spike time.
+            else:
+                self.units = [(unit[0][0]['spike_train']/mat['fs']*1e3)[0,:]
+                              for unit in mat['units'][0]]
+                self.length_sec = np.ceil(max(
+                    unit.max() for unit in self.units)/1e3)
+                self.raster, self._poprate = _raster_poprate_from_units(
+                    1e3*self.length_sec, self.bin_size_ms, self.units)
+                self._burst_default_rms = 3.0
 
         # If those .mat files don't exist, instead load from Sury's phy
         # zips. This can't work if the data is in a mat format, though.
-        # except (OSError, FileNotFoundError):
-        #     try:
-        #         from braingeneers.analysis import read_phy_files
-        #         self.sd = read_phy_files(
-        #             os.path.join(DATA_DIR, source, experiment + '.zip'))
-        #         if sl:
-        #             self.sd = self.sd[sl]
-        #     except AssertionError:
-        #         raise FileNotFoundError(
-        #             f'No data found for {source} {experiment}') from None
-        #     self.data = self.sd.raster(bin_size_ms).T
-        #     self.length_sec = self.sd.length / 1000
+        except (OSError, FileNotFoundError):
+            try:
+                self.sd = read_phy_files(
+                    os.path.join(DATA_DIR, source, experiment + '.zip'))
+                if sl:
+                    self.sd = self.sd[sl]
+            except AssertionError:
+                raise FileNotFoundError(
+                    f'No data found for {source} {experiment}') from None
+            self.data = self.sd.raster(bin_size_ms).T
+            self.length_sec = self.sd.length / 1000
+
+        self.n_units = len(self.units)
 
     def spikes_within(self, start_ms, end_ms):
         'Return unit indices and spike times within a time window.'
