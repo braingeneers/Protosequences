@@ -7,7 +7,9 @@ import numpy as np
 import hmmsupport
 from hmmsupport import get_raster, all_experiments, Model, figure
 import matplotlib.pyplot as plt
+
 plt.ion()
+hmmsupport.figdir('pca')
 
 source = 'organoid'
 # source = '2023-04-07-e-CCh_redux'
@@ -94,12 +96,29 @@ for exp in tqdm(experiments):
         ax.set_ylabel('Percent Explained Variance')
         ax.set_xlabel('Principal Component')
 
+
+# %%
+
+def components_required(exp:str):
+    return np.argmax(np.cumsum(pev[exp], axis=1)
+                     >= bad_pev[exp][:,[0]], axis=1)
+
+
+with figure('Components Required') as f:
+    ax = f.gca()
+    ax.violinplot([components_required(exp)
+                   for exp in experiments],
+                  showmeans=True, showextrema=False)
+    ax.set_xticks(1 + np.arange(len(experiments)),
+                  [f'Organoid {i}' for i in range(1,5)])
+    ax.set_ylabel('Components Required to Match Surrogate')
+
+
 # %%
 
 def transformed_data(exp:str, bad:bool):
     pca = (bad_pcas if bad else pcas)[exp]
-    r = (bad_rasters if bad else rasters)[exp]
-    return pca.transform(r.raster)[:,:2].T
+    return pca.transform(raster(exp, bad))[:,:2].T
 
 def transformed_states(exp:str, bad:bool):
     pca = (bad_pcas if bad else pcas)[exp]
