@@ -116,13 +116,14 @@ with figure('Components Required') as f:
 
 # %%
 
+state_idx = 40
 def transformed_data(exp:str, bad:bool):
-    pca = (bad_pcas if bad else pcas)[exp]
+    pca = (bad_pcas if bad else pcas)[exp][state_idx]
     return pca.transform(raster(exp, bad))[:,:2].T
 
 def transformed_states(exp:str, bad:bool):
-    pca = (bad_pcas if bad else pcas)[exp]
-    return pca.transform(stateses(exp, bad))[:,:2].T
+    pca = (bad_pcas if bad else pcas)[exp][state_idx]
+    return pca.transform(stateses(exp, bad)[state_idx])[:,:2].T
 
 bad = False
 for exp in tqdm(experiments):
@@ -130,4 +131,3 @@ for exp in tqdm(experiments):
         ax = f.gca()
         ax.plot(*transformed_data(exp, bad), alpha=0.5, color='grey')
         ax.plot(*transformed_states(exp, bad), 'o')
-        # ax.plot(*transformed_data(exp, True)[:,:2].T)
