@@ -484,7 +484,7 @@ class Raster:
         # First try loading the data from .mat files, in either Mattia's or
         # Tal's format...
         try:
-            mat = load_raw(source, experiment)
+            mat = load_raw(source, experiment + '.mat')
             if 'SUA' in mat:
                 mat['spike_matrix'] = mat['SUA'][0,0]['spike_matrix']
 
