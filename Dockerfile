@@ -4,7 +4,8 @@ RUN pip install --no-cache-dir smart_open[s3] numpy scipy scikit-learn cython hm
 RUN pip install --no-cache-dir git+https://github.com/lindermanlab/ssm
 RUN pip install --no-cache-dir dynamax
 
-# We use braingeneers.analysis in hmmsupport.
+# Install braingeneerspy, always from the latest commit.
+ADD "https://api.github.com/repos/braingeneers/braingeneerspy/commits?per_page=1" /tmp/latest_braingeneers_commit
 RUN pip install "git+https://github.com/braingeneers/braingeneerspy#egg=braingeneerspy[analysis]"
 
 # Install juliacall and force it to install all the relevant Julia
