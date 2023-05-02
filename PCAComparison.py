@@ -12,11 +12,11 @@ import joblib
 plt.ion()
 hmmsupport.figdir('pca')
 
-source = 'mouse'
+source = 'organoid'
 bin_size_ms = 30
 n_stateses = np.arange(10, 51)
 
-experiments = sorted(all_experiments(source))
+experiments = all_experiments(source)
 if source == 'organoid':
     experiments = [e for e in experiments
                    if e.startswith('L')]
@@ -25,7 +25,8 @@ def raster_valid(exp:str):
     try:
         r = get_raster(source, exp, bin_size_ms)
         return r.n_units > 15
-    except:
+    except Exception as e:
+        print(exp, 'failed to load:', e)
         return False
 
 rasters:dict[str,hmmsupport.Raster] = {

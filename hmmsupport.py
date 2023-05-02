@@ -65,7 +65,9 @@ def all_experiments(source):
         paths = [x['Key'] for x in s3_list_objects(path)['Contents']]
     else:
         paths = glob.glob(os.path.join(path, '*'))
-    return [os.path.splitext(os.path.basename(x))[0] for x in paths]
+    return sorted([
+        os.path.splitext(os.path.basename(x))[0]
+        for x in paths])
 
 
 S3_USER = os.environ.get('S3_USER')
