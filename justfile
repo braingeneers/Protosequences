@@ -37,7 +37,7 @@ deploy src exp bin_size ks surrogate="real" method="default":
         envsubst < job.yml | kubectl apply -f - || exit 1
         kubectl label job $JOB_NAME user=atspaeth app=organoid-hmm \
             data-source=$src surrogate=$surr \
-            hmm-method=$method experiment=$exp
+            hmm-method=$HMM_METHOD experiment=$exp
     fi
 
 local src exp bin_size ks surrogate="real" method="default":
