@@ -7,12 +7,12 @@ import numpy as np
 import hmmsupport
 from hmmsupport import get_raster, all_experiments, Model, figure
 import matplotlib.pyplot as plt
+import joblib
 
 plt.ion()
 hmmsupport.figdir('pca')
 
-source = 'organoid'
-# source = '2023-04-07-e-CCh_redux'
+source = 'mouse'
 bin_size_ms = 30
 n_stateses = np.arange(10, 51)
 
@@ -41,15 +41,18 @@ bad_rasters:dict[str,hmmsupport.Raster] = {
     for exp in tqdm(experiments)}
 
 models:dict[str,list[Model]] = {
-    exp: [Model(source, exp, bin_size_ms, n)
-          for n in n_stateses]
+    exp: joblib.Parallel(n_jobs=16)(
+        joblib.delayed(Model)(source, exp, bin_size_ms, n,
+                              recompute_ok=False)
+        for n in n_stateses)
     for exp in tqdm(experiments)}
 
 bad_models:dict[str,list[Model]] = {
-    exp: [Model(source, exp, bin_size_ms, n, 'rsm')
-          for n in n_stateses]
+    exp: joblib.Parallel(n_jobs=16)(
+        joblib.delayed(Model)(source, exp, bin_size_ms, n, 'rsm',
+                              recompute_ok=False)
+        for n in n_stateses)
     for exp in tqdm(experiments)}
-
 
 # %%
 
@@ -65,10 +68,10 @@ def raster(exp:str, bad:bool=False):
 
 pcas = {exp: [PCA().fit(s)
               for s in stateses(exp, False)]
-        for exp in tqdm(experiments)}
+        for exp in experiments}
 bad_pcas = {exp: [PCA().fit(s)
                   for s in stateses(exp, True)]
-            for exp in tqdm(experiments)}
+            for exp in experiments}
 
 def variance_by_axis(pca:PCA, exp:str, bad:bool=False):
     return pca.explained_variance_[:10]
