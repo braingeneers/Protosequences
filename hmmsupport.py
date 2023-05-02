@@ -282,13 +282,12 @@ def get_fitted_hmm(source, exp, bin_size_ms, n_states, surrogate='real',
 
 class Model:
     def __init__(self, source, exp, bin_size_ms, n_states,
-                 surrogate='real', lmargin_sec=-1.0, rmargin_sec=1.0,
-                 library='default'):
+                 surrogate='real', library='default', recompute_ok=True):
 
         # Retrieve the (hopefully cached) model.
         self._hmm = get_fitted_hmm(source, exp, bin_size_ms, n_states,
                                    surrogate, library=library,
-                                   recompute_ok=True)
+                                   recompute_ok=recompute_ok)
 
         # Save metadata.
         self.source = source
