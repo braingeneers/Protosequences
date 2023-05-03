@@ -2,6 +2,9 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: $JOB_NAME
+  labels:
+    app: organoid-hmm
+    user: $USER
 spec:
   backoffLimit: 0
   template:
@@ -11,8 +14,8 @@ spec:
         image: atspaeth/organoid-hmm
         env:
           - name: S3_USER
-            value: atspaeth
-          - name: AWS_ENDPOINT
+            value: $USER
+          - name: ENDPOINT
             value: http://rook-ceph-rgw-nautiluss3.rook
         imagePullPolicy: Always
         volumeMounts:
@@ -21,11 +24,11 @@ spec:
         resources:
           requests:
             cpu: 1
-            memory: "16Gi"
+            memory: "2Gi"
             nvidia.com/gpu: 0
           limits:
             cpu: 1
-            memory: "18Gi"
+            memory: "5Gi"
             nvidia.com/gpu: 0
         command: ["python", "stash_hmms.py"]
         args:
