@@ -1,6 +1,6 @@
 # This is an Ubuntu image with system Python 3.10.
 FROM python:3.10
-RUN pip install --no-cache-dir smart_open[s3] numpy scipy scikit-learn cython hmmlearn
+RUN pip install --no-cache-dir numpy scipy scikit-learn cython hmmlearn
 RUN pip install --no-cache-dir git+https://github.com/lindermanlab/ssm
 RUN pip install --no-cache-dir dynamax
 
@@ -22,4 +22,4 @@ COPY NeuroHMM/src NeuroHMM/src
 COPY *.py .
 
 # Define the variables used by the scripts.
-ENV AWS_ENDPOINT https://s3-west.nrp-nautilus.io
+ENV ENDPOINT https://s3-west.nrp-nautilus.io

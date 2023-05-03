@@ -1,40 +1,26 @@
-import os
-import numpy as np
-import scipy.io
-from scipy import stats, signal, sparse, ndimage
-from contextlib import contextmanager
 import itertools
 import functools
-import pickle
-import joblib
-from tqdm.auto import tqdm
 import re
 import glob
-
-
-try:
-    from braingeneers.analysis import read_phy_files
-except ImportError:
-    def read_phy_files(path):
-        raise ImportError('braingeneers.analysis not installed')
-
-from smart_open import open as _open
-import boto3
-boto3.setup_default_session()
-client = boto3.Session().client('s3', endpoint_url=os.environ.get(
-    'AWS_ENDPOINT', 'https://s3-west.nrp-nautilus.io'))
-_open = functools.partial(_open, transport_params=dict(client=client))
-
-
-def s3_list_objects(path):
-    bucket, prefix = path.removeprefix('s3://').split('/', 1)
-    if not prefix.endswith('/'):
-        prefix += '/'
-    return client.list_objects(Bucket=bucket, Prefix=prefix)
+import os
+import pickle
+import joblib
+import numpy as np
+import scipy.io
+import awswrangler
+from tqdm.auto import tqdm
+from contextlib import contextmanager
+from scipy import stats, signal, sparse, ndimage
+from braingeneers.analysis import read_phy_files
+from braingeneers.utils.smart_open_braingeneers import open as _open
 
 
 def s3_isdir(path):
-    return 'Contents' in s3_list_objects(path)
+    try:
+        next(awswrangler.s3.list_objects(path, chunked=True))
+        return True
+    except StopIteration:
+        return False
 
 
 DATA_DIR = './data'
@@ -62,7 +48,7 @@ def data_dir(source):
 def all_experiments(source):
     path = data_dir(source)
     if path.startswith('s3://'):
-        paths = [x['Key'] for x in s3_list_objects(path)['Contents']]
+        paths = awswrangler.s3.list_objects(path)
     else:
         paths = glob.glob(os.path.join(path, '*'))
     return sorted([
@@ -96,14 +82,10 @@ class Cache:
             yield f
 
     def is_cached(self, source, exp, bin_size_ms, n_states, surrogate):
-        item = self.cache_filename(source, exp, bin_size_ms, n_states, surrogate)
+        item = self.cache_filename(source, exp, bin_size_ms, n_states,
+                                   surrogate)
         if item.startswith('s3://'):
-            bucket, key = item[5:].split('/', 1)
-            try:
-                client.head_object(Bucket=bucket, Key=key)
-                return True
-            except Exception as e:
-                return False
+            return awswrangler.s3.does_object_exist(item)
         else:
             return os.path.isfile(item)
 
@@ -143,10 +125,6 @@ def figdir(path=None):
             os.makedirs(figdir.dir)
     return os.path.abspath(figdir.dir)
 figdir('')
-
-
-def open(name, attr):
-    return _open(os.path.join(figdir(), name), attr)
 
 
 def experiment_parts(experiment):
@@ -334,7 +312,7 @@ class Model:
                             for s in self.states()],
             n_states=self.hmm.K,
             bin_size_ms=self.hmm.bin_size_ms)
-        with open(path, 'wb') as f:
+        with open(os.path.join(figdir(), path), 'wb') as f:
             scipy.io.savemat(f, mat)
 
 
