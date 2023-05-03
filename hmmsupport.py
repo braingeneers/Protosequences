@@ -148,6 +148,13 @@ FIT_ATOL = 1e-4
 FIT_N_ITER = 1000
 
 _HMM_METHODS = {}
+class HMMMethod:
+    def __init__(self, library, fit, states):
+        self.library = library
+        self.fit = fit
+        self.states = states
+        _HMM_METHODS[library] = self
+
 try:
     from ssm import HMM as SSMHMM
 
@@ -166,7 +173,8 @@ try:
         'Return the most likely state sequence for the given raster.'
         return hmm.most_likely_states(raster)
 
-    _HMM_METHODS['ssm'] = _ssm_hmm, _ssm_states
+    SSMFit = HMMMethod('ssm', _ssm_hmm, _ssm_states)
+
 except ImportError:
     pass
 
@@ -190,7 +198,8 @@ try:
         'Return the most likely state sequence for the given raster.'
         return hmm.most_likely_states(hmm.params, raster)
 
-    _HMM_METHODS['dynamax'] = _dynamax_hmm, _dynamax_states
+    DynamaxFit = HMMMethod('dynamax', _dynamax_hmm, _dynamax_states)
+
 except ImportError:
     pass
 
@@ -211,7 +220,8 @@ try:
         'Return the most likely state sequence for the given raster.'
         return hmm.predict(raster)
 
-    _HMM_METHODS['hmmlearn'] = _hmmlearn_hmm, _hmmlearn_states
+    HMMLearnFit = HMMMethod('hmmlearn', _hmmlearn_hmm, _hmmlearn_states)
+
 except ImportError:
     pass
 
@@ -235,7 +245,8 @@ try:
         'Return the most likely state sequence for the given raster.'
         return np.asarray(jl.NeuroHMM.viterbi(hmm, raster)) - 1
 
-    _HMM_METHODS['hmmbase'] = _hmmbase_hmm, _hmmbase_states
+    HMMBaseFit = HMMMethod('hmmbase', _hmmbase_hmm, _hmmbase_states)
+
 except ImportError:
     pass
 
@@ -256,9 +267,9 @@ def get_fitted_hmm(source, exp, bin_size_ms, n_states, surrogate='real',
     if verbose:
         print(f'Running {source}/{exp}:{bin_size_ms}ms, K={n_states}')
     params = source, exp, bin_size_ms, n_states, surrogate
-    method = _HMM_METHODS[library][0]
-    if recompute_ok or method.is_cached(*params):
-        return method(*params, verbose=verbose)
+    method = _HMM_METHODS[library]
+    if recompute_ok or method.fit.is_cached(*params):
+        return method.fit(*params, verbose=verbose)
 
 
 class Model:
@@ -279,7 +290,7 @@ class Model:
         self.library = library
 
     def states(self, raster):
-        return _HMM_METHODS[self.library][1](self._hmm, raster.raster)
+        return _HMM_METHODS[self.library].states(self._hmm, raster.raster)
 
     def compute_entropy(self, raster=None, lmargin_sec=-1.0, rmargin_sec=1.0):
         # Save the burst margins in units of bins.
@@ -336,7 +347,7 @@ def cache_models(source, experiments, bin_size_mses, n_stateses,
     argses = experiments, bin_size_mses, n_stateses, surrogates
     needs_run = []
     for p in itertools.product(*[np.atleast_1d(x) for x in argses]):
-        if not _HMM_METHODS[library][0].is_cached(source, *p):
+        if not _HMM_METHODS[library].fit.is_cached(source, *p):
             needs_run.append(p)
 
     if verbose:
