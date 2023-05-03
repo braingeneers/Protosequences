@@ -8,11 +8,12 @@ import joblib
 import numpy as np
 import scipy.io
 import awswrangler
+from io import BytesIO
 from tqdm.auto import tqdm
 from contextlib import contextmanager
 from scipy import stats, signal, sparse, ndimage
 from braingeneers.analysis import read_phy_files
-from braingeneers.utils.smart_open_braingeneers import open as _open
+from braingeneers.utils.smart_open_braingeneers import open
 
 
 def s3_isdir(path):
@@ -78,7 +79,7 @@ class Cache:
             directory = os.path.dirname(path)
             if not os.path.isdir(directory):
                 os.mkdir(directory)
-        with _open(path, mode) as f:
+        with open(path, mode) as f:
             yield f
 
     def is_cached(self, source, exp, bin_size_ms, n_states, surrogate):
@@ -312,6 +313,8 @@ class Model:
                             for s in self.states()],
             n_states=self.hmm.K,
             bin_size_ms=self.hmm.bin_size_ms)
+        # This will be a regular file, not S3, so don't bother with the
+        # BytesIO workaround.
         with open(os.path.join(figdir(), path), 'wb') as f:
             scipy.io.savemat(f, mat)
 
@@ -382,8 +385,8 @@ def figure(name, save_args={}, save_exts=['png'], **kwargs):
 
 def load_raw(source, experiment):
     'Load raw data from a file.'
-    with _open(data_dir(source) + '/' + experiment, 'rb') as f:
-        return scipy.io.loadmat(f)
+    with open(data_dir(source) + '/' + experiment, 'rb') as f:
+        return scipy.io.loadmat(BytesIO(f.read()))
 
 
 def exp_name_parts(exp):
