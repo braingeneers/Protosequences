@@ -19,6 +19,3 @@ RUN python -c "from juliacall import Main as jl; jl.seval('using Pkg'); jl.Pkg.a
 # Now copy over the actual source files.
 COPY NeuroHMM/src NeuroHMM/src
 COPY *.py .
-
-# Define the variables used by the scripts.
-ENV ENDPOINT https://s3-west.nrp-nautilus.io
