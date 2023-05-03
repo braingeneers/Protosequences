@@ -144,8 +144,8 @@ def experiment_parts(experiment):
     return basename, extension, slice_text
 
 
-FIT_ATOL = 1e-4
-FIT_N_ITER = 1000
+FIT_ATOL = 1e-3
+FIT_N_ITER = 5000
 
 _HMM_METHODS = {}
 class HMMMethod:
