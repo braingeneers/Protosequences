@@ -49,7 +49,7 @@ def data_dir(source):
 def all_experiments(source):
     path = data_dir(source)
     if path.startswith('s3://'):
-        paths = awswrangler.s3.list_objects(path)
+        paths = awswrangler.s3.list_objects(path + '/')
     else:
         paths = glob.glob(os.path.join(path, '*'))
     return sorted([
