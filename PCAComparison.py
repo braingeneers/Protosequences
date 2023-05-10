@@ -12,7 +12,7 @@ import joblib
 plt.ion()
 hmmsupport.figdir('pca')
 
-source = 'organoid'
+source = 'mouse'
 bin_size_ms = 30
 n_stateses = np.arange(10, 51)
 
@@ -54,6 +54,16 @@ bad_models:dict[str,list[Model]] = {
                               recompute_ok=False)
         for n in n_stateses)
     for exp in tqdm(experiments)}
+
+are_ok = {k: np.logical_and(
+    [m._hmm is not None for m in models[k]],
+    [m._hmm is not None for m in bad_models[k]])
+          for k in experiments}
+
+models = {k: [m for m, ok in zip(models[k], are_ok[k]) if ok]
+          for k in experiments}
+bad_models = {k: [m for m, ok in zip(bad_models[k], are_ok[k]) if ok]
+              for k in experiments}
 
 # %%
 
