@@ -117,20 +117,28 @@ def components_required(exp:str):
     return np.argmax(np.cumsum(pev[exp], axis=1)
                      >= bad_pev[exp][:,[0]], axis=1)
 
+if source == 'organoid':
+    with figure('Components Required') as f:
+        ax = f.gca()
+        ax.violinplot([components_required(exp)
+                       for exp in experiments],
+                      showmeans=True, showextrema=False)
+        ax.set_xticks(1 + np.arange(len(experiments)),
+                      [f'Organoid {i}' for i in range(1,5)])
+        ax.set_ylabel('Components Required to Match Surrogate')
 
-with figure('Components Required') as f:
-    ax = f.gca()
-    ax.violinplot([components_required(exp)
-                   for exp in experiments],
-                  showmeans=True, showextrema=False)
-    ax.set_xticks(1 + np.arange(len(experiments)),
-                  [f'Organoid {i}' for i in range(1,5)])
-    ax.set_ylabel('Components Required to Match Surrogate')
+elif source == 'mouse':
+    with figure('Mouse Dimensionality') as f:
+        ax = f.gca()
+        ax.hist([components_required(exp).mean()
+                 for exp in experiments])
+        ax.set_xlabel('Mean Components Required Across Models')
+        ax.set_ylabel('Number of Experiments')
 
 
 # %%
 
-state_idx = 40
+state_idx = 10
 def transformed_data(exp:str, bad:bool):
     pca = (bad_pcas if bad else pcas)[exp][state_idx]
     return pca.transform(raster(exp, bad))[:,:2].T
