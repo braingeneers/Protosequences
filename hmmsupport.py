@@ -24,7 +24,7 @@ def s3_isdir(path):
         return False
 
 
-DATA_DIR = './data'
+DATA_DIR = 'data'
 
 
 @functools.lru_cache
@@ -57,9 +57,9 @@ def all_experiments(source):
         for x in paths])
 
 
+CACHE_DIR = '.cache'
 S3_USER = os.environ.get('S3_USER')
-CACHE_DIR = ('./.cache' if S3_USER is None else
-             f's3://braingeneers/personal/{S3_USER}/cache')
+S3_CACHE = f's3://braingeneers/personal/{S3_USER}/cache'
 
 
 class Cache:
@@ -67,48 +67,68 @@ class Cache:
         self.wrapped = func
         functools.update_wrapper(self, func)
 
-    def cache_filename(self, source, exp, bin_size_ms, n_states, surrogate):
+    def _cache_names(self, source, exp, bin_size_ms, n_states, surrogate):
+        'Local cache file and S3 object cache path.'
         key = f'{source}_{exp}_{bin_size_ms}ms_{n_states}S_{surrogate}.pkl'
-        return os.path.join(CACHE_DIR, self.__name__, key)
+        file = os.path.join(CACHE_DIR, self.__name__, key)
+        s3_object = '/'.join((S3_CACHE, self.__name__, key))
+        return file, s3_object
 
-    @contextmanager
-    def cache_file(self, mode, source, exp, bin_size_ms, n_states, surrogate):
-        path = self.cache_filename(source, exp, bin_size_ms, n_states,
-                                   surrogate)
-        if not path.startswith('s3://'):
-            directory = os.path.dirname(path)
-            if not os.path.isdir(directory):
-                os.mkdir(directory)
-        with open(path, mode) as f:
-            yield f
+    def _cache_path(self, *args):
+        'The nearest possible cache path to read from, None if uncached.'
+        filename, s3_object = self._cache_names(*args)
 
-    def is_cached(self, source, exp, bin_size_ms, n_states, surrogate):
-        item = self.cache_filename(source, exp, bin_size_ms, n_states,
-                                   surrogate)
-        if item.startswith('s3://'):
-            return awswrangler.s3.does_object_exist(item)
+        if os.path.isdir(CACHE_DIR) and os.path.isfile(filename):
+            return filename
+        elif S3_USER and awswrangler.s3.does_object_exist(s3_object):
+            return s3_object
         else:
-            return os.path.isfile(item)
-
-    def get_cached(self, source, exp, bin_size_ms, n_states, surrogate):
-        try:
-            with self.cache_file('rb', source, exp, bin_size_ms,
-                                 n_states, surrogate) as f:
-                return pickle.load(f)
-        except Exception as e:
             return None
 
-    def __call__(self, source, exp, bin_size_ms, n_states, surrogate, **kw):
-        ret = self.get_cached(source, exp, bin_size_ms, n_states, surrogate)
+    def _store_to_cache(self, obj, *args):
+        'Store the given object to both local and S3 caches.'
+
+        filename, s3_object = self._cache_names(*args)
+
+        # Store to local cache, ensuring the directory exists before
+        # attempting to write the file.
+        if os.path.isdir(CACHE_DIR) and not os.path.isfile(filename):
+            try:
+                dirname = os.path.dirname(filename)
+                os.makedirs(dirname, exist_ok=True)
+                with open(filename, 'wb') as f:
+                    pickle.dump(obj, f)
+            except Exception as e:
+                print(f'Failed to save {filename}: {e}', file=sys.stderr)
+
+        # Store to S3 cache.
+        if S3_USER is not None:
+            try:
+                with open(s3_object, 'wb') as f:
+                    pickle.dump(obj, f)
+            except Exception as e:
+                print(f'Failed to upload {s3_object}: {e}', file=sys.stderr)
+
+    def is_cached(self, *args):
+        'Whether the given parameters are cached.'
+        return self._cache_path(*args) is not None
+
+    def get_cached(self, *args):
+        'Get the cached object, or None if unavailable.'
+        path = self._cache_path(*args)
+
+        if path is None:
+            return None
+
+        with open(path, 'rb') as f:
+            return pickle.load(f)
+
+    def __call__(self, *args, **kw):
+        ret = self.get_cached(*args)
 
         if ret is None:
-            ret = self.wrapped(source, exp, bin_size_ms, n_states, surrogate, **kw)
-            try:
-                with self.cache_file('wb', source, exp, bin_size_ms,
-                                     n_states, surrogate) as f:
-                    pickle.dump(ret, f)
-            except Exception as e:
-                print('Failed to write to cache. :(', e)
+            ret = self.wrapped(*args, **kw)
+            self._store_to_cache(ret, *args)
 
         return ret
 
@@ -268,8 +288,10 @@ def get_fitted_hmm(source, exp, bin_size_ms, n_states, surrogate='real',
         print(f'Running {source}/{exp}:{bin_size_ms}ms, K={n_states}')
     params = source, exp, bin_size_ms, n_states, surrogate
     method = _HMM_METHODS[library]
-    if recompute_ok or method.fit.is_cached(*params):
+    if recompute_ok:
         return method.fit(*params, verbose=verbose)
+    else:
+        return method.fit.get_cached(*params)
 
 
 class Model:
