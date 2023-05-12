@@ -3,6 +3,7 @@ import functools
 import re
 import glob
 import os
+import sys
 import pickle
 import joblib
 import numpy as np
@@ -62,6 +63,26 @@ S3_USER = os.environ.get('S3_USER')
 S3_CACHE = f's3://braingeneers/personal/{S3_USER}/cache'
 
 
+def _store_local(obj, path):
+    'Ensure a path exists and pickle an object to it.'
+    try:
+        dirname = os.path.dirname(filename)
+        os.makedirs(dirname, exist_ok=True)
+        with open(filename, 'wb') as f:
+            pickle.dump(obj, f)
+    except Exception as e:
+        print(f'Failed to save {filename}: {e}', file=sys.stderr)
+
+
+def _store_s3(obj, path):
+    'Pickle an object to an S3 path.'
+    try:
+        with open(s3_object, 'wb') as f:
+            pickle.dump(obj, f)
+    except Exception as e:
+        print(f'Failed to upload {s3_object}: {e}', file=sys.stderr)
+
+
 class Cache:
     def __init__(self, func):
         self.wrapped = func
@@ -90,38 +111,36 @@ class Cache:
 
         filename, s3_object = self._cache_names(*args)
 
-        # Store to local cache, ensuring the directory exists before
-        # attempting to write the file.
         if os.path.isdir(CACHE_DIR) and not os.path.isfile(filename):
-            try:
-                dirname = os.path.dirname(filename)
-                os.makedirs(dirname, exist_ok=True)
-                with open(filename, 'wb') as f:
-                    pickle.dump(obj, f)
-            except Exception as e:
-                print(f'Failed to save {filename}: {e}', file=sys.stderr)
+            _store_local(obj, filename)
 
-        # Store to S3 cache.
         if S3_USER is not None:
-            try:
-                with open(s3_object, 'wb') as f:
-                    pickle.dump(obj, f)
-            except Exception as e:
-                print(f'Failed to upload {s3_object}: {e}', file=sys.stderr)
+            _store_s3(obj, s3_object)
 
     def is_cached(self, *args):
         'Whether the given parameters are cached.'
         return self._cache_path(*args) is not None
 
     def get_cached(self, *args):
-        'Get the cached object, or None if unavailable.'
+        '''
+        Get the cached object, or None if unavailable.
+
+        Additionally, if restoring the object from S3 when a local cache is
+        present, add the object to the local cache.
+        '''
         path = self._cache_path(*args)
 
         if path is None:
             return None
 
         with open(path, 'rb') as f:
-            return pickle.load(f)
+            ret = pickle.load(f)
+
+        if path.startswith('s3://') and os.path.isdir(CACHE_DIR):
+            filename = self._cache_names(*args)[0]
+            print(filename, 'missing from local cache, adding.',
+                  file=sys.stderr)
+            _store_s3(ret, filename)
 
     def __call__(self, *args, **kw):
         ret = self.get_cached(*args)
@@ -729,9 +748,6 @@ class RandSpikeMatrix(Raster):
         rate of each neuron by randomly reallocating all spike times to
         different neurons, using resampling to maintain the invariant that
         no neuron spikes twice in the same millisecond.
-
-        To maximize the chances of selecting acceptable units without
-        overlaps, I cancel out the 
         '''
         _steal_metadata(self, raster)
         sm = _spike_matrix_from_units(
