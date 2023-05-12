@@ -77,7 +77,7 @@ def _store_local(obj, path):
 def _store_s3(obj, path):
     'Pickle an object to an S3 path.'
     try:
-        with open(s3_object, 'wb') as f:
+        with open(path, 'wb') as f:
             pickle.dump(obj, f)
     except Exception as e:
         print(f'Failed to upload {s3_object}: {e}', file=sys.stderr)
