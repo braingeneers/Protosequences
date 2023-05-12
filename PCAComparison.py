@@ -100,15 +100,15 @@ bad_tev = {exp: np.array([variance_by_axis(pca, exp, bad=True)
 bad_pev = {e: bad_tev[e] / bad_tev[e].sum(axis=1, keepdims=True)
            for e in experiments}
 
-
-for exp in tqdm(experiments):
-    with figure(exp, save_exts=[]) as f:
-        ax = f.gca()
-        component = 1 + np.arange(10)
-        ax.plot(component, pev[exp].T, 'C0')
-        ax.plot(component, bad_pev[exp].T, 'C1')
-        ax.set_ylabel('Percent Explained Variance')
-        ax.set_xlabel('Principal Component')
+if source == 'organoid':
+    for exp in tqdm(experiments):
+        with figure(exp, save_exts=[]) as f:
+            ax = f.gca()
+            component = 1 + np.arange(10)
+            ax.plot(component, pev[exp].T, 'C0')
+            ax.plot(component, bad_pev[exp].T, 'C1')
+            ax.set_ylabel('Percent Explained Variance')
+            ax.set_xlabel('Principal Component')
 
 
 # %%
