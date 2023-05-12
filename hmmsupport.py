@@ -138,8 +138,6 @@ class Cache:
 
         if path.startswith('s3://') and os.path.isdir(CACHE_DIR):
             filename = self._cache_names(*args)[0]
-            print(filename, 'missing from local cache, adding.',
-                  file=sys.stderr)
             _store_s3(ret, filename)
 
     def __call__(self, *args, **kw):
