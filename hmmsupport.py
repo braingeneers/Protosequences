@@ -106,17 +106,6 @@ class Cache:
         else:
             return None
 
-    def _store_to_cache(self, obj, *args):
-        'Store the given object to both local and S3 caches.'
-
-        filename, s3_object = self._cache_names(*args)
-
-        if os.path.isdir(CACHE_DIR) and not os.path.isfile(filename):
-            _store_local(obj, filename)
-
-        if S3_USER is not None:
-            _store_s3(obj, s3_object)
-
     def is_cached(self, *args):
         'Whether the given parameters are cached.'
         return self._cache_path(*args) is not None
@@ -137,15 +126,23 @@ class Cache:
             ret = pickle.load(f)
 
         if path.startswith('s3://') and os.path.isdir(CACHE_DIR):
-            filename = self._cache_names(*args)[0]
-            _store_s3(ret, filename)
+            _store_s3(ret, self._cache_names(*args)[0])
+
+        return ret
 
     def __call__(self, *args, **kw):
         ret = self.get_cached(*args)
 
         if ret is None:
             ret = self.wrapped(*args, **kw)
-            self._store_to_cache(ret, *args)
+
+            filename, s3_object = self._cache_names(*args)
+
+            if os.path.isdir(CACHE_DIR) and not os.path.isfile(filename):
+                _store_local(obj, filename)
+
+            if S3_USER is not None:
+                _store_s3(obj, s3_object)
 
         return ret
 
