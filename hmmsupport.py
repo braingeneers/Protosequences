@@ -430,9 +430,15 @@ def figure(name, save_args={}, save_exts=['png'], **kwargs):
         f.savefig(path, **save_args)
 
 
-def load_raw(source, experiment):
-    'Load raw data from a file.'
-    with open(data_dir(source) + '/' + experiment, 'rb') as f:
+def load_raw(source, filename):
+    'Load raw data from a .mat file under a data directory.'
+
+    # We have to do this manually since we're using open() instead of
+    # loadmat() directly.
+    if not filename.endswith('.mat'):
+        filename = filename + '.mat'
+
+    with open(data_dir(source) + '/' + filename, 'rb') as f:
         return scipy.io.loadmat(BytesIO(f.read()))
 
 
@@ -513,7 +519,7 @@ class Raster:
         # First try loading the data from .mat files, in either Mattia's or
         # Tal's format...
         try:
-            mat = load_raw(source, experiment + '.mat')
+            mat = load_raw(source, experiment)
             if 'SUA' in mat:
                 mat['spike_matrix'] = mat['SUA'][0,0]['spike_matrix']
 
