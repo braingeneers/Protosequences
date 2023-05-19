@@ -10,6 +10,7 @@ import mat73
 import numpy as np
 import scipy.io
 import awswrangler
+import tempfile
 from io import BytesIO
 from tqdm.auto import tqdm
 from contextlib import contextmanager
@@ -451,7 +452,7 @@ def load_raw(source, filename):
     # a tempfile first.
     except NotImplementedError:
         if full_path.startswith('s3://'):
-            with tempfile.NamedTemporaryFile() as f:
+            with tempfile.NamedTemporaryFile(suffix='.mat') as f:
                 awswrangler.s3.download(full_path, f)
                 return mat73.loadmat(f.name)
         else:
