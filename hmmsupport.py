@@ -537,27 +537,35 @@ class Raster:
         # Tal's format...
         try:
             mat = load_raw(source, experiment)
-            if 'SUA' in mat:
-                mat['spike_matrix'] = mat['SUA'][0,0]['spike_matrix']
 
             # Mattia's data is formatted with something called a SUA, with
-            # fixed sample rate of 1 kHz.
-            if 'spike_matrix' in mat:
-                sm = mat['spike_matrix']
+            # fixed sample rate of 1 kHz, or possibly the spike_matrix is
+            # dumped directory in the root of the mat file.
+            if 'spike_matrix' in mat or 'SUA' in mat:
+                sm = (mat['SUA'][0,0]['spike_matrix'] if 'SUA' in mat 
+                      else mat['spike_matrix'])
                 self.raster, self._poprate, self.units = \
                     _raster_poprate_units_from_sm(sm.shape[1], bin_size_ms, sm)
                 self.length_sec = sm.shape[1] / 1000
                 self._burst_default_rms = 6.0
 
-            # Tal and TJ's data is organized as units instead, and fs is
-            # stored. The actual duration isn't stored, so just assume the
-            # recording was a whole number of seconds long by rounding up
-            # the last spike time.
+            # Tal and TJ's data is organized as units instead. For the UCSB
+            # recordings, fs is stored and duration is not, so just assume
+            # the recording was a whole number of seconds long by rounding
+            # up the last spike time. For the ETH recordings, there is
+            # a spike matrix to get the duration from, but use the raw spike
+            # times because they're a bit higher resolution and the spike
+            # matrix seems to have dropped some spikes.
             else:
-                self.units = [(unit[0][0]['spike_train']/mat['fs']*1e3)[0,:]
-                              for unit in mat['units'][0]]
-                self.length_sec = np.ceil(max(
-                    unit.max() for unit in self.units)/1e3)
+                if 'spike_times' in mat:
+                    self.units = [times*1e3 for times in mat['spike_times']]
+                    self.length_sec = mat['t_spk_mat'].shape[0] / 1e3
+                else:
+                    self.units = [
+                        (unit[0][0]['spike_train']/mat['fs']*1e3)[0,:]
+                        for unit in mat['units'][0]]
+                    self.length_sec = np.ceil(max(
+                        unit.max() for unit in self.units)/1e3)
                 self.raster, self._poprate = _raster_poprate_from_units(
                     1e3*self.length_sec, self.bin_size_ms, self.units)
                 self._burst_default_rms = 3.0
