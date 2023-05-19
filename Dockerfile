@@ -1,7 +1,7 @@
 # This is an Ubuntu image with system Python 3.10.
 FROM python:3.10
 ENV PIP_NO_CACHE_DIR=1
-RUN pip install numpy scipy scikit-learn cython juliacall
+RUN pip install numpy scipy scikit-learn cython juliacall mat73
 RUN pip install hmmlearn dynamax git+https://github.com/lindermanlab/ssm
 
 # Install braingeneerspy, always from the latest commit.

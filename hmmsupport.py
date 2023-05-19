@@ -6,6 +6,7 @@ import os
 import sys
 import pickle
 import joblib
+import mat73
 import numpy as np
 import scipy.io
 import awswrangler
@@ -438,8 +439,23 @@ def load_raw(source, filename):
     if not filename.endswith('.mat'):
         filename = filename + '.mat'
 
-    with open(data_dir(source) + '/' + filename, 'rb') as f:
-        return scipy.io.loadmat(BytesIO(f.read()))
+    full_path = data_dir(source) + '/' + filename
+
+    try:
+        with open(full_path, 'rb') as f:
+            return scipy.io.loadmat(BytesIO(f.read()))
+
+    # This is horrific, but apparently none of the libraries for opening the
+    # new Matlab format accept file-like objects. Since they require
+    # a string path, if the file is nonlocal, I have to download it to
+    # a tempfile first.
+    except NotImplementedError:
+        if full_path.startswith('s3://'):
+            with tempfile.NamedTemporaryFile() as f:
+                awswrangler.s3.download(full_path, f)
+                return mat73.loadmat(f.name)
+        else:
+            return mat73.loadmat(full_path)
 
 
 def exp_name_parts(exp):
