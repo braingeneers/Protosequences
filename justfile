@@ -21,7 +21,7 @@ deploy src exp bin_size ks surrogate="real" method="default":
         s3files=$(aws s3 ls "$s3dir" | grep '[^ ]*\.mat' -o)
         for file in $s3files; do
             exp=$(basename "$file" .mat)
-            just deploy {{src}} $exp {{bin_size}} {{ks}} {{surrogate}} {{method}} || exit 1
+            just deploy "{{src}}" "$exp" "{{bin_size}}" "{{ks}}" "{{surrogate}}" "{{method}}" || exit 1
         done
 
     else
