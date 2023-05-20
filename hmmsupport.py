@@ -141,10 +141,10 @@ class Cache:
             filename, s3_object = self._cache_names(*args)
 
             if os.path.isdir(CACHE_DIR) and not os.path.isfile(filename):
-                _store_local(obj, filename)
+                _store_local(ret, filename)
 
             if S3_USER is not None:
-                _store_s3(obj, s3_object)
+                _store_s3(ret, s3_object)
 
         return ret
 
