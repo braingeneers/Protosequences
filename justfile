@@ -31,5 +31,13 @@ deploy src exp bin_size ks surrogate="real" method="default":
         envsubst < job.yml | kubectl apply -f -
     fi
 
+split-deploy src exp splits surrogate="real" method="default":
+    #! /usr/bin/env bash
+    for i in $(seq 0 $(({{splits}} - 1))); do
+        start=$((10 + (41 * i) / {{splits}}))
+        end=$((9 + (41 * (i + 1)) / {{splits}}))
+        just deploy "{{src}}" "{{exp}}" 30 "$start-$end" "{{surrogate}}" "{{method}}" || exit 1
+    done
+
 local src exp bin_size ks surrogate="real" method="default":
     python stash_hmms.py {{src}} {{exp}} {{bin_size}} {{ks}} {{surrogate}} {{method}}
