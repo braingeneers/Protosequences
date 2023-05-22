@@ -12,7 +12,7 @@ import joblib
 plt.ion()
 hmmsupport.figdir('pca')
 
-source = 'mouse'
+source = 'eth'
 bin_size_ms = 30
 n_stateses = np.arange(10, 51)
 
@@ -100,7 +100,7 @@ bad_tev = {exp: np.array([variance_by_axis(pca, exp, bad=True)
 bad_pev = {e: bad_tev[e] / bad_tev[e].sum(axis=1, keepdims=True)
            for e in experiments}
 
-if source == 'organoid':
+if source in ['organoid', 'eth']:
     for exp in tqdm(experiments):
         with figure(exp, save_exts=[]) as f:
             ax = f.gca()
@@ -123,9 +123,18 @@ if source == 'organoid':
         ax.violinplot([components_required(exp)
                        for exp in experiments],
                       showmeans=True, showextrema=False)
-        ax.set_xticks(1 + np.arange(len(experiments)),
+        ax.set_xticks(np.arange(1,5),
                       [f'Organoid {i}' for i in range(1,5)])
         ax.set_ylabel('Components Required to Match Surrogate')
+
+elif source == 'eth':
+    with figure('Companents Required for ETH Organoids') as f:
+        ax = f.gca()
+        ax.violinplot([components_required(exp)
+                       for exp in experiments],
+                      showmeans=True, showextrema=False)
+        ax.set_xticks(np.arange(1,5),
+                      [f'Well {i}' for i in range(2,6)])
 
 elif source == 'mouse':
     with figure('Mouse Dimensionality') as f:
@@ -141,15 +150,15 @@ elif source == 'mouse':
 state_idx = 10
 def transformed_data(exp:str, bad:bool):
     pca = (bad_pcas if bad else pcas)[exp][state_idx]
-    return pca.transform(raster(exp, bad))[:,:2].T
+    return pca.transform(raster(exp, bad))[:,:3].T
 
 def transformed_states(exp:str, bad:bool):
     pca = (bad_pcas if bad else pcas)[exp][state_idx]
-    return pca.transform(stateses(exp, bad)[state_idx])[:,:2].T
+    return pca.transform(stateses(exp, bad)[state_idx])[:,:3].T
 
 bad = False
 for exp in tqdm(experiments):
     with figure(exp, save_exts=[]) as f:
-        ax = f.gca()
-        ax.plot(*transformed_data(exp, bad), alpha=0.5, color='grey')
+        ax = f.add_subplot(111, projection='3d')
+        ax.plot(*transformed_data(exp, bad), color='grey', lw=0.1)
         ax.plot(*transformed_states(exp, bad), 'o')
