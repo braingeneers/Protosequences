@@ -728,8 +728,10 @@ class RateSurrogate(Raster):
         within the total time interval. Preserves individual firing rates
         and nothing else.
         '''
+        rng = np.random.RandomState(2953)
         _steal_metadata(self, raster)
-        self.units = [np.random.rand(len(t))*self.length_sec*1e3
+
+        self.units = [rng.rand(len(t))*self.length_sec*1e3
                       for t in raster.units]
         self.raster, self._poprate = _raster_poprate_from_units(
             1e3*self.length_sec, self.bin_size_ms, self.units)
@@ -745,10 +747,12 @@ class PoprateSurrogate(Raster):
         Surrogate raster formed by randomizing the unit ID for every spike.
         Preserves population rate and nothing else.
         '''
+        rng = np.random.RandomState(2953)
         _steal_metadata(self, raster)
+
         counts = np.cumsum([0] + [len(unit) for unit in raster.units])
         times = np.hstack(raster.units)
-        np.random.shuffle(times)
+        rng.shuffle(times)
         self.units = [times[a:b] for a,b in zip(counts, counts[1:])]
         self.raster, self._poprate = _raster_poprate_from_units(
             1e3*self.length_sec, self.bin_size_ms, self.units)
@@ -775,6 +779,7 @@ class RandSpikeMatrix(Raster):
         different neurons, using resampling to maintain the invariant that
         no neuron spikes twice in the same millisecond.
         '''
+        rng = np.random.RandomState(2953)
         _steal_metadata(self, raster)
         sm = _spike_matrix_from_units(
             1e3*self.length_sec, raster.units)
@@ -788,8 +793,7 @@ class RandSpikeMatrix(Raster):
             n_spikes = n_spikeses[frame]
             if n_spikes > 0:
                 for i in range(100):
-                    rand_i = np.random.choice(len(units), n_spikes,
-                                              replace=False)
+                    rand_i = rng.choice(len(units), n_spikes, replace=False)
                     rand_units = np.unique(units[rand_i])
                     if len(rand_units) == n_spikes:
                         unused_idces = np.isin(np.arange(len(units)),
@@ -810,6 +814,13 @@ class RandSpikeMatrix(Raster):
 class RandSpikeMatrix2(Raster):
     surrogate_name = 'Randomized Spike Matrix'
     def __init__(self, raster):
+        '''
+        Return a raster which preserves the population rate and mean firing
+        rate of each neuron by randomly reallocating all spike times to
+        different neurons, using resampling to maintain the invariant that
+        no neuron spikes twice in the same millisecond.
+        '''
+        rng = np.random.RandomState(2953)
         _steal_metadata(self, raster)
         sm = _spike_matrix_from_units(
             1e3*self.length_sec, raster.units)
@@ -827,8 +838,7 @@ class RandSpikeMatrix2(Raster):
         for frame in frame_order:
             n_spikes = n_spikeses[frame]
             p = weights/weights.sum()
-            rand_units = np.random.choice(units, n_spikes,
-                                          replace=False, p=p)
+            rand_units = rng.choice(units, n_spikes, replace=False, p=p)
             weights[rand_units] -= 1
             rsm[rand_units,frame] = 1
 
