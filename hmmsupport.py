@@ -769,49 +769,8 @@ def _spike_matrix_from_units(length_ms, units):
                             (len(units), int(length_ms)))
 
 
-@surrogate('tj')
-class RandSpikeMatrix(Raster):
-    surrogate_name = 'Randomized Spike Matrix'
-    def __init__(self, raster, verbose=False):
-        '''
-        Return a raster which preserves the population rate and mean firing
-        rate of each neuron by randomly reallocating all spike times to
-        different neurons, using resampling to maintain the invariant that
-        no neuron spikes twice in the same millisecond.
-        '''
-        rng = np.random.RandomState(2953)
-        _steal_metadata(self, raster)
-        sm = _spike_matrix_from_units(
-            1e3*self.length_sec, raster.units)
-
-        rsm = np.zeros(sm.shape, int)
-        units = np.repeat(np.arange(self.n_units),
-                          [len(t) for t in raster.units])
-        n_spikeses = sm.sum(0)
-        frame_order = np.argsort(n_spikeses)[::-1]
-        for frame in tqdm(frame_order, disable=not verbose):
-            n_spikes = n_spikeses[frame]
-            if n_spikes > 0:
-                for i in range(100):
-                    rand_i = rng.choice(len(units), n_spikes, replace=False)
-                    rand_units = np.unique(units[rand_i])
-                    if len(rand_units) == n_spikes:
-                        unused_idces = np.isin(np.arange(len(units)),
-                                               rand_i,
-                                               assume_unique=True,
-                                               invert=True)
-                        units = units[unused_idces]
-                        break
-                else:
-                    print('Dropping spikes due to statistics. :(')
-                rsm[rand_units,frame] = 1
-
-        self.raster, self._poprate, self.units = \
-            _raster_poprate_units_from_sm(1e3*self.length_sec,
-                                          self.bin_size_ms, rsm)
-
 @surrogate('rsm')
-class RandSpikeMatrix2(Raster):
+class RandSpikeMatrix(Raster):
     surrogate_name = 'Randomized Spike Matrix'
     def __init__(self, raster):
         '''
@@ -826,21 +785,19 @@ class RandSpikeMatrix2(Raster):
             1e3*self.length_sec, raster.units)
 
         rsm = np.zeros(sm.shape, int)
-        units = np.arange(self.n_units)
-        weights = np.array([len(t) for t in raster.units])
+        weights = sm.sum(0)
 
-        # Iterate over the frames in order of how many spikes they have,
-        # skipping all the frames with none.
-        n_spikeses = sm.sum(0)
-        frame_order = np.argsort(n_spikeses)[::-1]
-        frame_order = frame_order[n_spikeses[frame_order] != 0]
+        # Iterate over the units in order of how many spikes they have.
+        n_spikeses = sm.sum(1)
+        unit_order = np.argsort(n_spikeses)[::-1]
 
-        for frame in frame_order:
-            n_spikes = n_spikeses[frame]
-            p = weights/weights.sum()
-            rand_units = rng.choice(units, n_spikes, replace=False, p=p)
-            weights[rand_units] -= 1
-            rsm[rand_units,frame] = 1
+        for unit in unit_order:
+            n_spikes = n_spikeses[unit]
+            p = weights / weights.sum()
+            rand_frames = rng.choice(
+                rsm.shape[1], n_spikes, replace=False, p=p)
+            weights[rand_frames] -= 1
+            rsm[unit,rand_frames] = 1
 
         self.raster, self._poprate, self.units = \
             _raster_poprate_units_from_sm(1e3*self.length_sec,
