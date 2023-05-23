@@ -576,16 +576,30 @@ class Raster:
     def fine_rate(self):
         return self.poprate(5, 5)
 
-    def poprate(self, square_width_ms, gaussian_width_ms=None):
+    def poprate(self, square_width_ms=0, gaussian_width_ms=None):
+        '''
+        Calculate population rate with a two-stage filter.
+
+        The first stage is square and the second Gaussian. If one argument
+        is provided, the same width is used for both filters. If either
+        filter width is set to zero, that stage is skipped entirely.
+
+        The width parameter of the Gaussian filter is five times its
+        standard deviation because TJ uses an FIR Gaussian filter whose
+        parameter is its support. The one here is actually IIR, but the
+        difference is very small.
+        '''
+        ret = self._poprate * 1.0
+
+        if square_width_ms > 0:
+            ret = ndimage.uniform_filter1d(ret, square_width_ms)
+
         if gaussian_width_ms is None:
             gaussian_width_ms = square_width_ms
+        if gaussian_width_ms > 0:
+            ret = ndimage.gaussian_filter1d(ret, gaussian_width_ms/5)
 
-        # gaussian_filter1d uses the sigma of an IIR Gaussian, whereas TJ
-        # uses a Matlab function that specifies the width of an FIR window
-        # with sigma 1/5 of the width, so divide Gaussian width by 5.
-        return ndimage.gaussian_filter1d(
-            ndimage.uniform_filter1d(self._poprate*1.0, square_width_ms),
-            gaussian_width_ms / 5)
+        return ret
 
     def get_surrogate(self, which):
         return Raster.surrogates[which](self)
