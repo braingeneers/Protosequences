@@ -331,6 +331,13 @@ class Model:
         return _HMM_METHODS[self.library].states(self._hmm, raster.raster)
 
     def compute_entropy(self, raster=None, lmargin_sec=-1.0, rmargin_sec=1.0):
+        # Load the raster if not provided. You shouldn't actually need to
+        # provide it, as it is cached in the kernel and there's no reason
+        # to compute entropy on the wrong data.
+        if raster is None:
+            raster = get_raster(self.source, self.exp, self.bin_size_ms,
+                                self.surrogate)
+
         # Save the burst margins in units of bins.
         lmargin = int(lmargin_sec * 1000 / self.bin_size_ms)
         rmargin = int(rmargin_sec * 1000 / self.bin_size_ms)
