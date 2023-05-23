@@ -147,7 +147,6 @@ elif source == 'mouse':
 
 # %%
 
-state_idx = 10
 def transformed_data(exp:str, bad:bool):
     pca = (bad_pcas if bad else pcas)[exp][state_idx]
     return pca.transform(raster(exp, bad))[:,:3].T
@@ -156,9 +155,16 @@ def transformed_states(exp:str, bad:bool):
     pca = (bad_pcas if bad else pcas)[exp][state_idx]
     return pca.transform(stateses(exp, bad)[state_idx])[:,:3].T
 
-bad = False
-for exp in tqdm(experiments):
-    with figure(exp, save_exts=[]) as f:
-        ax = f.add_subplot(111, projection='3d')
-        ax.plot(*transformed_data(exp, bad), color='grey', lw=0.1)
-        ax.plot(*transformed_states(exp, bad), 'o')
+state_idx = 0
+if source == 'mouse':
+    # These are the key experiments Mattia pointed out as having good
+    # temporal structure.
+    key_exps = ['1009-3', '1005-1', '366-2']
+    with figure('Key Mouse Surrogate Comparison', figsize=(10,6)) as f:
+        axes = f.subplots(2, 3, subplot_kw=dict(projection='3d'))
+        for j, exp in enumerate(key_exps):
+            axes[0,j].set_title(f'{exp}: {rasters[exp].n_units} units')
+            for i, bad in enumerate([False, True]):
+                axes[i,j].plot(*transformed_data(exp, bad),
+                               color='grey', lw=0.1)
+                axes[i,j].plot(*transformed_states(exp, bad), 'o')
