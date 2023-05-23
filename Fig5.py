@@ -95,15 +95,19 @@ good_experiments = [e for e,r in rasters.items()
 def good_models(exp):
     return [m for m in rasters[exp][1] if m is not None]
 
-entropies, entropy_means, baselines, baseline_std = {}, {}, {}, {}
-for exp in good_experiments:
-    entropies[exp] = np.array([m.mean_entropy
-                               for m in good_models(exp)])
-    entropy_means[exp] = entropies[exp].mean(axis=0)
-    baselines[exp] = np.mean([m.baseline_entropy
-                              for m in good_models(exp)])
-    baseline_std[exp] = np.std([m.baseline_entropy
-                                for m in good_models(exp)])
+entropies = {e: [] for e in good_experiments}
+entropy_means, baseline_mean, baseline_std = {}, {}, {}
+with tqdm(total=len(good_experiments)*len(n_stateses)) as pbar:
+    for exp in good_experiments:
+        for m in good_models(exp):
+            m.compute_entropy(rasters[exp][0])
+            pbar.update()
+            entropies[exp].append(m.mean_entropy)
+            baseline_mean[exp].append(m.baseline_entropy)
+        entropies[exp] = np.array(entropies[exp])
+        entropy_means[exp] = entropies[exp].mean(axis=0)
+        baseline_std[exp] = np.std(baseline_mean[exp])
+        baseline_mean[exp] = np.mean(baseline_mean[exp])
 
 
 # %%
@@ -112,7 +116,8 @@ n_states = 15
 r = rasters[experiments[0]][0]
 model = Model(source, experiments[0], bin_size_ms, n_states, surr,
               library=hmm_library)
-h = model.states(r.raster)
+model.compute_entropy(r)
+h = model.states(r)
 
 lmargin_h, rmargin_h = model.burst_margins
 peaks = r.find_bursts(margins=model.burst_margins)
