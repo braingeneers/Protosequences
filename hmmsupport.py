@@ -301,6 +301,13 @@ else:
     _HMM_METHODS['default'] = _HMM_METHODS[default_method]
 
 
+def is_cached(source, exp, bin_size_ms, n_states, surrogate='real',
+              library='default'):
+    'Return whether the given model is cached.'
+    return _HMM_METHODS[library].fit.is_cached(source, exp, bin_size_ms,
+                                               n_states, surrogate)
+
+
 def get_fitted_hmm(source, exp, bin_size_ms, n_states, surrogate='real',
                    recompute_ok=False, library='default', verbose=False):
     if verbose:
@@ -378,53 +385,6 @@ class Model:
         # BytesIO workaround.
         with open(os.path.join(figdir(), path), 'wb') as f:
             scipy.io.savemat(f, mat)
-
-
-def cache_models(source, experiments, bin_size_mses, n_stateses,
-                 surrogates='real', library='default', verbose=False):
-    '''
-    Cache HMMs for all combinations of given parameters.
-
-    Caching now happens in the fit method, so just shelve all the rasters
-    once they're generated so we can collect them in the return. Most of
-    the complexity now comes from getting a progress bar with a proper
-    count of the total of models that need fitted.
-    '''
-    if not CACHE_ROOTS:
-        raise ValueError('No cache directory found.')
-
-    if verbose:
-        print('Loading data from', data_dir(source))
-        print('Caching models computed by method', library, 'to',
-              ' and '.join(CACHE_ROOTS))
-
-    argses = experiments, bin_size_mses, n_stateses, surrogates
-    needs_run = []
-    for p in itertools.product(*[np.atleast_1d(x) for x in argses]):
-        if not _HMM_METHODS[library].fit.is_cached(source, *p):
-            needs_run.append(p)
-
-    if verbose:
-        if needs_run:
-            print(f'Need to re-run for {len(needs_run)} parameter values:')
-            for p in needs_run:
-                print('\t', *p)
-        else:
-            print('All models already cached.')
-
-    if not needs_run:
-        return
-
-    # Turn needs_run into a progress bar, but verbose breaks the bar, so
-    # instead just let get_fitted_hmm print the parameters.
-    for p in needs_run if verbose else tqdm(needs_run):
-        try:
-            get_fitted_hmm(source, *p, recompute_ok=True,
-                           library=library, verbose=verbose)
-        except ZeroDivisionError:
-            e, bsms, n, surr = p
-            print(f'Failed to fit hmm to {source}/{e}[{surr}] '
-                  f'with T={bsms}ms, K={n}.')
 
 
 @contextmanager
