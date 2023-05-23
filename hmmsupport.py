@@ -311,11 +311,13 @@ def get_fitted_hmm(source, exp, bin_size_ms, n_states, surrogate='real',
 
 class Model:
     def __init__(self, source, exp, bin_size_ms, n_states,
-                 surrogate='real', library='default', recompute_ok=True):
+                 surrogate='real', library='default',
+                 verbose=False, recompute_ok=True):
 
         # Retrieve the (hopefully cached) model.
         self._hmm = get_fitted_hmm(source, exp, bin_size_ms, n_states,
                                    surrogate, library=library,
+                                   verbose=verbose,
                                    recompute_ok=recompute_ok)
 
         # Save metadata.
