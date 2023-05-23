@@ -65,24 +65,23 @@ S3_USER = os.environ.get('S3_USER')
 S3_CACHE = f's3://braingeneers/personal/{S3_USER}/cache'
 
 
-def _store_local(obj, path):
-    'Ensure a path exists and pickle an object to it.'
-    try:
-        dirname = os.path.dirname(filename)
-        os.makedirs(dirname, exist_ok=True)
-        with open(filename, 'wb') as f:
-            pickle.dump(obj, f)
-    except Exception as e:
-        print(f'Failed to save {filename}: {e}', file=sys.stderr)
+def _store(obj, path):
+    '''
+    Pickle an object to a path.
 
-
-def _store_s3(obj, path):
-    'Pickle an object to an S3 path.'
+    If the path is local, ensure that it exists before trying to open the
+    file.
+    '''
+    iss3 = path.startswith('s3://')
     try:
+        if not iss3:
+            dirname = os.path.dirname(path)
+            os.makedirs(dirname, exist_ok=True)
         with open(path, 'wb') as f:
             pickle.dump(obj, f)
     except Exception as e:
-        print(f'Failed to upload {s3_object}: {e}', file=sys.stderr)
+        verb = 'upload' if iss3 else 'save'
+        print(f'Failed to {verb} {path}: {e}', file=sys.stderr)
 
 
 class Cache:
@@ -128,7 +127,7 @@ class Cache:
             ret = pickle.load(f)
 
         if path.startswith('s3://') and os.path.isdir(CACHE_DIR):
-            _store_s3(ret, self._cache_names(*args)[0])
+            _store(ret, self._cache_names(*args)[0])
 
         return ret
 
@@ -140,11 +139,11 @@ class Cache:
 
             filename, s3_object = self._cache_names(*args)
 
-            if os.path.isdir(CACHE_DIR) and not os.path.isfile(filename):
-                _store_local(ret, filename)
+            if os.path.isdir(CACHE_DIR):
+                _store(ret, filename)
 
             if S3_USER is not None:
-                _store_s3(ret, s3_object)
+                _store(ret, s3_object)
 
         return ret
 
