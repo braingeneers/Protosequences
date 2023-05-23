@@ -40,6 +40,7 @@ n_stateses = np.arange(n_states[0], n_states[-1]+1)
 
 source = 'mouse'
 experiments = all_experiments(source)
+# experiments = ['1009-3', '1005-1', '366-2']
 
 if source == 'mouse':
     exp_age = {exp: load_raw(source, exp)['SUA'][0,0]['age'][0,0]
@@ -56,17 +57,17 @@ if age_subset is not None:
     experiments = [exp for exp in experiments
                    if exp_age[exp] in age_subset]
 
-print('Fitting HMMs.')
-cache_models(source, experiments, bin_size_ms, n_stateses, surr,
-             library=hmm_library)
-
 print('Loading fitted HMMs and calculating entropy.')
 rasters = {}
 for exp in tqdm(experiments):
     r = get_raster(source, exp, bin_size_ms, surr)
     def process_model(n):
-        m = Model(source, exp, bin_size_ms, n, surr, library=hmm_library)
-        m.compute_entropy(r)
+        m = Model(source, exp, bin_size_ms, n, surr, library=hmm_library,
+                  recompute_ok=False)
+        if m is None:
+            print(f'No model for {exp} with {n} states!')
+        else:
+            m.compute_entropy(r)
         return m
     models = joblib.Parallel(n_jobs=12)(
         joblib.delayed(process_model)(n)
@@ -109,7 +110,7 @@ for exp in good_experiments:
 # %%
 
 n_states = 15
-base_exp = '497-3'
+base_exp = '366-2'
 r = rasters[base_exp][0]
 model = rasters[base_exp][1][np.where(n_stateses == n_states)[0][0]]
 h = model.states(r)
@@ -247,10 +248,11 @@ with figure('Fig8', figsize=(8.5, 8.5)) as f:
 
     r = rasters[exp][0]
     peaks = r.find_bursts(margins=(lmargin, rmargin))
+    poprate = r.coarse_rate()
     for peak in peaks:
         peak_ms = int(round(peak * bin_size_ms))
         t_ms = np.arange(lmargin*bin_size_ms, rmargin*bin_size_ms+1)
-        pr.plot(t_ms/1e3, r.coarse_rate()[peak_ms+t_ms[0]:peak_ms+t_ms[-1]+1],
+        pr.plot(t_ms/1e3, poprate[peak_ms+t_ms[0]:peak_ms+t_ms[-1]+1],
                 f'C3', alpha=0.2)
 
     top = 4
