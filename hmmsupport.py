@@ -63,6 +63,10 @@ def all_experiments(source):
 CACHE_DIR = '.cache'
 S3_USER = os.environ.get('S3_USER')
 S3_CACHE = f's3://braingeneers/personal/{S3_USER}/cache'
+CACHE_ROOTS = [root_path for (root_path, valid) in [
+    (CACHE_DIR, os.path.isdir(CACHE_DIR)),
+    (S3_CACHE, S3_USER is not None)
+] if valid]
 
 
 def _store(obj, path):
@@ -386,9 +390,13 @@ def cache_models(source, experiments, bin_size_mses, n_stateses,
     the complexity now comes from getting a progress bar with a proper
     count of the total of models that need fitted.
     '''
+    if not CACHE_ROOTS:
+        raise ValueError('No cache directory found.')
+
     if verbose:
         print('Loading data from', data_dir(source))
-        print('Caching models computed by method', library, 'to', CACHE_DIR)
+        print('Caching models computed by method', library, 'to',
+              ' and '.join(CACHE_ROOTS))
 
     argses = experiments, bin_size_mses, n_stateses, surrogates
     needs_run = []
