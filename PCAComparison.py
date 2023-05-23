@@ -12,7 +12,7 @@ import joblib
 plt.ion()
 hmmsupport.figdir('pca')
 
-source = 'eth'
+source = 'mouse'
 bin_size_ms = 30
 n_stateses = np.arange(10, 51)
 
@@ -33,7 +33,7 @@ rasters:dict[str,hmmsupport.Raster] = {
     exp: get_raster(source, exp, bin_size_ms)
     for exp in tqdm(experiments)
     if raster_valid(exp)}
-experiments = [e for e in rasters]
+experiments = list(rasters.keys())
 
 print(len(experiments), 'experiments have any data')
 

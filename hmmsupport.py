@@ -797,7 +797,9 @@ class RandSpikeMatrix(Raster):
         # Iterate over the units in order of how many spikes they have.
         n_spikeses = sm.sum(1)
         unit_order = np.argsort(n_spikeses)[::-1]
+        unit_order = unit_order[n_spikeses[unit_order] > 0]
 
+        # Choose spike times from the big list for each unit.
         for unit in unit_order:
             n_spikes = n_spikeses[unit]
             p = weights / weights.sum()
