@@ -10,7 +10,7 @@ spec:
   template:
     spec:
       containers:
-      - name: fit-hmms
+      - name: hmm-worker
         image: atspaeth/organoid-hmm
         env:
           - name: S3_USER
@@ -20,7 +20,7 @@ spec:
         imagePullPolicy: Always
         volumeMounts:
           - mountPath: /root/.aws
-            name: s3-credentials
+            name: prp-s3-credentials
         resources:
           requests:
             cpu: 1
@@ -30,16 +30,9 @@ spec:
             cpu: 1
             memory: "5Gi"
             nvidia.com/gpu: 0
-        command: ["python", "stash_hmms.py"]
-        args:
-          - "$HMM_DATA_SOURCE"
-          - "$HMM_EXPERIMENT"
-          - "$HMM_BIN_SIZE_MS"
-          - "$HMM_K_RANGE"
-          - "$HMM_SURROGATE"
-          - "$HMM_METHOD"
+        command: ["python", "hmm_worker.py"]
       restartPolicy: Never
       volumes:
-        - name: s3-credentials
+        - name: prp-s3-credentials
           secret:
             secretName: prp-s3-credentials
