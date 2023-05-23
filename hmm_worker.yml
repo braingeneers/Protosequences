@@ -6,6 +6,7 @@ metadata:
     app: organoid-hmm
     user: $USER
 spec:
+  ttlSecondsAfterFinished: 3600
   backoffLimit: 0
   template:
     spec:
@@ -24,11 +25,11 @@ spec:
         resources:
           requests:
             cpu: 1
-            memory: "2Gi"
+            memory: "4Gi"
             nvidia.com/gpu: 0
           limits:
             cpu: 1
-            memory: "5Gi"
+            memory: "8Gi"
             nvidia.com/gpu: 0
         command: ["python", "hmm_worker.py"]
       restartPolicy: Never
