@@ -567,7 +567,9 @@ class Raster:
         unitsub = [t[(t >= start_ms) & (t < end_ms)]
                    for t in self.units]
         times = np.hstack(unitsub)
-        idces = np.hstack([[i]*len(t) for i,t in enumerate(unitsub)])
+        idces = np.hstack([[i]*len(t)
+                           for i,t in enumerate(unitsub)
+                           if len(t) > 0])
         return idces, times
 
     def coarse_rate(self):
