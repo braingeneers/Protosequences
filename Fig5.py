@@ -8,7 +8,7 @@ from scipy import stats, signal, sparse, interpolate
 import matplotlib.pyplot as plt
 import matplotlib.colors as plc
 import hmmsupport
-from hmmsupport import get_raster, figure, load_raw, Model
+from hmmsupport import get_raster, figure, load_raw, Model, all_experiments
 from sklearn.decomposition import PCA
 import warnings
 from tqdm import tqdm
@@ -18,12 +18,16 @@ import re
 randomize = False
 surr = 'rsm' if randomize else 'real'
 
+source = 'eth'
+experiments = [x for x in all_experiments(source)
+               if source != 'organoid' or x.startswith('L')]
+
 if 'HMM_METHOD' in os.environ:
     hmm_library = os.environ['HMM_METHOD']
-    figure_name = 'Fig5 ' + hmm_library
+    figure_name = f'fig5 {source} {hmm_library}'
 else:
     hmm_library = 'default'
-    figure_name = 'Fig5'
+    figure_name = f'fig5 {source}'
 
 if randomize:
     figure_name += ' Surrogate'
@@ -35,16 +39,6 @@ bin_size_ms = 30
 n_states = 10, 20
 n_stateses = np.arange(n_states[0], n_states[-1]+1)
 
-source = 'organoid'
-organoids_ages = {
-    'L1_200123_2953_C': 7.7,
-    'L2_200123_2950_C': 11.3,
-    'L3_200123_2957_C': 11.3,
-    'L5_200520_5116_C': 7.0,
-}
-experiments = list(organoids_ages.keys())
-
-
 print('Loading fitted HMMs and calculating entropy.')
 with tqdm(total=len(experiments)*len(n_stateses)) as pbar:
     rasters = {}
@@ -55,26 +49,21 @@ with tqdm(total=len(experiments)*len(n_stateses)) as pbar:
                                          surr, library=hmm_library))
             pbar.update()
 
-# I can't read the Matlab file perfectly, so instead of TJ's experiment
-# names, I have to hackily identify them by the number of units.
-scaf_units = load_raw('scaf', 'scaf_unit_numbers')
-scaf_unit_counts = [scaf_units['scaf_units'][0,i].shape[0]
-                    + scaf_units['non_scaf_units'][0,i].shape[0]
-                    for i in range(4)]
-organoid_names = {e: re.search('_\d\d\d\d_', e).group(0)[1:-1]
-                  for e in experiments}
-scafs = {e: load_raw('scaf', f'{n}_cos_sim')['scaf_window'][0,:]/1e3
-         for e, n in organoid_names.items()}
 
-# Also read the burst edges and peaks from TJ's files for comparison to
-# the ones I compute...
-# Some of the arrays have mismatches, so I correct that manually too...
-burst_edges = {e: load_raw('burstedges', f'{n}_BurstEdges')['edges'] * 1e3
-               for e, n in organoid_names.items()}
-burst_peaks = {e: load_raw('burstedges', f'{n}_BurstPeaks')['tburst'][0,:]
-               for e, n in organoid_names.items()}
-burst_peaks['L2_200123_2950_C'] = burst_peaks['L2_200123_2950_C'][1:]
-burst_peaks['L3_200123_2957_C'] = burst_peaks['L3_200123_2957_C'][1:]
+srm_name = {e: e.split('_')[0] + '_single_recording_metrics'
+            for e in experiments}
+srms = {e: load_raw('metrics', n) for e,n in srm_name.items()}
+scafs = {e: srm['scaf_window'][0,:]/1e3
+         for e,srm in srms.items()}
+burst_edges = {e: srm['edges']
+               for e,srm in srms.items()}
+burst_peaks = {e: srm['tburst'][0,:]
+               for e,srm in srms.items()}
+# One of the burst peaks has one peak too many for some reason, so drop it.
+# It's at the end, maybe too close to the end of the recording.
+if 'L2_200123_2950_C' in experiments:
+    burst_edges['L2_200123_2950_C'] = burst_edges['L2_200123_2950_C'][:-1,:]
+
 
 for k,(r,_) in rasters.items():
     nunits = r.raster.shape[1]
