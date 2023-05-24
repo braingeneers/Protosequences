@@ -8,8 +8,7 @@ from scipy import stats, signal, sparse, interpolate
 import matplotlib.pyplot as plt
 import matplotlib.colors as plc
 import hmmsupport
-from hmmsupport import get_raster, figure, figdir, load_raw
-from hmmsupport import cache_models, Model
+from hmmsupport import get_raster, figure, load_raw, Model
 from sklearn.decomposition import PCA
 import warnings
 from tqdm import tqdm
@@ -30,7 +29,7 @@ if randomize:
     figure_name += ' Surrogate'
 
 plt.ion()
-figdir('paper')
+hmmsupport.figdir('paper')
 
 bin_size_ms = 30
 n_states = 10, 20
@@ -45,10 +44,6 @@ organoids_ages = {
 }
 experiments = list(organoids_ages.keys())
 
-
-print('Fitting HMMs.')
-cache_models(source, experiments, bin_size_ms, n_stateses, surr,
-             library=hmm_library)
 
 print('Loading fitted HMMs and calculating entropy.')
 with tqdm(total=len(experiments)*len(n_stateses)) as pbar:
@@ -96,6 +91,7 @@ def good_models(exp):
     return [m for m in rasters[exp][1] if m is not None]
 
 entropies = {e: [] for e in good_experiments}
+baselines = {e: [] for e in good_experiments}
 entropy_means, baseline_mean, baseline_std = {}, {}, {}
 with tqdm(total=len(good_experiments)*len(n_stateses)) as pbar:
     for exp in good_experiments:
@@ -103,11 +99,11 @@ with tqdm(total=len(good_experiments)*len(n_stateses)) as pbar:
             m.compute_entropy(rasters[exp][0])
             pbar.update()
             entropies[exp].append(m.mean_entropy)
-            baseline_mean[exp].append(m.baseline_entropy)
+            baselines[exp].append(m.baseline_entropy)
         entropies[exp] = np.array(entropies[exp])
         entropy_means[exp] = entropies[exp].mean(axis=0)
-        baseline_std[exp] = np.std(baseline_mean[exp])
-        baseline_mean[exp] = np.mean(baseline_mean[exp])
+        baseline_std[exp] = np.std(baselines[exp])
+        baseline_mean[exp] = np.mean(baselines[exp])
 
 
 # %%
