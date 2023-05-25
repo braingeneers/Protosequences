@@ -18,7 +18,7 @@ import re
 randomize = False
 surr = 'rsm' if randomize else 'real'
 
-source = 'eth'
+source = 'organoid'
 experiments = [x for x in all_experiments(source)
                if source != 'organoid' or x.startswith('L')]
 
@@ -40,30 +40,20 @@ n_states = 10, 20
 n_stateses = np.arange(n_states[0], n_states[-1]+1)
 
 print('Loading fitted HMMs and calculating entropy.')
-with tqdm(total=len(experiments)*len(n_stateses)) as pbar:
+srms = {}
+with tqdm(total=len(experiments)*(1+len(n_stateses))) as pbar:
     rasters = {}
     for exp in experiments:
+        srms[exp] = load_raw(
+            'metrics', exp.split('_')[0] + '_single_recording_metrics')
         rasters[exp] = get_raster(source, exp, bin_size_ms, surr), []
+        pbar.update()
+        window = srms[exp]['burst_window'][0,:]/1e3
         for n in n_stateses:
             rasters[exp][1].append(Model(source, exp, bin_size_ms, n,
                                          surr, library=hmm_library))
+            rasters[exp][1][-1].compute_entropy(rasters[exp][0], *window)
             pbar.update()
-
-
-srm_name = {e: e.split('_')[0] + '_single_recording_metrics'
-            for e in experiments}
-srms = {e: load_raw('metrics', n) for e,n in srm_name.items()}
-scafs = {e: srm['scaf_window'][0,:]/1e3
-         for e,srm in srms.items()}
-burst_edges = {e: srm['edges']
-               for e,srm in srms.items()}
-burst_peaks = {e: srm['tburst'][0,:]
-               for e,srm in srms.items()}
-# One of the burst peaks has one peak too many for some reason, so drop it.
-# It's at the end, maybe too close to the end of the recording.
-if 'L2_200123_2950_C' in experiments:
-    burst_edges['L2_200123_2950_C'] = burst_edges['L2_200123_2950_C'][:-1,:]
-
 
 for k,(r,_) in rasters.items():
     nunits = r.raster.shape[1]
@@ -72,44 +62,40 @@ for k,(r,_) in rasters.items():
     print(f'{k} has {nunits} units firing at {meanfr:0.2f} '
           f'Hz with {nbursts} bursts')
 
-good_experiments = [e for e,r in rasters.items()
-                    if any(m is not None
-                           for m in r[1])]
-
-def good_models(exp):
-    return [m for m in rasters[exp][1] if m is not None]
-
-entropies = {e: [] for e in good_experiments}
-baselines = {e: [] for e in good_experiments}
-entropy_means, baseline_mean, baseline_std = {}, {}, {}
-with tqdm(total=len(good_experiments)*len(n_stateses)) as pbar:
-    for exp in good_experiments:
-        for m in good_models(exp):
-            m.compute_entropy(rasters[exp][0])
-            pbar.update()
-            entropies[exp].append(m.mean_entropy)
-            baselines[exp].append(m.baseline_entropy)
-        entropies[exp] = np.array(entropies[exp])
-        entropy_means[exp] = entropies[exp].mean(axis=0)
-        baseline_std[exp] = np.std(baselines[exp])
-        baseline_mean[exp] = np.mean(baselines[exp])
-
 
 # %%
 
+# The figure plots results for one example HMM first before comparing
+# multiple, so pick a number of states and an experiment of interest.
 n_states = 15
-r = rasters[experiments[0]][0]
-model = Model(source, experiments[0], bin_size_ms, n_states, surr,
-              library=hmm_library)
-model.compute_entropy(r)
-h = model.states(r)
+r,models = rasters[experiments[0]]
+model = models[np.nonzero(n_stateses == n_states)[0][0]]
 
+# Compute hidden states throughout the recording, and use them to identify
+# which states happen at which peak-relative times.
+h = model.states(r)
 lmargin_h, rmargin_h = model.burst_margins
 peaks = r.find_bursts(margins=model.burst_margins)
 state_prob = r.observed_state_probs(h, burst_margins=model.burst_margins)
 state_order = np.argsort(np.argmax(state_prob, axis=1))
 poprate = r.coarse_rate()
+# unit_order = srms[experiments[0]]['mean_rate_ordering'][0,:] - 1
+unit_order = np.vstack([srms[experiments[0]]['scaf_units'],
+                        srms[experiments[0]]['non_scaf_units']])[:,0] - 1
+inverse_unit_order = np.argsort(unit_order)
 
+# The figure compares three states of interest, which need to depend on the
+# specific trained model we're looking at...
+match source, hmm_library, randomize, n_states:
+    case 'organoid', 'default', False, 15:
+        interesting_states = [8, 9, 10]
+    case 'organoid', 'default', True, 15:
+        interesting_states = [7, 8, 9]
+    case 'eth', 'default', False, 15:
+        interesting_states = [4, 5, 6]
+    case _:
+        print('No interesting states chosen yet for these parameters.')
+        interesting_states = state_prob[state_order,:].max(1).argsort()[-3:]
 
 with figure(figure_name, figsize=(8.5, 8.5)) as f:
 
@@ -131,10 +117,11 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
         idces, times_ms = r.spikes_within(when.start*bin_size_ms,
                                           when.stop*bin_size_ms)
         times = (times_ms - peak_float*bin_size_ms) / 1000
-        ax.plot(times, idces+1, 'ko', markersize=0.5)
+        ax.plot(times, inverse_unit_order[idces]+1, 'ko', markersize=0.5)
         ax.set_ylim(0.5, rsub.shape[1]+0.5)
         ax.set_xticks([0, 0.5])
-        ax.set_xlim(-0.3, 0.6)
+        # ax.set_xlim(-0.3, 0.6)
+        ax.set_xlim(*srms[experiments[0]]['burst_window'][0,:]/1e3)
         ax.set_xlabel('Time from Peak (s)')
         ax.set_yticks([])
         ax2 = ax.twinx()
@@ -168,7 +155,7 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
     rates = [RA, RB, RC]
     for ax in examples:
         ax.set_xticks([])
-        # ax.set_xlabel('Realizations', rotation=35)
+        ax.set_xlabel('Realizations', rotation=35)
     for ax in rates:
         ax.set_xlim([0, 5])
         ax.set_xticks([0, 5])
@@ -183,23 +170,24 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
     A.set_ylabel('Neuron Unit ID')
     A.set_yticks([1, rsub.shape[1]])
 
-    states = [8, 9, 10]   # for the currently saved SSM model
-    # states = [7, 8, 9]   # for the SSM model trained on surrogate data
-    for axS, axH, s in zip(examples, rates, states):
-        data = r.raster[h == state_order[s], :][:60, :]
+    for axS, axH, s in zip(examples, rates, interesting_states):
+        data = r.raster[h == state_order[s], :][:, unit_order]
+        data_sub = data[np.random.choice(data.shape[0], 60),:]
         axS.set_title(f'State {s+1}')
-        axS.imshow(data.T, aspect='auto', interpolation='none',
+        axS.imshow(data_sub.T, aspect='auto', interpolation='none',
+                   vmin=0, vmax=r.raster.max(),
                    extent=[0, 1, r.raster.shape[1]+0.5, 0.5])
 
         axH.plot(data.mean(0), np.arange(r.raster.shape[1])+1,
                  c=plt.get_cmap('gist_rainbow')(s/(n_states-1)),
                  alpha=0.3)
 
-    for ax, s0, s1 in zip(deltas, states[:-1], states[1:]):
+    for ax, s0, s1 in zip(deltas, interesting_states[:-1],
+                          interesting_states[1:]):
         mu0 = r.raster[h == state_order[s0], :].mean(0)
         mu1 = r.raster[h == state_order[s1], :].mean(0)
         delta = mu1 - mu0
-        ax.plot(delta, np.arange(r.raster.shape[1])+1,
+        ax.plot(delta[unit_order], np.arange(r.raster.shape[1])+1,
                 c='red', alpha=0.3)
 
     # Subfigure C: state heatmap.
@@ -224,21 +212,15 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
                                        top=0.4, bottom=0.05,
                                        left=0.06, right=0.985))
 
-    burst_widths = {e: (burst_edges[e]
-                        - burst_peaks[e][:,None]).mean(0) / 1e3
-                    for e in experiments}
-
     def hexcolor(r, g, b, a):
         r, g, b, a = [int(x*255) for x in (r, g, b, a)]
         return f'#{r:02x}{g:02x}{b:02x}{a:02x}'
 
-    lmargin, rmargin = model.burst_margins
-
     en, pr = axes[0, :], axes[1, :]
-    time_sec = np.arange(lmargin, rmargin+1) * bin_size_ms / 1000
-    for i, exp in enumerate(good_experiments):
-        # Plot the entropy on the left.
-        ent = entropies[exp]
+    for i, exp in enumerate(experiments):
+        lmargin, rmargin = rasters[exp][1][0].burst_margins
+        time_sec = np.arange(lmargin, rmargin+1) * bin_size_ms / 1000
+        ent = np.array([m.mean_entropy for m in rasters[exp][1]])
         c = f'C{i}'
         meanent = ent.mean(0)
         stdent = ent.std(0)
@@ -251,10 +233,9 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
                            alpha=0.5, color=c)
 
         for a in (en[i], pr[i]):
-            a.axvspan(scafs[exp][0], scafs[exp][1],
-                       color='gray', alpha=0.3)
-            width = scafs[exp][1] - scafs[exp][0]
-            a.set_xlim(burst_widths[exp])
+            a.axvspan(*srms[exp]['scaf_window'][0,:]/1e3,
+                      color='gray', alpha=0.3)
+            a.set_xlim(srms[exp]['burst_window'][0,:]/1e3)
             a.set_yticks([])
         en[i].set_xticks([])
         en[i].set_title(f'Organoid {i+1}')
@@ -266,10 +247,11 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
         r = rasters[exp][0]
         peaks = r.find_bursts(margins=model.burst_margins)
         poprate = r.coarse_rate()
+        t_ms = np.arange(lmargin*bin_size_ms, (rmargin+1)*bin_size_ms)
         for peak in peaks:
-            peak = int(peak * bin_size_ms)
-            burst = poprate[peak+lmargin*bin_size_ms
-                            :peak+(rmargin+1)*bin_size_ms]
+            peak_ms = int(round(peak * bin_size_ms))
+            burst = poprate[peak_ms+lmargin*bin_size_ms
+                            :peak_ms+(rmargin+1)*bin_size_ms]
             pr[i].plot(t_ms/1e3, burst, c, alpha=0.1)
 
     en[0].set_ylabel('Entropy (bits)')
