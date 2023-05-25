@@ -1,35 +1,24 @@
 #  Fig5.py
 # Generate most of figure 5 of the final manuscript.
-import os
-import sys
 import numpy as np
-import scipy.io
-from scipy import stats, signal, sparse, interpolate
 import matplotlib.pyplot as plt
-import matplotlib.colors as plc
 import hmmsupport
 from hmmsupport import get_raster, figure, load_raw, Model, all_experiments
 from sklearn.decomposition import PCA
-import warnings
 from tqdm import tqdm
-import re
 
-
-randomize = False
-surr = 'rsm' if randomize else 'real'
 
 source = 'organoid'
 experiments = [x for x in all_experiments(source)
                if source != 'organoid' or x.startswith('L')]
 
-if 'HMM_METHOD' in os.environ:
-    hmm_library = os.environ['HMM_METHOD']
-    figure_name = f'fig5 {source} {hmm_library}'
-else:
-    hmm_library = 'default'
-    figure_name = f'fig5 {source}'
+surr = 'real'
+hmm_library = 'default'
 
-if randomize:
+figure_name = f'Fig5 {source}'
+if hmm_library != 'default':
+    figure_name += ' ' + hmm_library
+if surr != 'real':
     figure_name += ' Surrogate'
 
 plt.ion()

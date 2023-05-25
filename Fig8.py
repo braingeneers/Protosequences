@@ -1,45 +1,33 @@
 # Fig8.py
 # Generate my part of figure 8 of the final manuscript.
-import os
-import sys
 import numpy as np
-import scipy.io
-from scipy import stats, signal, sparse, interpolate
 import matplotlib.pyplot as plt
-import matplotlib.colors as plc
-from hmmsupport import get_raster, figure, figdir, open, load_raw
-from hmmsupport import cache_models, Model, all_experiments
+import hmmsupport
+from hmmsupport import get_raster, figure, load_raw, Model
 from sklearn.decomposition import PCA
-import glob
-import warnings
 from tqdm import tqdm
-import re
 import joblib
 
 
-randomize = False
-surr = 'rsm' if randomize else 'real'
+surr = 'real'
 age_subset = None
+hmm_library = 'default'
 
-if 'HMM_METHOD' in os.environ:
-    hmm_library = os.environ['HMM_METHOD']
-    figure_name = 'Fig8 ' + hmm_library
-else:
-    hmm_library = 'default'
-    figure_name = 'Fig8'
-
-if randomize:
+figure_name = 'Fig8'
+if hmm_library != 'default':
+    figure_name += ' ' + hmm_library
+if surr != 'real':
     figure_name += ' Surrogate'
 
 plt.ion()
-figdir('paper')
+hmmsupport.figdir('paper')
 
 bin_size_ms = 30
 n_states = 10, 50
 n_stateses = np.arange(n_states[0], n_states[-1]+1)
 
 source = 'mouse'
-experiments = all_experiments(source)
+experiments = hmmsupport.all_experiments(source)
 # experiments = ['1009-3', '1005-1', '366-2']
 
 if source == 'mouse':
