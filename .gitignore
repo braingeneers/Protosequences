@@ -1,5 +1,5 @@
 .cache/
 data/
 __pycache__/
-old/
+untracked/
 figures/
