@@ -38,6 +38,8 @@ with tqdm(total=len(experiments)*(1+len(n_stateses))) as pbar:
         rasters[exp] = get_raster(source, exp, bin_size_ms, surr), []
         pbar.update()
         window = srms[exp]['burst_window'][0,:]/1e3
+        window[0] = min(window[0], -0.3)
+        window[1] = max(window[1], 0.6)
         for n in n_stateses:
             rasters[exp][1].append(Model(source, exp, bin_size_ms, n,
                                          surr, library=hmm_library))
@@ -68,7 +70,8 @@ peaks = r.find_bursts(margins=model.burst_margins)
 state_prob = r.observed_state_probs(h, burst_margins=model.burst_margins)
 state_order = np.argsort(np.argmax(state_prob, axis=1))
 poprate = r.coarse_rate()
-unit_order = srms[experiments[0]]['mean_rate_ordering'][0,:] - 1
+unit_order = srms[experiments[0]]['mean_rate_ordering'].flatten() - 1
+n_packet_units = len(srms[experiments[0]]['scaf_units'])
 
 # inverse_unit_order[i] is the index of unit i in unit_order.
 inverse_unit_order = np.zeros_like(unit_order)
@@ -93,7 +96,7 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
     axes = f.subplots(
         1, 3, gridspec_kw=dict(wspace=0.1,
                                top=0.995, bottom=0.82,
-                               left=0.07, right=0.94))
+                               left=0.04, right=0.95))
     for ax, peak_float in zip(axes, peaks):
         peak = int(round(peak_float))
         when = slice(peak+lmargin_h, peak+rmargin_h+1)
@@ -110,8 +113,8 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
         ax.plot(times, inverse_unit_order[idces]+1, 'ko', markersize=0.5)
         ax.set_ylim(0.5, rsub.shape[1]+0.5)
         ax.set_xticks([0, 0.5])
-        # ax.set_xlim(-0.3, 0.6)
         ax.set_xlim(*srms[experiments[0]]['burst_window'][0,:]/1e3)
+        ax.axhline(len(unit_order) - n_packet_units + 0.5, color='k', lw=0.5)
         ax.set_xlabel('Time from Peak (s)')
         ax.set_yticks([])
         ax2 = ax.twinx()
@@ -123,8 +126,8 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
 
     ax2.set_ylabel('Population Rate (kHz)')
     ax2.set_yticks([0, 3])
-    axes[0].set_ylabel('Neuron Unit ID')
-    axes[0].set_yticks([1, rsub.shape[1]])
+    axes[0].set_ylabel(r'Non-Packet \hspace{1.5em} Packet', y=1.03,
+                       horizontalalignment='right')
 
     # Subfigure B: state heatmap.
     BCtop, BCbot = 0.73, 0.5
@@ -172,8 +175,9 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
     for ax in examples + rates + deltas:
         ax.set_yticks([])
         ax.set_ylim(0.5, rsub.shape[1]+0.5)
-    A.set_ylabel('Neuron Unit ID')
-    A.set_yticks([1, rsub.shape[1]])
+        ax.axhline(len(unit_order) - n_packet_units + 0.5, color='k', lw=0.5)
+    A.set_ylabel(r'Non-Packet \hspace{3em} Packet', y=1.01,
+                 horizontalalignment='right')
 
     for axS, axH, s in zip(examples, rates, interesting_states):
         data = r.raster[h == state_order[s], :][:, unit_order]
@@ -196,18 +200,18 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
                 c='red', alpha=0.3)
 
     # Subfigure D: entropy.
-    axes = f.subplots(2, 4,
+    axes = f.subplots(2, 1,
                       gridspec_kw=dict(hspace=0.1,
                                        height_ratios=[3,2],
                                        top=0.4, bottom=0.05,
-                                       left=0.06, right=0.985))
+                                       left=0.06, right=0.25))
 
     def hexcolor(r, g, b, a):
         r, g, b, a = [int(x*255) for x in (r, g, b, a)]
         return f'#{r:02x}{g:02x}{b:02x}{a:02x}'
 
-    en, pr = axes[0, :], axes[1, :]
-    for i, exp in enumerate(experiments):
+    en, pr = [axes[0]], [axes[1]]
+    for i, exp in [(0,experiments[0])]:
         lmargin, rmargin = rasters[exp][1][0].burst_margins
         time_sec = np.arange(lmargin, rmargin+1) * bin_size_ms / 1000
         ent = np.array([m.mean_entropy for m in rasters[exp][1]])
@@ -230,7 +234,7 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
         en[i].set_xticks([])
         en[i].set_title(f'Organoid {i+1}')
 
-        top = 4
+        top = 3
         en[i].set_ylim(0, top)
         en[i].set_yticks([])
         # Plot the population rate for each burst on the right.
