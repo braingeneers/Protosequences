@@ -126,19 +126,34 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
     axes[0].set_ylabel('Neuron Unit ID')
     axes[0].set_yticks([1, rsub.shape[1]])
 
-    # Subfigure B: state examples.
+    # Subfigure B: state heatmap.
     BCtop, BCbot = 0.73, 0.5
-    Bleft, Bwidth = 0.03, 0.6
+    ax = f.subplots(gridspec_kw=dict(top=BCtop, bottom=BCbot,
+                                     left=0.06, right=0.3))
+    im = ax.imshow(state_prob[state_order, :], vmin=0, vmax=1,
+                   extent=[t_sec[0], t_sec[-1],
+                           n_states+0.5, 0.5],
+                   interpolation='none', aspect='auto')
+    ax.set_yticks([1, n_states])
+    ax.set_xticks(0.3*np.arange(-1,3))
+    ax.set_xlim(-0.3, 0.6)
+    ax.set_xlabel('Time From Burst Peak (s)')
+    ax.set_ylabel('Hidden State Number')
+    plt.colorbar(im, ax=ax, label='Probability of Observing State',
+                 aspect=10, ticks=[0, 1])
+
+    # Subfigure C: state examples.
+    Cleft, Cwidth = 0.375, 0.625
     (A,RA), (B,RB), (C,RC) = [
         f.subplots(1, 2, gridspec_kw=dict(top=BCtop, bottom=BCbot,
                                           width_ratios=[3,1], wspace=0,
-                                          left=Bleft+Bwidth*l,
-                                          right=Bleft+Bwidth*r))
+                                          left=Cleft+Cwidth*l,
+                                          right=Cleft+Cwidth*r))
         for l,r in [(0.06, 0.26), (0.4, 0.61), (0.76, 0.96)]]
     deltas = dBA, dCB = [
         f.subplots(gridspec_kw=dict(top=BCtop, bottom=BCbot,
-                                    left=Bleft+Bwidth*l,
-                                    right=Bleft+Bwidth*r))
+                                    left=Cleft+Cwidth*l,
+                                    right=Cleft+Cwidth*r))
         for l,r in [(0.305,0.365), (0.655,0.715)]]
 
     examples = [A, B, C]
@@ -179,21 +194,6 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
         delta = mu1 - mu0
         ax.plot(delta[unit_order], np.arange(r.raster.shape[1])+1,
                 c='red', alpha=0.3)
-
-    # Subfigure C: state heatmap.
-    ax = f.subplots(gridspec_kw=dict(top=BCtop, bottom=BCbot,
-                                     left=0.7, right=0.97))
-    im = ax.imshow(state_prob[state_order, :], vmin=0, vmax=1,
-                   extent=[t_sec[0], t_sec[-1],
-                           n_states+0.5, 0.5],
-                   interpolation='none', aspect='auto')
-    ax.set_yticks([1, n_states])
-    ax.set_xticks(0.3*np.arange(-1,3))
-    ax.set_xlim(-0.3, 0.6)
-    ax.set_xlabel('Time From Burst Peak (s)')
-    ax.set_ylabel('Hidden State Number')
-    plt.colorbar(im, ax=ax, label='Probability of Observing State',
-                 aspect=10, ticks=[0, 1])
 
     # Subfigure D: entropy.
     axes = f.subplots(2, 4,
