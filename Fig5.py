@@ -91,12 +91,12 @@ match source, hmm_library, surr, n_states:
         print('No interesting states chosen yet for these parameters.')
         interesting_states = state_prob[state_order,:].max(1).argsort()[-3:]
 
-with figure(figure_name, figsize=(8.5, 8.5)) as f:
+with figure(figure_name, figsize=(8.5, 11)) as f:
 
     # Subfigure A: example burst rasters.
     axes = f.subplots(
         1, 3, gridspec_kw=dict(wspace=0.1,
-                               top=0.995, bottom=0.82,
+                               top=0.995, bottom=0.85,
                                left=0.04, right=0.95))
     for ax, peak_float in zip(axes, peaks):
         peak = int(round(peak_float))
@@ -131,7 +131,7 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
                        horizontalalignment='right')
 
     # Subfigure B: state heatmap.
-    BCtop, BCbot = 0.73, 0.5
+    BCtop, BCbot = 0.78, 0.58
     ax = f.subplots(gridspec_kw=dict(top=BCtop, bottom=BCbot,
                                      left=0.06, right=0.3))
     im = ax.imshow(state_prob[state_order, :], vmin=0, vmax=1,
@@ -201,7 +201,7 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
                 c='red', alpha=0.3)
 
     # Subfigure D: entropy specifically for Organoid 1.
-    DEtop, DEbot=0.4, 0.05
+    DEtop, DEbot = 0.51, 0.3
     en, pr = f.subplots(2, 1,
                         gridspec_kw=dict(height_ratios=[3,2],
                                          top=DEtop, bottom=DEbot,
@@ -235,6 +235,7 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
     pr.set_xticks([0, 0.5])
     en.set_ylabel('Entropy (bits)')
     en.set_yticks([0, entropy_range])
+    pr.set_yticks([0, 2])
     pr.set_ylabel('Population Rate (Hz)')
     pr.set_xlabel('Time from Burst Peak (s)')
     f.align_ylabels((en, pr))
