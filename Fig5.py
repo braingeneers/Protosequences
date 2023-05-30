@@ -68,10 +68,11 @@ peaks = r.find_bursts(margins=model.burst_margins)
 state_prob = r.observed_state_probs(h, burst_margins=model.burst_margins)
 state_order = np.argsort(np.argmax(state_prob, axis=1))
 poprate = r.coarse_rate()
-# unit_order = srms[experiments[0]]['mean_rate_ordering'][0,:] - 1
-unit_order = np.vstack([srms[experiments[0]]['scaf_units'],
-                        srms[experiments[0]]['non_scaf_units']])[:,0] - 1
-inverse_unit_order = np.argsort(unit_order)
+unit_order = srms[experiments[0]]['mean_rate_ordering'][0,:] - 1
+
+# inverse_unit_order[i] is the index of unit i in unit_order.
+inverse_unit_order = np.zeros_like(unit_order)
+inverse_unit_order[unit_order] = np.arange(len(unit_order))
 
 # The figure compares three states of interest, which need to depend on the
 # specific trained model we're looking at...
