@@ -58,8 +58,9 @@ for k,(r,_) in rasters.items():
 
 # The figure plots results for one example HMM first before comparing
 # multiple, so pick a number of states and an experiment of interest.
+exp = experiments[0]
 n_states = 15
-r,models = rasters[experiments[0]]
+r, models = rasters[exp]
 model = models[np.nonzero(n_stateses == n_states)[0][0]]
 
 # Compute hidden states throughout the recording, and use them to identify
@@ -70,8 +71,8 @@ peaks = r.find_bursts(margins=model.burst_margins)
 state_prob = r.observed_state_probs(h, burst_margins=model.burst_margins)
 state_order = np.argsort(np.argmax(state_prob, axis=1))
 poprate = r.coarse_rate()
-unit_order = srms[experiments[0]]['mean_rate_ordering'].flatten() - 1
-n_packet_units = len(srms[experiments[0]]['scaf_units'])
+unit_order = srms[exp]['mean_rate_ordering'].flatten() - 1
+n_packet_units = len(srms[exp]['scaf_units'])
 
 # inverse_unit_order[i] is the index of unit i in unit_order.
 inverse_unit_order = np.zeros_like(unit_order)
@@ -113,7 +114,7 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
         ax.plot(times, inverse_unit_order[idces]+1, 'ko', markersize=0.5)
         ax.set_ylim(0.5, rsub.shape[1]+0.5)
         ax.set_xticks([0, 0.5])
-        ax.set_xlim(*srms[experiments[0]]['burst_window'][0,:]/1e3)
+        ax.set_xlim(*srms[exp]['burst_window'][0,:]/1e3)
         ax.axhline(len(unit_order) - n_packet_units + 0.5, color='k', lw=0.5)
         ax.set_xlabel('Time from Peak (s)')
         ax.set_yticks([])
@@ -146,7 +147,7 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
                  aspect=10, ticks=[0, 1])
 
     # Subfigure C: state examples.
-    Cleft, Cwidth = 0.375, 0.625
+    Cleft, Cwidth = 0.35, 0.65
     (A,RA), (B,RB), (C,RC) = [
         f.subplots(1, 2, gridspec_kw=dict(top=BCtop, bottom=BCbot,
                                           width_ratios=[3,1], wspace=0,
@@ -199,58 +200,45 @@ with figure(figure_name, figsize=(8.5, 8.5)) as f:
         ax.plot(delta[unit_order], np.arange(r.raster.shape[1])+1,
                 c='red', alpha=0.3)
 
-    # Subfigure D: entropy.
-    axes = f.subplots(2, 1,
-                      gridspec_kw=dict(hspace=0.1,
-                                       height_ratios=[3,2],
-                                       top=0.4, bottom=0.05,
-                                       left=0.06, right=0.25))
+    # Subfigure D: entropy specifically for Organoid 1.
+    DEtop, DEbot=0.4, 0.05
+    en, pr = f.subplots(2, 1,
+                        gridspec_kw=dict(height_ratios=[3,2],
+                                         top=DEtop, bottom=DEbot,
+                                         left=0.06, right=0.25))
 
-    def hexcolor(r, g, b, a):
-        r, g, b, a = [int(x*255) for x in (r, g, b, a)]
-        return f'#{r:02x}{g:02x}{b:02x}{a:02x}'
+    lmargin, rmargin = model.burst_margins
+    time_sec = np.arange(lmargin, rmargin+1) * bin_size_ms / 1000
+    ent = np.array([m.mean_entropy for m in rasters[exp][1]])
+    meanent, stdent = ent.mean(0), ent.std(0)
+    en.plot(time_sec, meanent - stdent, 'C0', label=exp)
+    en.plot(time_sec, meanent + stdent, 'C0')
+    en.plot(time_sec, meanent, 'C0--')
+    en.fill_between(time_sec, meanent - stdent, meanent + stdent,
+                    alpha=0.5, color='C0')
 
-    en, pr = [axes[0]], [axes[1]]
-    for i, exp in [(0,experiments[0])]:
-        lmargin, rmargin = rasters[exp][1][0].burst_margins
-        time_sec = np.arange(lmargin, rmargin+1) * bin_size_ms / 1000
-        ent = np.array([m.mean_entropy for m in rasters[exp][1]])
-        c = f'C{i}'
-        meanent = ent.mean(0)
-        stdent = ent.std(0)
-        minent = meanent - stdent
-        maxent = meanent + stdent
-        en[i].plot(time_sec, minent, c, label=exp)
-        en[i].plot(time_sec, maxent, c)
-        en[i].plot(time_sec, meanent, '--', c=c)
-        en[i].fill_between(time_sec, minent, maxent,
-                           alpha=0.5, color=c)
+    for a in (en, pr):
+        a.axvspan(*srms[exp]['scaf_window'][0,:]/1e3,
+                  color='gray', alpha=0.3)
+        a.set_xlim(srms[exp]['burst_window'][0,:]/1e3)
 
-        for a in (en[i], pr[i]):
-            a.axvspan(*srms[exp]['scaf_window'][0,:]/1e3,
-                      color='gray', alpha=0.3)
-            a.set_xlim(srms[exp]['burst_window'][0,:]/1e3)
-            a.set_yticks([])
-        en[i].set_xticks([])
-        en[i].set_title(f'Organoid {i+1}')
+    entropy_range = 3
+    en.set_ylim(0, entropy_range)
+    t_ms = np.arange(lmargin*bin_size_ms, (rmargin+1)*bin_size_ms)
+    for peak in peaks:
+        peak_ms = int(round(peak * bin_size_ms))
+        burst = poprate[peak_ms+lmargin*bin_size_ms
+                        :peak_ms+(rmargin+1)*bin_size_ms]
+        pr.plot(t_ms/1e3, burst, 'C0', alpha=0.1)
 
-        top = 3
-        en[i].set_ylim(0, top)
-        en[i].set_yticks([])
-        # Plot the population rate for each burst on the right.
-        r = rasters[exp][0]
-        peaks = r.find_bursts(margins=model.burst_margins)
-        poprate = r.coarse_rate()
-        t_ms = np.arange(lmargin*bin_size_ms, (rmargin+1)*bin_size_ms)
-        for peak in peaks:
-            peak_ms = int(round(peak * bin_size_ms))
-            burst = poprate[peak_ms+lmargin*bin_size_ms
-                            :peak_ms+(rmargin+1)*bin_size_ms]
-            pr[i].plot(t_ms/1e3, burst, c, alpha=0.1)
+    en.set_xticks([])
+    pr.set_xticks([0, 0.5])
+    en.set_ylabel('Entropy (bits)')
+    en.set_yticks([0, entropy_range])
+    pr.set_ylabel('Population Rate (Hz)')
+    pr.set_xlabel('Time from Burst Peak (s)')
+    f.align_ylabels((en, pr))
 
-    en[0].set_ylabel('Entropy (bits)')
-    en[0].set_yticks([0, top])
-    pr[0].set_ylabel('Normalized Pop. FR')
-    for ax in pr:
-        ax.set_xlabel('Time from Burst Peak (s)')
-    f.align_ylabels(axes)
+    # Subfigure E: some kind of per-organoid metrics??
+    E = f.subplots(1, 1, gridspec_kw=dict(top=DEtop, bottom=DEbot,
+                                          left=0.32, right=0.98))
