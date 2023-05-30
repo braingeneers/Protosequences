@@ -76,12 +76,12 @@ inverse_unit_order[unit_order] = np.arange(len(unit_order))
 
 # The figure compares three states of interest, which need to depend on the
 # specific trained model we're looking at...
-match source, hmm_library, randomize, n_states:
-    case 'organoid', 'default', False, 15:
+match source, hmm_library, surr, n_states:
+    case 'organoid', 'default', 'real', 15:
         interesting_states = [8, 9, 10]
-    case 'organoid', 'default', True, 15:
+    case 'organoid', 'default', 'rsm', 15:
         interesting_states = [7, 8, 9]
-    case 'eth', 'default', False, 15:
+    case 'eth', 'default', 'rsm', 15:
         interesting_states = [4, 5, 6]
     case _:
         print('No interesting states chosen yet for these parameters.')
