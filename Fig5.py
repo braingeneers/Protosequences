@@ -7,7 +7,6 @@ from hmmsupport import get_raster, figure, load_raw, Model, all_experiments
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 
-
 source = 'organoid'
 experiments = [x for x in all_experiments(source)
                if source != 'organoid' or x.startswith('L')]
@@ -91,6 +90,32 @@ match source, hmm_library, surr, n_states:
         print('No interesting states chosen yet for these parameters.')
         interesting_states = state_prob[state_order,:].max(1).argsort()[-3:]
 
+# Fit PCA to the states of the model up there as well as the same-parameter
+# model trained on the surrogate data.
+r_bad = get_raster(source, exp, bin_size_ms, 'rsm')
+model_bad = Model(source, exp, bin_size_ms, n_states, 'rsm')
+pca_good, pca_bad = [PCA().fit(np.exp(m._hmm.observations.log_lambdas))
+                     for m in [model, model_bad]]
+
+# Do a PCA like that for every trained model across all n_stateses and all
+# organoids, and store the fraction of variance explained by PC1 in two
+# arrays, one for the real and one for the surrogate data.
+def pve_score(surr):
+    scores = []
+    for exp in experiments:
+        for n in n_stateses:
+            m = Model(source, exp, bin_size_ms, n, surr)
+            pca = PCA().fit(np.exp(m._hmm.observations.log_lambdas))
+            scores.append(pca.explained_variance_ratio_[0])
+    return scores
+pve_good, pve_bad = [np.array(pve_score(surr)) for surr in ['real', 'rsm']]
+
+# Create a color map which is identical to gist_rainbow but with all the
+# colors rescaled by 0.3 to make them match the ones above that are
+# affected by alpha.
+alpha_rainbow = plt.matplotlib.colors.LinearSegmentedColormap.from_list(
+    'alpha_rainbow', 0.5 + 0.5*plt.get_cmap('gist_rainbow')(np.linspace(0, 1, 256)))
+
 with figure(figure_name, figsize=(8.5, 11)) as f:
 
     # Subfigure A: example burst rasters.
@@ -105,8 +130,8 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
         hsub = np.array([np.nonzero(state_order == s)[0][0]
                          for s in h[when]])
         t_sec = (np.ogrid[when] - peak) * bin_size_ms / 1000
-        ax.imshow(hsub.reshape((1,-1)), cmap='gist_rainbow',
-                  aspect='auto', alpha=0.3, vmin=0, vmax=n_states-1,
+        ax.imshow(hsub.reshape((1,-1)), cmap=alpha_rainbow, alpha=0.8,
+                  aspect='auto', vmin=0, vmax=n_states-1,
                   extent=[t_sec[0], t_sec[-1], 0.5, rsub.shape[1]+0.5])
         idces, times_ms = r.spikes_within(when.start*bin_size_ms,
                                           when.stop*bin_size_ms)
@@ -189,8 +214,7 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
                    extent=[0, 1, r.raster.shape[1]+0.5, 0.5])
 
         axH.plot(data.mean(0), np.arange(r.raster.shape[1])+1,
-                 c=plt.get_cmap('gist_rainbow')(s/(n_states-1)),
-                 alpha=0.3)
+                 c=alpha_rainbow(s/(n_states-1)))
 
     for ax, s0, s1 in zip(deltas, interesting_states[:-1],
                           interesting_states[1:]):
@@ -243,3 +267,54 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     # Subfigure E: some kind of per-organoid metrics??
     E = f.subplots(1, 1, gridspec_kw=dict(top=DEtop, bottom=DEbot,
                                           left=0.32, right=0.98))
+
+    # Subfigure F: PCA of real vs. surrogate data.
+    FGtop, FGbot = 0.23, 0.04
+    F = f.subplots(1, 2, width_ratios=[11, 6],
+                   gridspec_kw=dict(wspace=-0.5, top=FGtop, bottom=FGbot,
+                                    left=-0.05, right=0.4))
+
+    for ax, pca, ri, m in zip(F, [pca_good, pca_bad], [r, r_bad],
+                              [model, model_bad]):
+        ax.set_aspect('equal')
+        h = m.states(ri)
+        data = pca.transform(ri.raster)[:,1::-1]
+        ax.scatter(data[:,0], data[:,1], s=2, c=h, cmap=alpha_rainbow)
+        ax.set_ylim([-3, 13])
+        ax.set_xlabel('PC2')
+    F[0].set_ylabel('PC1')
+    F[0].set_yticks([0, 10])
+    F[1].set_yticks([])
+    F[0].set_title('Real')
+    F[1].set_title('Randomized')
+    F[0].set_xlim([-3, 8])
+    F[0].set_xticks([0, 5])
+    F[1].set_xlim([-3, 3])
+    F[1].set_xticks([-2, 2])
+
+    # Subfigure G: explained variance ratio across multiple organoids.
+    evr, bp = f.subplots(1, 2, width_ratios=[5,2],
+                         gridspec_kw=dict(top=FGtop, bottom=FGbot,
+                                          wspace=0.4,
+                                          left=0.42, right=0.98))
+
+    evr.plot(np.arange(n_states)+1, pca_good.explained_variance_ratio_,
+             label='Real')
+    evr.plot(np.arange(n_states)+1, pca_bad.explained_variance_ratio_,
+             label='Randomized')
+    evr.set_xticks([1, 15])
+    evr.set_xlabel('Principal Component')
+    evr.set_ylabel('Explained Variance Ratio')
+    evr.set_yticks([0, 1])
+    evr.legend(ncol=2, loc='upper right')
+
+    bp = evr.inset_axes([0.3, 0.2, 0.6, 0.6])
+    plot = bp.boxplot([pve_good, pve_bad], positions=[0.8, 1.2],
+                      patch_artist=True, widths=0.2)
+    bp.set_ylim([0.48, 1.02])
+    bp.set_xlim([0.6, 1.4])
+    bp.set_xticks([])
+    bp.set_yticks([])
+    evr.indicate_inset_zoom(bp, edgecolor='black');
+    for patch, color in zip(plot['boxes'], ['lightblue', 'orange']):
+        patch.set_facecolor(color)
