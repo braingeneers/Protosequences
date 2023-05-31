@@ -53,6 +53,26 @@ for k,(r,_) in rasters.items():
           f'Hz with {nbursts} bursts')
 
 
+# Compute consistency of neurons by state for every model and organoid for
+# both real and surrogate data. This is an n_states x n_units array
+# indicating how likely a unit is to have nonzero firings in each time bin
+# of a given state.
+def consistency_scores(exp, surr):
+    scores = []
+    for n in n_stateses:
+        r = get_raster(source, exp, bin_size_ms, surr)
+        m = Model(source, exp, bin_size_ms, n, surr)
+        h = m.states(r)
+        scores.append(np.array([(r.raster[h == i, :] > 0).mean(0)
+                                for i in range(n)]))
+    return scores
+consistency_good, consistency_bad = [
+    {exp: consistency_scores(exp, surr)
+     for exp in experiments}
+    for surr in ['real', 'rsm']]
+
+
+
 # %%
 
 # The figure plots results for one example HMM first before comparing
