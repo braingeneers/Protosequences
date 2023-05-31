@@ -24,7 +24,7 @@ plt.ion()
 hmmsupport.figdir('paper')
 
 bin_size_ms = 30
-n_states = 10, 20
+n_states = 10, 50
 n_stateses = np.arange(n_states[0], n_states[-1]+1)
 
 print('Loading fitted HMMs and calculating entropy.')
@@ -105,6 +105,11 @@ def pve_score(surr):
     for exp in experiments:
         for n in n_stateses:
             m = Model(source, exp, bin_size_ms, n, surr)
+            pca = PCA().fit(np.exp(m._hmm.observations.log_lambdas))
+            scores.append(pca.explained_variance_ratio_[0])
+    for exp in all_experiments('eth'):
+        for n in n_stateses:
+            m = Model('eth', exp, bin_size_ms, n, surr)
             pca = PCA().fit(np.exp(m._hmm.observations.log_lambdas))
             scores.append(pca.explained_variance_ratio_[0])
     return scores
@@ -309,12 +314,11 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     evr.legend(ncol=2, loc='upper right')
 
     bp = evr.inset_axes([0.3, 0.2, 0.6, 0.6])
-    plot = bp.boxplot([pve_good, pve_bad], positions=[0.8, 1.2],
-                      patch_artist=True, widths=0.2)
-    bp.set_ylim([0.48, 1.02])
+    for pve, x in zip([pve_good, pve_bad], [0.8, 1.2]):
+        bp.violinplot(pve, showmedians=True, showextrema=False,
+                      positions=[x], widths=0.2)
+    bp.set_ylim([0.38, 1.02])
     bp.set_xlim([0.6, 1.4])
     bp.set_xticks([])
     bp.set_yticks([])
     evr.indicate_inset_zoom(bp, edgecolor='black');
-    for patch, color in zip(plot['boxes'], ['lightblue', 'orange']):
-        patch.set_facecolor(color)
