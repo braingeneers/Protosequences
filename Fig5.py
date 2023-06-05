@@ -14,7 +14,7 @@ experiments = [x for x in all_experiments(source)
 surr = 'real'
 hmm_library = 'default'
 
-figure_name = f'Fig5 {source}'
+figure_name = f'Fig5 {source}' if source != 'organoid' else 'Fig5'
 if hmm_library != 'default':
     figure_name += ' ' + hmm_library
 if surr != 'real':
@@ -140,6 +140,9 @@ pve_good, pve_bad = [np.array(pve_score(surr)) for surr in ['real', 'rsm']]
 # affected by alpha.
 alpha_rainbow = plt.matplotlib.colors.LinearSegmentedColormap.from_list(
     'alpha_rainbow', 0.5 + 0.5*plt.get_cmap('gist_rainbow')(np.linspace(0, 1, 256)))
+
+
+# %%
 
 with figure(figure_name, figsize=(8.5, 11)) as f:
 
@@ -302,9 +305,9 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     for ax, pca, ri, m in zip(F, [pca_good, pca_bad], [r, r_bad],
                               [model, model_bad]):
         ax.set_aspect('equal')
-        h = m.states(ri)
         data = pca.transform(ri.raster)[:,1::-1]
-        ax.scatter(data[:,0], data[:,1], s=2, c=h, cmap=alpha_rainbow)
+        ax.scatter(data[:,0], data[:,1], s=2, c=m.states(ri),
+                   cmap=alpha_rainbow)
         ax.set_ylim([-3, 13])
         ax.set_xlabel('PC2')
     F[0].set_ylabel('PC1')
