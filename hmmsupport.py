@@ -661,7 +661,7 @@ class Raster:
 
         return peaks
 
-    def observed_state_probs(self, h, burst_margins, rms=None,
+    def observed_state_probs(self, h, burst_margins, burst_rms=None,
                              n_states=None):
         '''
         Return a probability distribution of the states in h over time
@@ -671,7 +671,7 @@ class Raster:
         '''
         if n_states is None:
             n_states = h.max()+1
-        peaks = self.find_bursts(margins=burst_margins, rms=rms)
+        peaks = self.find_bursts(margins=burst_margins, rms=burst_rms)
         lmargin, rmargin = burst_margins
         state_prob = np.zeros((n_states, rmargin-lmargin+1))
 
@@ -682,6 +682,29 @@ class Raster:
                 state_prob[s,i] += 1 / len(peaks)
 
         return state_prob
+
+    def state_order(self, h, burst_margins, burst_rms=None, n_states=None):
+        '''
+        Return an order of the states based on the median burst-relative
+        time at which they occur.
+
+        Automatically determines how many states to include, but can be
+        overridden by passing n_states.
+        '''
+        if n_states is None:
+            n_states = h.max()+1
+        peaks = self.find_bursts(margins=burst_margins, rms=burst_rms)
+        lmargin, rmargin = burst_margins
+
+        burst_relative_state_times = [[] for _ in range(n_states)]
+        for peak in peaks:
+            peak_bin = int(round(peak))
+            state_seq = h[peak_bin+lmargin:peak_bin+rmargin+1]
+            for i, s in enumerate(state_seq):
+                burst_relative_state_times[s].append(i+lmargin)
+        
+        return np.argsort([np.median(times)
+                           for times in burst_relative_state_times])
 
 
 def surrogate(name=None):
