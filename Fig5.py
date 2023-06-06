@@ -53,23 +53,30 @@ for k,(r,_) in rasters.items():
           f'Hz with {nbursts} bursts')
 
 
-# Compute consistency of neurons by state for every model and organoid for
-# both real and surrogate data. This is an n_states x n_units array
-# indicating how likely a unit is to have nonzero firings in each time bin
-# of a given state.
-def consistency_scores(exp, surr):
-    scores = []
-    for n in n_stateses:
-        r = get_raster(source, exp, bin_size_ms, surr)
-        m = Model(source, exp, bin_size_ms, n, surr)
-        h = m.states(r)
-        scores.append(np.array([(r.raster[h == i, :] > 0).mean(0)
-                                for i in range(n)]))
-    return scores
-consistency_good, consistency_bad = [
-    {exp: consistency_scores(exp, surr)
-     for exp in experiments}
-    for surr in ['real', 'rsm']]
+print('Calculating consistency scores per neuron.')
+with tqdm(total=len(experiments)*len(n_stateses)*2) as pbar:
+    def consistency_scores(exp, surr):
+        '''
+        Compute an n_states x n_units array indicating how likely a unit is
+        to have nonzero firings in each time bin of a given state.
+        '''
+        scoreses = []
+        for n in n_stateses:
+            r = get_raster(source, exp, bin_size_ms, surr)
+            m = Model(source, exp, bin_size_ms, n, surr)
+            h = m.states(r)
+            scores = np.array([(r.raster[h == i, :] > 0).mean(0)
+                                    for i in range(n)])
+            unit_order = srms[exp]['mean_rate_ordering'].flatten() - 1
+            margins = rasters[exp][1][0].burst_margins
+            state_order = r.state_order(h, margins, n_states=n)
+            scoreses.append(scores[:, unit_order][state_order, :])
+            pbar.update()
+        return scoreses
+    consistency_good, consistency_bad = [
+        {exp: consistency_scores(exp, surr)
+         for exp in experiments}
+        for surr in ['real', 'rsm']]
 
 
 
@@ -88,7 +95,7 @@ h = model.states(r)
 lmargin_h, rmargin_h = model.burst_margins
 peaks = r.find_bursts(margins=model.burst_margins)
 state_prob = r.observed_state_probs(h, burst_margins=model.burst_margins)
-state_order = np.argsort(np.argmax(state_prob, axis=1))
+state_order = r.state_order(h, model.burst_margins, n_states=n_states)
 poprate = r.coarse_rate()
 unit_order = srms[exp]['mean_rate_ordering'].flatten() - 1
 n_packet_units = len(srms[exp]['scaf_units'])
@@ -141,8 +148,6 @@ pve_good, pve_bad = [np.array(pve_score(surr)) for surr in ['real', 'rsm']]
 alpha_rainbow = plt.matplotlib.colors.LinearSegmentedColormap.from_list(
     'alpha_rainbow', 0.5 + 0.5*plt.get_cmap('gist_rainbow')(np.linspace(0, 1, 256)))
 
-
-# %%
 
 with figure(figure_name, figsize=(8.5, 11)) as f:
 
