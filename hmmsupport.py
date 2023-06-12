@@ -534,14 +534,17 @@ class Raster:
             # matrix seems to have dropped some spikes.
             else:
                 if 'spike_times' in mat:
-                    self.units = [times*1e3 for times in mat['spike_times']]
-                    self.length_sec = mat['t_spk_mat'].shape[0] / 1e3
+                    self.units = []
+                    for times in mat['spike_times']:
+                        while len(times) == 1:
+                            times = times[0]
+                        self.units.append(times * 1e3)
                 else:
                     self.units = [
                         (unit[0][0]['spike_train']/mat['fs']*1e3)[0,:]
                         for unit in mat['units'][0]]
-                    self.length_sec = np.ceil(max(
-                        unit.max() for unit in self.units)/1e3)
+                self.length_sec = np.ceil(max(
+                    unit.max() for unit in self.units)/1e3)
                 self.raster, self._poprate = _raster_poprate_from_units(
                     1e3*self.length_sec, self.bin_size_ms, self.units)
                 self._burst_default_rms = 3.0
