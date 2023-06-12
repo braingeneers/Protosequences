@@ -6,15 +6,17 @@ import hmmsupport
 from hmmsupport import get_raster, figure, load_raw, Model, all_experiments
 from sklearn.decomposition import PCA
 from tqdm import tqdm
+import itertools
 
-source = 'organoid'
-experiments = [x for x in all_experiments(source)
-               if source != 'organoid' or x.startswith('L')]
+experiments = [
+    ('organoid', exp) for exp in all_experiments('organoid')
+    if exp.startswith('L')
+] + [('eth', exp) for exp in all_experiments('eth')]
 
 surr = 'real'
 hmm_library = 'default'
 
-figure_name = f'Fig5 {source}' if source != 'organoid' else 'Fig5'
+figure_name = 'Fig5'
 if hmm_library != 'default':
     figure_name += ' ' + hmm_library
 if surr != 'real':
@@ -31,7 +33,7 @@ print('Loading fitted HMMs and calculating entropy.')
 srms = {}
 with tqdm(total=len(experiments)*(1+len(n_stateses))) as pbar:
     rasters = {}
-    for exp in experiments:
+    for source, exp in experiments:
         srms[exp] = load_raw(
             'metrics', exp.split('_')[0] + '_single_recording_metrics')
         rasters[exp] = get_raster(source, exp, bin_size_ms, surr), []
@@ -55,7 +57,7 @@ for k,(r,_) in rasters.items():
 
 print('Calculating consistency scores per neuron.')
 with tqdm(total=len(experiments)*len(n_stateses)*2) as pbar:
-    def consistency_scores(exp, surr):
+    def consistency_scores(source, exp, surr):
         '''
         Compute an n_states x n_units array indicating how likely a unit is
         to have nonzero firings in each time bin of a given state.
@@ -74,8 +76,8 @@ with tqdm(total=len(experiments)*len(n_stateses)*2) as pbar:
             pbar.update()
         return scoreses
     consistency_good, consistency_bad = [
-        {exp: consistency_scores(exp, surr)
-         for exp in experiments}
+        {exp: consistency_scores(source, exp, surr)
+         for (source,exp) in experiments}
         for surr in ['real', 'rsm']]
 
 
@@ -84,7 +86,7 @@ with tqdm(total=len(experiments)*len(n_stateses)*2) as pbar:
 
 # The figure plots results for one example HMM first before comparing
 # multiple, so pick a number of states and an experiment of interest.
-exp = experiments[0]
+source, exp = experiments[0]
 n_states = 15
 r, models = rasters[exp]
 model = models[np.nonzero(n_stateses == n_states)[0][0]]
