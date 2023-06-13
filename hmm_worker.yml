@@ -25,11 +25,11 @@ spec:
         resources:
           requests:
             cpu: 1
-            memory: "4Gi"
+            memory: "12Gi"
             nvidia.com/gpu: 0
           limits:
             cpu: 1
-            memory: "8Gi"
+            memory: "16Gi"
             nvidia.com/gpu: 0
         command: ["python", "hmm_worker.py"]
       restartPolicy: Never
