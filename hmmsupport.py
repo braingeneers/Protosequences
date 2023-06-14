@@ -6,6 +6,7 @@ import os
 import sys
 import pickle
 import joblib
+import h5py
 import mat73
 import numpy as np
 import scipy.io
@@ -408,7 +409,21 @@ def figure(name, save_args={}, save_exts=['png'], **kwargs):
         f.savefig(path, **save_args)
 
 
-def load_raw(source, filename):
+def _load73(filename, only_include=None):
+    '''
+    Load raw data from a Matlab 7.3 file on disk, only including the
+    specified variables. Silently ignore missing entries.
+    '''
+    # Mat73 doesn't support silently ignoring, so we have to actually filter
+    # them out. Fortunately, we only care about top-level variables, so this
+    # is easy to do.
+    if only_include is not None:
+        with h5py.File(filename) as f:
+            only_include = [k for k in only_include if k in f]
+    return mat73.loadmat(filename, only_include=only_include)
+
+
+def load_raw(source, filename, only_include=None):
     'Load raw data from a .mat file under a data directory.'
 
     # We have to do this manually since we're using open() instead of
@@ -420,7 +435,8 @@ def load_raw(source, filename):
 
     try:
         with open(full_path, 'rb') as f:
-            return scipy.io.loadmat(BytesIO(f.read()))
+            return scipy.io.loadmat(BytesIO(f.read()),
+                                    variable_names=only_include)
 
     # This is horrific, but apparently none of the libraries for opening the
     # new Matlab format accept file-like objects. Since they require
@@ -430,9 +446,9 @@ def load_raw(source, filename):
         if full_path.startswith('s3://'):
             with tempfile.NamedTemporaryFile(suffix='.mat') as f:
                 awswrangler.s3.download(full_path, f)
-                return mat73.loadmat(f.name)
+                return _load73(f.name, only_include)
         else:
-            return mat73.loadmat(full_path)
+            return _load73(full_path, only_include)
 
 
 def exp_name_parts(exp):
@@ -512,7 +528,10 @@ class Raster:
         # First try loading the data from .mat files, in either Mattia's or
         # Tal's format...
         try:
-            mat = load_raw(source, experiment)
+            # Save memory by only loading variables we'll actually use.
+            mat = load_raw(source, experiment, only_include=[
+                'spike_matrix', 'SUA', 'spike_train', 'fs', 'units',
+                'spike_times', '#refs#'])
 
             # Mattia's data is formatted with something called a SUA, with
             # fixed sample rate of 1 kHz, or possibly the spike_matrix is
