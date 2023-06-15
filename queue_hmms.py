@@ -32,6 +32,10 @@ def parse_range_str(range_str):
 
 
 if __name__ == '__main__':
+    dryrun = '--dryrun' in sys.argv
+    if dryrun:
+        sys.argv.remove('--dryrun')
+
     # Validate the arguments.
     try:
         if len(sys.argv) == 5:
@@ -78,6 +82,9 @@ if __name__ == '__main__':
     for exp, T, K, surrogate in needs_run:
         print(f'  {source}/{exp}[{surrogate}] with {T=}ms, {K=}.')
 
+    # If this is a dry run, don't actually bother queueing anything.
+    if dryrun:
+        sys.exit()
 
     # Get the MQTT queue and add all the jobs to it.
     q = MessageBroker().get_queue('atspaeth/hmm-job-queue')
