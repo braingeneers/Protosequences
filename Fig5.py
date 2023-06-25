@@ -1,12 +1,13 @@
 #  Fig5.py
 # Generate most of figure 5 of the final manuscript.
+import itertools
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import hmmsupport
 from hmmsupport import get_raster, figure, load_raw, Model, all_experiments
 from sklearn.decomposition import PCA
 from tqdm import tqdm
-import itertools
 
 experiments = [
     ('organoid', exp) for exp in all_experiments('organoid')
@@ -55,31 +56,36 @@ for k,(r,_) in rasters.items():
           f'Hz with {nbursts} bursts')
 
 
-print('Calculating consistency scores per neuron.')
-with tqdm(total=len(experiments)*len(n_stateses)*2) as pbar:
-    def consistency_scores(source, exp, surr):
-        '''
-        Compute an n_states x n_units array indicating how likely a unit is
-        to have nonzero firings in each time bin of a given state.
-        '''
-        scoreses = []
-        for n in n_stateses:
+try:
+    with open('.cache/consistencies.pickle', 'rb') as f:
+        consistency_good, consistency_bad = pickle.load(f)
+    print('Loaded consistency scores from file.')
+except FileNotFoundError:
+    print('Calculating consistency scores per neuron.')
+    with tqdm(total=len(experiments)*len(n_stateses)*2) as pbar:
+        def consistency_scores(source, exp, n, surr):
+            '''
+            Compute an n_states x n_units array indicating how likely a unit is
+            to have nonzero firings in each time bin of a given state.
+            '''
             r = get_raster(source, exp, bin_size_ms, surr)
             m = Model(source, exp, bin_size_ms, n, surr)
             h = m.states(r)
             scores = np.array([(r.raster[h == i, :] > 0).mean(0)
-                                    for i in range(n)])
+                               for i in range(n)])
             unit_order = srms[exp]['mean_rate_ordering'].flatten() - 1
             margins = rasters[exp][1][0].burst_margins
             state_order = r.state_order(h, margins, n_states=n)
-            scoreses.append(scores[:, unit_order][state_order, :])
             pbar.update()
-        return scoreses
-    consistency_good, consistency_bad = [
-        {exp: consistency_scores(source, exp, surr)
-         for (source,exp) in experiments}
-        for surr in ['real', 'rsm']]
-
+            scores[np.isnan(scores)] = 0
+            return scores[:, unit_order]
+        consistency_good, consistency_bad = [
+            {exp: [consistency_scores(source, exp, n, surr)
+                   for n in n_stateses]
+             for (source,exp) in experiments}
+            for surr in ['real', 'rsm']]
+    with open('.cache/consistencies.pickle', 'wb') as f:
+        pickle.dump((consistency_good, consistency_bad), f)
 
 
 # %%
@@ -131,14 +137,9 @@ pca_good, pca_bad = [PCA().fit(np.exp(m._hmm.observations.log_lambdas))
 # arrays, one for the real and one for the surrogate data.
 def pve_score(surr):
     scores = []
-    for exp in experiments:
+    for src,exp in experiments:
         for n in n_stateses:
-            m = Model(source, exp, bin_size_ms, n, surr)
-            pca = PCA().fit(np.exp(m._hmm.observations.log_lambdas))
-            scores.append(pca.explained_variance_ratio_[0])
-    for exp in all_experiments('eth'):
-        for n in n_stateses:
-            m = Model('eth', exp, bin_size_ms, n, surr)
+            m = Model(src, exp, bin_size_ms, n, surr)
             pca = PCA().fit(np.exp(m._hmm.observations.log_lambdas))
             scores.append(pca.explained_variance_ratio_[0])
     return scores
