@@ -8,6 +8,9 @@ import hmmsupport
 from hmmsupport import get_raster, figure, load_raw, Model, all_experiments
 from sklearn.decomposition import PCA
 from tqdm import tqdm
+from sklearn.linear_model import SGDClassifier
+from sklearn.cluster import KMeans
+
 
 experiments = [
     ('organoid', exp) for exp in all_experiments('organoid')
@@ -86,6 +89,31 @@ except FileNotFoundError:
             for surr in ['real', 'rsm']]
     with open('.cache/consistencies.pickle', 'wb') as f:
         pickle.dump((consistency_good, consistency_bad), f)
+
+
+def separability(exp, scores):
+    '''
+    Fit a linear classifier to the consistency scores and return its
+    performance separating packet and non-packet units.
+    '''
+    pak = ~(np.arange(scores.shape[0])
+            < len(srms[exp]['non_scaf_units']))
+    pca = PCA(10)
+    pca.fit(scores)
+    scores = pca.transform(scores)
+    clf = SGDClassifier(loss='modified_huber', max_iter=1000000, n_jobs=12,
+                        tol=1e-6, penalty='l1', random_state=42)
+    # clf = KMeans(2, n_init='auto')
+    clf.fit(scores, pak)
+    # pred = clf.predict(scores)
+    # separability = (pred == pak).mean()
+    return clf.score(scores, pak)
+    # return max(separability, 1-separability)
+separability_good, separability_bad = [
+    {exp: [separability(exp, scores.T)
+           for scores in scoreses]
+     for exp, scoreses in consistency.items()}
+    for consistency in [consistency_good, consistency_bad]]
 
 
 # %%
@@ -302,7 +330,27 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
 
     # Subfigure E: some kind of per-organoid metrics??
     E = f.subplots(1, 1, gridspec_kw=dict(top=DEtop, bottom=DEbot,
-                                          left=0.32, right=0.98))
+                                          left=0.35, right=0.98))
+
+    violins = [E.violinplot(separability.values(),
+                             positions=np.arange(len(experiments)))
+               for separability in [separability_good, separability_bad]]
+    for b in violins[0]['bodies']:
+        verts = b.get_paths()[0].vertices
+        m = np.mean(verts[:,0])
+        verts[:,0] = np.clip(verts[:,0], -np.inf, m)
+    for b in violins[1]['bodies']:
+        b.set_cmap(violins[1]['bodies'][0].get_cmap())
+        verts = b.get_paths()[0].vertices
+        m = np.mean(verts[:,0])
+        verts[:,0] = np.clip(verts[:,0], m, np.inf)
+
+    E.set_xticks(range(len(experiments)),
+                 [f'Organoid {i+1}' for i in range(len(experiments))])
+
+    ticks = E.get_yticks()
+    E.set_yticks(ticks, [f'{100*t:.0f}\\%' for t in ticks])
+    E.set_ylabel('Packet / Non-Packet Separability')
 
     # Subfigure F: PCA of real vs. surrogate data.
     FGtop, FGbot = 0.23, 0.04
