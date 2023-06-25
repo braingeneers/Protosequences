@@ -332,18 +332,10 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     E = f.subplots(1, 1, gridspec_kw=dict(top=DEtop, bottom=DEbot,
                                           left=0.35, right=0.98))
 
-    violins = [E.violinplot(separability.values(),
-                             positions=np.arange(len(experiments)))
-               for separability in [separability_good, separability_bad]]
-    for b in violins[0]['bodies']:
-        verts = b.get_paths()[0].vertices
-        m = np.mean(verts[:,0])
-        verts[:,0] = np.clip(verts[:,0], -np.inf, m)
-    for b in violins[1]['bodies']:
-        b.set_cmap(violins[1]['bodies'][0].get_cmap())
-        verts = b.get_paths()[0].vertices
-        m = np.mean(verts[:,0])
-        verts[:,0] = np.clip(verts[:,0], m, np.inf)
+    E.violinplot(
+        [np.subtract(separability_good[exp], separability_bad[exp])
+         for _,exp in experiments],
+        positions=np.arange(len(experiments)))
 
     E.set_xticks(range(len(experiments)),
                  [f'Organoid {i+1}' for i in range(len(experiments))])
