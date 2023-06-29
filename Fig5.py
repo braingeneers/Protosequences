@@ -103,17 +103,29 @@ def separability(exp, scores):
     scores = pca.transform(scores)
     clf = SGDClassifier(loss='modified_huber', max_iter=1000000, n_jobs=12,
                         tol=1e-6, penalty='l1', random_state=42)
-    # clf = KMeans(2, n_init='auto')
     clf.fit(scores, pak)
-    # pred = clf.predict(scores)
-    # separability = (pred == pak).mean()
     return clf.score(scores, pak)
-    # return max(separability, 1-separability)
-separability_good, separability_bad = [
-    {exp: [separability(exp, scores.T)
-           for scores in scoreses]
-     for exp, scoreses in consistency.items()}
-    for consistency in [consistency_good, consistency_bad]]
+
+separability_good = {exp: [separability(exp, scores.T)
+                           for scores in scoreses]
+                     for exp, scoreses in consistency_good.items()}
+
+def separability_on_fr(r):
+    '''
+    Check how well you can separate packet and non-packet units based on
+    just their overall firing rates.
+    '''
+    rates = np.array([[len(u)/r.length_sec] for u in r.units])
+    clf = SGDClassifier(loss='modified_huber', max_iter=1000000, n_jobs=12,
+                        tol=1e-6, penalty='l1', random_state=42)
+    pak = ~(np.arange(len(rates)) < len(srms[r.experiment]['non_scaf_units']))
+    clf.fit(rates, pak)
+    return clf.score(rates, pak)
+
+separability_scores = {
+    exp: np.subtract(separability_good[exp],
+                     separability_on_fr(r))
+    for exp,(r,_) in rasters.items()}
 
 
 # %%
@@ -378,10 +390,8 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     GHtop, GHbot = 0.25, 0.04
     H = f.subplots(1, 1, gridspec_kw=dict(top=GHtop, bottom=GHbot,
                                           left=0.5, right=0.98))
-    H.violinplot(
-        [np.subtract(separability_good[exp], separability_bad[exp])
-         for _,exp in experiments],
-        positions=np.arange(len(experiments)))
+    H.violinplot(separability_scores.values(),
+                 positions=np.arange(len(experiments)))
     H.set_xticks(range(len(experiments)),
                  [f'Org.\\ {i+1}' for i in range(len(experiments))])
     ticks = H.get_yticks()
