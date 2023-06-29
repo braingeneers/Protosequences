@@ -1,8 +1,9 @@
-# Stash HMMs
+# Fit HMMs
 #
 # A script which takes a data source plus lists of experiment IDs, bin
 # sizes, and numbers of hidden states, checks which of those models are not
-# cached, and adds them to the HMM job queue.
+# cached, and either adds them to the HMM job queue or just runs them
+# locally, depending whether the option --local is provided.
 import sys
 import itertools
 import numpy as np
@@ -35,6 +36,10 @@ if __name__ == '__main__':
     dryrun = '--dryrun' in sys.argv
     if dryrun:
         sys.argv.remove('--dryrun')
+
+    local = '--local' in sys.argv
+    if local:
+        sys.argv.remove('--local')
 
     # Validate the arguments.
     try:
@@ -86,11 +91,18 @@ if __name__ == '__main__':
     if dryrun:
         sys.exit()
 
+    # If local, don't use MQTT, just do all the fits in a loop here.
+    elif local:
+        for exp, bin_size_ms, n_states, surrogate in needs_run:
+            hmmsupport.get_fitted_hmm(source, exp, bin_size_ms, n_states,
+                                      surrogate, library, verbose=True)
+    
     # Get the MQTT queue and add all the jobs to it.
-    q = MessageBroker().get_queue('atspaeth/hmm-job-queue')
-    for exp, bin_size_ms, n_states, surrogate in needs_run:
-        q.put(dict(
-            retries_allowed=3,
-            params=dict(source=source, exp=exp, bin_size_ms=bin_size_ms,
-                        n_states=n_states, surrogate=surrogate,
-                        library=library)))
+    else:
+        q = MessageBroker().get_queue('atspaeth/hmm-job-queue')
+        for exp, bin_size_ms, n_states, surrogate in needs_run:
+            q.put(dict(
+                retries_allowed=3,
+                params=dict(source=source, exp=exp, bin_size_ms=bin_size_ms,
+                            n_states=n_states, surrogate=surrogate,
+                            library=library)))
