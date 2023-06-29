@@ -289,11 +289,11 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
                 c='red', alpha=0.3)
 
     # Subfigure D: entropy specifically for Organoid 1.
-    DEtop, DEbot = 0.51, 0.3
+    DEFtop, DEFbot = 0.51, 0.31
     en, pr = f.subplots(2, 1,
                         gridspec_kw=dict(height_ratios=[3,2],
-                                         top=DEtop, bottom=DEbot,
-                                         left=0.06, right=0.25))
+                                         top=DEFtop, bottom=DEFbot,
+                                         left=0.06, right=0.21))
 
     lmargin, rmargin = model.burst_margins
     time_sec = np.arange(lmargin, rmargin+1) * bin_size_ms / 1000
@@ -328,63 +328,41 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     pr.set_xlabel('Time from Burst Peak (s)')
     f.align_ylabels((en, pr))
 
-    # Subfigure E: some kind of per-organoid metrics??
-    E = f.subplots(1, 1, gridspec_kw=dict(top=DEtop, bottom=DEbot,
-                                          left=0.35, right=0.98))
-
-    E.violinplot(
-        [np.subtract(separability_good[exp], separability_bad[exp])
-         for _,exp in experiments],
-        positions=np.arange(len(experiments)))
-
-    E.set_xticks(range(len(experiments)),
-                 [f'Organoid {i+1}' for i in range(len(experiments))])
-
-    ticks = E.get_yticks()
-    E.set_yticks(ticks, [f'{100*t:.0f}\\%' for t in ticks])
-    E.set_ylabel('Packet / Non-Packet Separability')
-
-    # Subfigure F: PCA of real vs. surrogate data.
-    FGtop, FGbot = 0.23, 0.04
-    F = f.subplots(1, 2, width_ratios=[11, 6],
-                   gridspec_kw=dict(wspace=-0.5, top=FGtop, bottom=FGbot,
-                                    left=-0.05, right=0.4))
-
-    for ax, pca, ri, m in zip(F, [pca_good, pca_bad], [r, r_bad],
+    # Subfigure E: PCA of real vs. surrogate data.
+    E = f.subplots(1, 2,
+                   gridspec_kw=dict(wspace=-0.345, top=DEFtop, bottom=DEFbot,
+                                    left=0.225, right=0.675))
+    for ax, pca, ri, m in zip(E, [pca_good, pca_bad], [r, r_bad],
                               [model, model_bad]):
         ax.set_aspect('equal')
         data = pca.transform(ri.raster)[:,1::-1]
         ax.scatter(data[:,0], data[:,1], s=2, c=m.states(ri),
                    cmap=alpha_rainbow)
         ax.set_ylim([-3, 13])
+        ax.set_xlim([-3, 8])
         ax.set_xlabel('PC2')
-    F[0].set_ylabel('PC1')
-    F[0].set_yticks([0, 10])
-    F[1].set_yticks([])
-    F[0].set_title('Real')
-    F[1].set_title('Randomized')
-    F[0].set_xlim([-3, 8])
-    F[0].set_xticks([0, 5])
-    F[1].set_xlim([-3, 3])
-    F[1].set_xticks([-2, 2])
+        ax.set_xticks([0, 5])
+    E[0].set_ylabel('PC1')
+    E[0].set_yticks([0, 10])
+    E[1].set_yticks([])
+    E[0].set_title('Real')
+    E[1].set_title('Randomized')
 
-    # Subfigure G: explained variance ratio across multiple organoids.
-    evr, bp = f.subplots(1, 2, width_ratios=[5,2],
-                         gridspec_kw=dict(top=FGtop, bottom=FGbot,
-                                          wspace=0.4,
-                                          left=0.42, right=0.98))
-
-    evr.plot(np.arange(n_states)+1, pca_good.explained_variance_ratio_,
+    # Subfigure F: explained variance ratio with inset.
+    F = f.subplots(1, 1,
+                     gridspec_kw=dict(top=DEFtop, bottom=DEFbot,
+                                      wspace=0.4,
+                                      left=0.69, right=0.98))
+    F.plot(np.arange(n_states)+1, pca_good.explained_variance_ratio_,
              label='Real')
-    evr.plot(np.arange(n_states)+1, pca_bad.explained_variance_ratio_,
+    F.plot(np.arange(n_states)+1, pca_bad.explained_variance_ratio_,
              label='Randomized')
-    evr.set_xticks([1, 15])
-    evr.set_xlabel('Principal Component')
-    evr.set_ylabel('Explained Variance Ratio')
-    evr.set_yticks([0, 1])
-    evr.legend(ncol=2, loc='upper right')
-
-    bp = evr.inset_axes([0.3, 0.2, 0.6, 0.6])
+    F.set_xticks([1, 15])
+    F.set_xlabel('Principal Component')
+    F.set_ylabel('Explained Variance Ratio')
+    F.set_yticks([0, 1])
+    F.legend(ncol=2, loc='upper right')
+    bp = F.inset_axes([0.3, 0.2, 0.6, 0.6])
     for pve, x in zip([pve_good, pve_bad], [0.8, 1.2]):
         bp.violinplot(pve, showmedians=True, showextrema=False,
                       positions=[x], widths=0.2)
@@ -392,4 +370,20 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     bp.set_xlim([0.6, 1.4])
     bp.set_xticks([])
     bp.set_yticks([])
-    evr.indicate_inset_zoom(bp, edgecolor='black');
+    F.indicate_inset_zoom(bp, edgecolor='black');
+
+    # Subfigure G: somehow show what's happening on the right.
+
+    # Subfigure H: per-organoid separability metric.
+    GHtop, GHbot = 0.25, 0.04
+    H = f.subplots(1, 1, gridspec_kw=dict(top=GHtop, bottom=GHbot,
+                                          left=0.5, right=0.98))
+    H.violinplot(
+        [np.subtract(separability_good[exp], separability_bad[exp])
+         for _,exp in experiments],
+        positions=np.arange(len(experiments)))
+    H.set_xticks(range(len(experiments)),
+                 [f'Org.\\ {i+1}' for i in range(len(experiments))])
+    ticks = H.get_yticks()
+    H.set_yticks(ticks, [f'{100*t:.0f}\\%' for t in ticks])
+    H.set_ylabel('Packet / Non-Packet Separability')
