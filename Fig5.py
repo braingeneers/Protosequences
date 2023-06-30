@@ -52,8 +52,8 @@ with tqdm(total=len(experiments)*(1+len(n_stateses))) as pbar:
             pbar.update()
 
 for k,(r,_) in rasters.items():
-    nunits = r.raster.shape[1]
-    meanfr = r.raster.mean() / r.bin_size_ms * 1000
+    nunits = r._raster.shape[1]
+    meanfr = r._raster.mean() / r.bin_size_ms * 1000
     nbursts = len(r.find_bursts())
     print(f'{k} has {nunits} units firing at {meanfr:0.2f} '
           f'Hz with {nbursts} bursts')
@@ -74,7 +74,7 @@ except FileNotFoundError:
             r = get_raster(source, exp, bin_size_ms, surr)
             m = Model(source, exp, bin_size_ms, n, surr)
             h = m.states(r)
-            scores = np.array([(r.raster[h == i, :] > 0).mean(0)
+            scores = np.array([(r._raster[h == i, :] > 0).mean(0)
                                for i in range(n)])
             unit_order = srms[exp]['mean_rate_ordering'].flatten() - 1
             margins = rasters[exp][1][0].burst_margins
@@ -115,7 +115,7 @@ def separability_on_fr(r):
     Check how well you can separate packet and non-packet units based on
     just their overall firing rates.
     '''
-    rates = np.array([[len(u)/r.length_sec] for u in r.units])
+    rates = r.rates('Hz').reshape((-1,1))
     clf = SGDClassifier(loss='modified_huber', max_iter=1000000, n_jobs=12,
                         tol=1e-6, penalty='l1', random_state=42)
     pak = ~(np.arange(len(rates)) < len(srms[r.experiment]['non_scaf_units']))
@@ -202,16 +202,16 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     for ax, peak_float in zip(axes, peaks):
         peak = int(round(peak_float))
         when = slice(peak+lmargin_h, peak+rmargin_h+1)
-        rsub = r.raster[when, :] / bin_size_ms
+        rsub = r._raster[when, :] / bin_size_ms
         hsub = np.array([np.nonzero(state_order == s)[0][0]
                          for s in h[when]])
         t_sec = (np.ogrid[when] - peak) * bin_size_ms / 1000
         ax.imshow(hsub.reshape((1,-1)), cmap=alpha_rainbow, alpha=0.8,
                   aspect='auto', vmin=0, vmax=n_states-1,
                   extent=[t_sec[0], t_sec[-1], 0.5, rsub.shape[1]+0.5])
-        idces, times_ms = r.spikes_within(when.start*bin_size_ms,
-                                          when.stop*bin_size_ms)
-        times = (times_ms - peak_float*bin_size_ms) / 1000
+        idces, times_ms = r.subtime(when.start*bin_size_ms, when.stop*bin_size_ms
+                                    ).idces_times()
+        times = (times_ms - (peak_float - when.start)*bin_size_ms) / 1000
         ax.plot(times, inverse_unit_order[idces]+1, 'ko', markersize=0.5)
         ax.set_ylim(0.5, rsub.shape[1]+0.5)
         ax.set_xticks([0, 0.5])
@@ -282,22 +282,22 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
                  horizontalalignment='right')
 
     for axS, axH, s in zip(examples, rates, interesting_states):
-        data = r.raster[h == state_order[s], :][:, unit_order]
+        data = r._raster[h == state_order[s], :][:, unit_order]
         data_sub = data[np.random.choice(data.shape[0], 60),:]
         axS.set_title(f'State {s+1}')
         axS.imshow(data_sub.T, aspect='auto', interpolation='none',
-                   vmin=0, vmax=r.raster.max(),
-                   extent=[0, 1, r.raster.shape[1]+0.5, 0.5])
+                   vmin=0, vmax=r._raster.max(),
+                   extent=[0, 1, r._raster.shape[1]+0.5, 0.5])
 
-        axH.plot(data.mean(0), np.arange(r.raster.shape[1])+1,
+        axH.plot(data.mean(0), np.arange(r._raster.shape[1])+1,
                  c=alpha_rainbow(s/(n_states-1)))
 
     for ax, s0, s1 in zip(deltas, interesting_states[:-1],
                           interesting_states[1:]):
-        mu0 = r.raster[h == state_order[s0], :].mean(0)
-        mu1 = r.raster[h == state_order[s1], :].mean(0)
+        mu0 = r._raster[h == state_order[s0], :].mean(0)
+        mu1 = r._raster[h == state_order[s1], :].mean(0)
         delta = mu1 - mu0
-        ax.plot(delta[unit_order], np.arange(r.raster.shape[1])+1,
+        ax.plot(delta[unit_order], np.arange(r._raster.shape[1])+1,
                 c='red', alpha=0.3)
 
     # Subfigure D: entropy specifically for Organoid 1.
@@ -347,7 +347,7 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     for ax, pca, ri, m in zip(E, [pca_good, pca_bad], [r, r_bad],
                               [model, model_bad]):
         ax.set_aspect('equal')
-        data = pca.transform(ri.raster)[:,1::-1]
+        data = pca.transform(ri._raster)[:,1::-1]
         ax.scatter(data[:,0], data[:,1], s=2, c=m.states(ri),
                    cmap=alpha_rainbow)
         ax.set_ylim([-3, 13])

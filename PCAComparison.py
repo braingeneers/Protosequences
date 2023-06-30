@@ -23,8 +23,7 @@ if source == 'organoid':
 
 def raster_valid(exp:str):
     try:
-        r = get_raster(source, exp, bin_size_ms)
-        return r.n_units > 15
+        return get_raster(source, exp, bin_size_ms).N > 15
     except Exception as e:
         print(exp, 'failed to load:', e)
         return False

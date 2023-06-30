@@ -16,7 +16,7 @@ from io import BytesIO
 from tqdm.auto import tqdm
 from contextlib import contextmanager
 from scipy import stats, signal, sparse, ndimage
-from braingeneers.analysis import read_phy_files
+from braingeneers.analysis import read_phy_files, SpikeData
 from braingeneers.utils.smart_open_braingeneers import open
 
 
@@ -203,9 +203,9 @@ try:
                  verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
         'Fit an HMM to data with SSM and return the model.'
         r = get_raster(source, exp, bin_size_ms, surrogate)
-        hmm = SSMHMM(K=n_states, D=r.raster.shape[1],
+        hmm = SSMHMM(K=n_states, D=r._raster.shape[1],
                      observations='poisson')
-        hmm.fit(r.raster, verbose=2 if verbose else 0,
+        hmm.fit(r._raster, verbose=2 if verbose else 0,
                 tolerance=atol, num_iters=n_iter)
         return hmm
 
@@ -228,9 +228,9 @@ try:
                      verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
         'Fit an HMM to data with Dynamax and return the model.'
         r = get_raster(source, exp, bin_size_ms, surrogate)
-        hmm = DynamaxHMM(num_states=n_states, emission_dim=r.raster.shape[1])
+        hmm = DynamaxHMM(num_states=n_states, emission_dim=r._raster.shape[1])
         hmm.params, props = hmm.initialize(jr.PRNGKey(np.random.randint(2**32)))
-        hmm.params, lls = hmm.fit_em(hmm.params, props, r.raster,
+        hmm.params, lls = hmm.fit_em(hmm.params, props, r._raster,
                                      verbose=verbose, num_iters=n_iter)
         return hmm
 
@@ -253,7 +253,7 @@ try:
         r = get_raster(source, exp, bin_size_ms, surrogate)
         hmm = HMMLearnHMM(n_components=n_states, verbose=False,
                           n_iter=n_iter, tol=atol)
-        hmm.fit(r.raster)
+        hmm.fit(r._raster)
         return hmm
 
     def _hmmlearn_states(hmm, raster):
@@ -277,7 +277,7 @@ try:
         'Fit an HMM to data with NeuroHMM and return the model.'
         r = get_raster(source, exp, bin_size_ms, surrogate)
         display = jl.Symbol('iter' if verbose else 'none')
-        hmm, _ = jl.NeuroHMM.fit_hmm(n_states, r.raster, tol=atol,
+        hmm, _ = jl.NeuroHMM.fit_hmm(n_states, r._raster, tol=atol,
                                      maxiter=n_iter, display=display)
         return hmm
 
@@ -341,7 +341,7 @@ class Model:
         self.library = library
 
     def states(self, raster):
-        return _HMM_METHODS[self.library].states(self._hmm, raster.raster)
+        return _HMM_METHODS[self.library].states(self._hmm, raster._raster)
 
     def compute_entropy(self, raster=None, lmargin_sec=-1.0, rmargin_sec=1.0):
         # Load the raster if not provided. You shouldn't actually need to
@@ -451,59 +451,6 @@ def load_raw(source, filename, only_include=None):
             return _load73(full_path, only_include)
 
 
-def exp_name_parts(exp):
-    '''
-    Split an experiment name into three parts, of which the latter two are
-    optional: basename, file extension, and slice.
-
-    Extension is the part of the name after the last dot, unless that would
-    create an empty basename, in which case the basename is the whole name.
-    Slice is not part of a filename; it is indicated in square brackets in
-    Python syntax, and is used to select a subset of the data in seconds.
-    '''
-    exp, start, end = re.match(
-        r'^(.*?)(?:\[([^\]]*):([^\]]*)\])?$', exp).groups()
-
-    # Get rid of the extension.
-    if '.' in exp[1:]:
-        exp, _ = exp.rsplit('.', 1)
-
-    # If there is a slice part, turn it into an actual slice in ms.
-    if start is None:
-        return exp, None
-    try:
-        conv = lambda x: int(float(x)*1e3) if x else None
-        return exp, slice(conv(start), conv(end))
-    except Exception:
-        raise ValueError(
-            'Invalid slice syntax in experiment name') from None
-
-
-def _raster_poprate_from_units(length_ms, bin_size_ms, units):
-    n_bins = int(np.ceil(length_ms / bin_size_ms))
-    raster = np.zeros((n_bins, len(units)), int)
-    poprate = np.zeros(int(length_ms))
-    for i,unit in enumerate(units):
-        for t in unit:
-            raster[int(t // bin_size_ms), i] += 1
-            poprate[int(t)] += 1
-    return raster, poprate
-
-
-def _raster_poprate_units_from_sm(length_ms, bin_size_ms, sm):
-    sm = sparse.coo_array(sm)
-    cols = sm.col // bin_size_ms
-    n_bins = int(np.ceil(length_ms / bin_size_ms))
-    raster = np.zeros((n_bins, sm.shape[0]), int)
-    for d,r,c in zip(sm.data, sm.row, cols):
-        raster[c,r] += d
-    poprate = np.array(sm.sum(0)).ravel()
-    idces, times = np.nonzero(sm)
-    units = [times[idces == i] for i in range(sm.shape[0])]
-    return raster, poprate, units
-
-
-
 @functools.lru_cache
 def get_raster(source, experiment, bin_size_ms, surrogate=None):
     if surrogate is None:
@@ -511,19 +458,11 @@ def get_raster(source, experiment, bin_size_ms, surrogate=None):
     return get_raster(source, experiment, bin_size_ms).get_surrogate(surrogate)
 
 
-class Raster:
+class Raster(SpikeData):
     surrogates: dict[str, type] = {}
     surrogate_name = 'Real Data'
 
     def __init__(self, source, experiment, bin_size_ms):
-        self.bin_size_ms = bin_size_ms
-        self.source = source
-        self.experiment = experiment
-        self.tag = f'{source}_{experiment}_{bin_size_ms}ms'
-        experiment, sl = exp_name_parts(experiment)
-
-        if sl:
-            raise NotImplementedError('Slicing not implemented yet.')
 
         # First try loading the data from .mat files, in either Mattia's or
         # Tal's format...
@@ -539,10 +478,10 @@ class Raster:
             if 'spike_matrix' in mat or 'SUA' in mat:
                 sm = (mat['SUA'][0,0]['spike_matrix'] if 'SUA' in mat 
                       else mat['spike_matrix'])
-                self.raster, self._poprate, self.units = \
-                    _raster_poprate_units_from_sm(sm.shape[1], bin_size_ms, sm)
-                self.length_sec = sm.shape[1] / 1000
                 self._burst_default_rms = 6.0
+                idces, times = np.nonzero(sm)
+                units = [times[idces == i] for i in range(sm.shape[0])]
+                length=sm.shape[1]*1.0
 
             # Tal and TJ's data is organized as units instead. For the UCSB
             # recordings, fs is stored and duration is not, so just assume
@@ -553,19 +492,16 @@ class Raster:
             # matrix seems to have dropped some spikes.
             else:
                 if 'spike_times' in mat:
-                    self.units = []
+                    units = []
                     for times in mat['spike_times']:
                         while len(times) == 1:
                             times = times[0]
-                        self.units.append(times * 1e3)
+                        units.append(times * 1e3)
                 else:
-                    self.units = [
+                    units = [
                         (unit[0][0]['spike_train']/mat['fs']*1e3)[0,:]
                         for unit in mat['units'][0]]
-                self.length_sec = np.ceil(max(
-                    unit.max() for unit in self.units)/1e3)
-                self.raster, self._poprate = _raster_poprate_from_units(
-                    1e3*self.length_sec, self.bin_size_ms, self.units)
+                length = 1e3*np.ceil(max(unit.max() for unit in units)/1e3)
                 self._burst_default_rms = 3.0
 
         # If those .mat files don't exist, instead load from Sury's phy
@@ -576,23 +512,25 @@ class Raster:
             except AssertionError as e:
                 raise FileNotFoundError(
                     f'Failed to load {source} {experiment}: {e}') from None
-            self.units = sd.train
-            self.length_sec = sd.length / 1000
-            self.raster = sd.raster(bin_size_ms).T
-            self._poprate = sd.binned(1)
             self._burst_default_rms = None
+            units, length = sd.train, sd.length
+            
+        # Delegate out to the part that's useful to extract for subclass
+        # constructors.
+        self._init(source, experiment, bin_size_ms, units, length)
 
-        self.n_units = len(self.units)
-
-    def spikes_within(self, start_ms, end_ms):
-        'Return unit indices and spike times within a time window.'
-        unitsub = [t[(t >= start_ms) & (t < end_ms)]
-                   for t in self.units]
-        times = np.hstack(unitsub)
-        idces = np.hstack([[i]*len(t)
-                           for i,t in enumerate(unitsub)
-                           if len(t) > 0])
-        return idces, times
+    def _init(self, source, experiment, bin_size_ms, units, length):
+        '''
+        The boilerplate that should be used in subclass constructors to make
+        sure the correct attributes get assigned.
+        '''
+        self.bin_size_ms = bin_size_ms
+        self.source = source
+        self.experiment = experiment
+        self.tag = f'{source}_{experiment}_{bin_size_ms}ms'
+        super().__init__(units, length=length)
+        self._poprate = self.binned(1)
+        self._raster = self.raster(bin_size_ms).T
 
     def coarse_rate(self):
         return self.poprate(20, 100)
@@ -679,7 +617,7 @@ class Raster:
             except TypeError:
                 lmargin, rmargin = -margins, margins
             peaks = peaks[(peaks + lmargin >= 0)
-                          & (peaks + rmargin < self.raster.shape[0])]
+                          & (peaks + rmargin < self._raster.shape[0])]
 
         return peaks
 
@@ -743,69 +681,6 @@ def surrogate(name=None):
 Raster.surrogates['real'] = lambda x: x
 
 
-def _steal_metadata(dest, src, add_to_tag=None):
-    dest.bin_size_ms = src.bin_size_ms
-    dest.source = src.source
-    dest.experiment = src.experiment
-    dest.length_sec = src.length_sec
-    dest.n_units = src.n_units
-    dest._burst_default_rms = src._burst_default_rms
-    if add_to_tag is None:
-        dest.tag = src.tag
-    else:
-        dest.tag = src.tag + '_' + add_to_tag
-
-
-@surrogate('rate')
-class RateSurrogate(Raster):
-    surrogate_name = 'Rate Surrogate'
-    def __init__(self, raster):
-        '''
-        Surrogate raster formed by randomizing all the spike times uniformly
-        within the total time interval. Preserves individual firing rates
-        and nothing else.
-        '''
-        rng = np.random.RandomState(2953)
-        _steal_metadata(self, raster)
-
-        self.units = [rng.rand(len(t))*self.length_sec*1e3
-                      for t in raster.units]
-        self.raster, self._poprate = _raster_poprate_from_units(
-            1e3*self.length_sec, self.bin_size_ms, self.units)
-        assert np.all(self.raster.sum(0) == raster.raster.sum(0)),\
-            'Failed to preserve individual rates.'
-
-
-@surrogate('poprate')
-class PoprateSurrogate(Raster):
-    surrogate_name = 'Population Rate Surrogate'
-    def __init__(self, raster):
-        '''
-        Surrogate raster formed by randomizing the unit ID for every spike.
-        Preserves population rate and nothing else.
-        '''
-        rng = np.random.RandomState(2953)
-        _steal_metadata(self, raster)
-
-        counts = np.cumsum([0] + [len(unit) for unit in raster.units])
-        times = np.hstack(raster.units)
-        rng.shuffle(times)
-        self.units = [times[a:b] for a,b in zip(counts, counts[1:])]
-        self.raster, self._poprate = _raster_poprate_from_units(
-            1e3*self.length_sec, self.bin_size_ms, self.units)
-        assert np.all(self.raster.sum(1) == raster.raster.sum(1)),\
-            'Failed to preserve population rates.'
-
-
-def _spike_matrix_from_units(length_ms, units):
-    'Create a spike matrix with 1ms bins from a list of spike trains.'
-    indices = np.hstack(units).astype(int)
-    indptr = np.cumsum([0] + [len(unit) for unit in units])
-    data = np.ones_like(indices)
-    return sparse.csr_array((data, indices, indptr),
-                            (len(units), int(length_ms)))
-
-
 @surrogate('rsm')
 class RandSpikeMatrix(Raster):
     surrogate_name = 'Randomized Spike Matrix'
@@ -816,11 +691,8 @@ class RandSpikeMatrix(Raster):
         different neurons, using resampling to maintain the invariant that
         no neuron spikes twice in the same millisecond.
         '''
-        rng = np.random.RandomState(2953)
-        _steal_metadata(self, raster)
-        sm = _spike_matrix_from_units(
-            1e3*self.length_sec, raster.units)
-
+        # Collect the spikes of the original raster.
+        sm = raster.sparse_raster(1)
         rsm = np.zeros(sm.shape, int)
         weights = sm.sum(0)
 
@@ -830,6 +702,7 @@ class RandSpikeMatrix(Raster):
         unit_order = unit_order[n_spikeses[unit_order] > 0]
 
         # Choose spike times from the big list for each unit.
+        rng = np.random.RandomState(2953)
         for unit in unit_order:
             n_spikes = n_spikeses[unit]
             p = weights / weights.sum()
@@ -838,6 +711,8 @@ class RandSpikeMatrix(Raster):
             weights[rand_frames] -= 1
             rsm[unit,rand_frames] = 1
 
-        self.raster, self._poprate, self.units = \
-            _raster_poprate_units_from_sm(1e3*self.length_sec,
-                                          self.bin_size_ms, rsm)
+        idces, times = np.nonzero(rsm)
+        train = [times[idces == i] for i in range(sm.shape[0])]
+        self._init(raster.source, raster.experiment, raster.bin_size_ms,
+                   train, raster.length)
+        self._burst_default_rms = raster._burst_default_rms

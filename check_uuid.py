@@ -11,7 +11,7 @@ if __name__ == '__main__':
         try:
             r = Raster(uuid, exp, 30)
             pr = r.coarse_rate().max()
-            print(f'{exp} has {r.n_units} units, peak rate {pr}')
+            print(f'{exp} has {r.N} units, peak rate {pr}')
         except Exception as e:
             print(e)
 
