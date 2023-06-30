@@ -74,7 +74,7 @@ def stateses(exp:str, bad:bool):
             for m in ms]
 
 def raster(exp:str, bad:bool=False):
-    return (bad_rasters if bad else rasters)[exp].raster
+    return (bad_rasters if bad else rasters)[exp]._raster
 
 pcas = {exp: [PCA().fit(s)
               for s in stateses(exp, False)]
@@ -159,10 +159,12 @@ if source == 'mouse':
     # These are the key experiments Mattia pointed out as having good
     # temporal structure.
     key_exps = ['1009-3', '1005-1', '366-2']
-    with figure('Key Mouse Surrogate Comparison', figsize=(10,6)) as f:
-        axes = f.subplots(2, 3, subplot_kw=dict(projection='3d'))
+    with figure('Key Mouse Surrogate Comparison',
+                figsize=(4*len(key_exps), 6)) as f:
+        axes = f.subplots(2, len(key_exps), squeeze=False,
+                          subplot_kw=dict(projection='3d'))
         for j, exp in enumerate(key_exps):
-            axes[0,j].set_title(f'{exp}: {rasters[exp].n_units} units')
+            axes[0,j].set_title(f'{exp}: {rasters[exp].N} units')
             for i, bad in enumerate([False, True]):
                 axes[i,j].plot(*transformed_data(exp, bad),
                                color='grey', lw=0.1)
