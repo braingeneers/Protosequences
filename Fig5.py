@@ -93,7 +93,7 @@ except FileNotFoundError:
         pickle.dump((consistency_good, consistency_bad), f)
 
 
-def separability(exp, X, pca=None, n_tries=10, validation=0.33):
+def separability(exp, X, pca=None, n_tries=100, validation=0.2):
     '''
     Fit a linear classifier to the given features X and return its
     performance separating packet and non-packet units.
@@ -104,12 +104,17 @@ def separability(exp, X, pca=None, n_tries=10, validation=0.33):
     y = ~(np.arange(X.shape[0])
             < len(srms[exp]['non_scaf_units']))
     if validation is None:
-        Xtr = Xte = X
-        ytr = yte = y
-    else:
-        Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=validation)
-    return max(clf.fit(Xtr, ytr).score(Xtr, ytr)
-               for _ in range(n_tries))
+        Xt = Xv = X
+        yt = yv = y
+    scores = []
+    for _ in range(n_tries):
+        if validation is not None:
+            Xt, Xv, yt, yv = train_test_split(
+                X, y, stratify=y, test_size=validation)
+        clf.fit(Xt, yt)
+        scores.append((clf.score(Xv, yv),
+                       clf.score(X, y)))
+    return max(scores, key=lambda x: x[0])[1]
 
 def separability_on_fr(r):
     '''
