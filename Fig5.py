@@ -389,9 +389,22 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     F.indicate_inset_zoom(bp, edgecolor='black');
 
     # Subfigure G: somehow show what's happening on the right.
+    GHtop, GHbot = 0.25, 0.04
+    G = f.subplot_mosaic('AA\nBC\nDD',
+                         width_ratios=[2,3],
+                         gridspec_kw=dict(top=GHtop, bottom=GHbot,
+                                          left=0.04, right=0.4))
+    for i, (_,exp) in enumerate(experiments[:4]):
+        ax = G['ABCD'[i]]
+        ax.imshow(consistency_good[exp][1])
+        ax.set_title(f'Organoid {i+1}', fontsize='medium')
+        ax.set_xticks([])
+        ax.set_yticks([])
+    G['D'].set_xlabel('Unit')
+    for c in 'ABD':
+        G[c].set_ylabel('State')
 
     # Subfigure H: per-organoid separability metric.
-    GHtop, GHbot = 0.25, 0.04
     H = f.subplots(1, 1, gridspec_kw=dict(top=GHtop, bottom=GHbot,
                                           left=0.5, right=0.98))
     H.violinplot(sep_on_states.values(),
