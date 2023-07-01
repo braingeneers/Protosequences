@@ -8,6 +8,7 @@ import hmmsupport
 from hmmsupport import get_raster, figure, load_raw, Model, all_experiments
 from sklearn.decomposition import PCA
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
 from sklearn.linear_model import SGDClassifier
 from sklearn.cluster import KMeans
 
@@ -91,21 +92,25 @@ except FileNotFoundError:
         pickle.dump((consistency_good, consistency_bad), f)
 
 
-def separability(exp, X, pca=None):
+def separability(exp, X, pca=None, n_tries=10, validation=0.33):
     '''
     Fit a linear classifier to the given features X and return its
     performance separating packet and non-packet units.
     '''
-    y = ~(np.arange(X.shape[0])
-            < len(srms[exp]['non_scaf_units']))
+    clf = SGDClassifier(n_jobs=12)
     if pca is not None and pca < X.shape[1]:
         pca = PCA(n_components=pca)
         pca.fit(X)
         X = pca.transform(X)
-    clf = SGDClassifier(loss='modified_huber', max_iter=1000000,
-                        n_jobs=12, tol=1e-6, penalty='l1')
-    clf.fit(X, y)
-    return clf.score(X, y)
+    y = ~(np.arange(X.shape[0])
+            < len(srms[exp]['non_scaf_units']))
+    if validation is None:
+        Xtr = Xte = X
+        ytr = yte = y
+    else:
+        Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=validation)
+    return max(clf.fit(Xtr, ytr).score(Xtr, ytr)
+               for _ in range(n_tries))
 
 def separability_on_fr(r):
     '''
@@ -116,10 +121,12 @@ def separability_on_fr(r):
     return separability(r.experiment, rates)
 
 
-separability_scores = {exp: [separability(exp, scores.T)
-                             for scores in scoreses
-                             for _ in range(100)]
-                       for exp, scoreses in consistency_good.items()}
+sep_on_states = {exp: [separability(exp, scores.T)
+                       for scores in scoreses]
+                 for exp, scoreses in consistency_good.items()}
+
+sep_on_fr = {exp: separability_on_fr(r)
+             for exp, (r,_) in rasters.items()}
 
 # %%
 
@@ -383,7 +390,7 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     GHtop, GHbot = 0.25, 0.04
     H = f.subplots(1, 1, gridspec_kw=dict(top=GHtop, bottom=GHbot,
                                           left=0.5, right=0.98))
-    H.violinplot(separability_scores.values(),
+    H.violinplot(sep_on_states.values(),
                  positions=np.arange(len(experiments)),
                  showextrema=False, showmeans=True)
     H.plot([], [], 'C0_', ms=10, label='By State Structure')
@@ -392,8 +399,8 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
            '_', ms=10, label='By Firing Rate')
     H.set_xticks(range(len(experiments)),
                  [f'Org.\\ {i+1}' for i in range(len(experiments))])
-    H.set_ylim([0.19, 1.01])
-    ticks = [0.2, 0.4, 0.6, 0.8, 1.0]
+    H.set_ylim([0.49, 1.01])
+    ticks = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
     H.set_yticks(ticks, [f'{100*t:.0f}\\%' for t in ticks])
     H.set_ylabel('Packet / Non-Packet Separability')
     H.legend()
