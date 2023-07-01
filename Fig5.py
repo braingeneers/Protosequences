@@ -411,12 +411,10 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
                  positions=np.arange(len(experiments)),
                  showextrema=False, showmeans=True)
     H.plot([], [], 'C0_', ms=10, label='By State Structure')
-    H.plot([separability_on_fr(r)
-            for (r,_) in rasters.values()],
-           '_', ms=10, label='By Firing Rate')
+    H.plot(sep_on_fr.values(), '_', ms=10, label='By Firing Rate')
     H.set_xticks(range(len(experiments)),
                  [f'Org.\\ {i+1}' for i in range(len(experiments))])
-    H.set_ylim([0.49, 1.01])
+    H.set_ylim([0.45, 1.05])
     ticks = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
     H.set_yticks(ticks, [f'{100*t:.0f}\\%' for t in ticks])
     H.set_ylabel('Packet / Non-Packet Separability')
