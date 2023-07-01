@@ -91,17 +91,21 @@ except FileNotFoundError:
         pickle.dump((consistency_good, consistency_bad), f)
 
 
-def separability(exp, scores):
+def separability(exp, X, pca=None):
     '''
-    Fit a linear classifier to the consistency scores and return its
+    Fit a linear classifier to the given features X and return its
     performance separating packet and non-packet units.
     '''
-    pak = ~(np.arange(scores.shape[0])
+    y = ~(np.arange(X.shape[0])
             < len(srms[exp]['non_scaf_units']))
+    if pca is not None and pca < X.shape[1]:
+        pca = PCA(n_components=pca)
+        pca.fit(X)
+        X = pca.transform(X)
     clf = SGDClassifier(loss='modified_huber', max_iter=1000000,
                         n_jobs=12, tol=1e-6, penalty='l1')
-    clf.fit(scores, pak)
-    return clf.score(scores, pak)
+    clf.fit(X, y)
+    return clf.score(X, y)
 
 def separability_on_fr(r):
     '''
@@ -109,11 +113,7 @@ def separability_on_fr(r):
     just their overall firing rates.
     '''
     rates = r.rates('Hz').reshape((-1,1))
-    clf = SGDClassifier(loss='modified_huber', max_iter=1000000, n_jobs=12,
-                        tol=1e-6, penalty='l1', random_state=42)
-    pak = ~(np.arange(len(rates)) < len(srms[r.experiment]['non_scaf_units']))
-    clf.fit(rates, pak)
-    return clf.score(rates, pak)
+    return separability(r.experiment, rates)
 
 
 separability_scores = {exp: [separability(exp, scores.T)
