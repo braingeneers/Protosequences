@@ -8,6 +8,7 @@ import hmmsupport
 from hmmsupport import get_raster, figure, load_raw, Model, all_experiments
 from sklearn.decomposition import PCA
 from tqdm import tqdm
+from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import SGDClassifier
 from sklearn.cluster import KMeans
@@ -99,9 +100,7 @@ def separability(exp, X, pca=None, n_tries=10, validation=0.33):
     '''
     clf = SGDClassifier(n_jobs=12)
     if pca is not None and pca < X.shape[1]:
-        pca = PCA(n_components=pca)
-        pca.fit(X)
-        X = pca.transform(X)
+        clf = make_pipeline(PCA(n_components=pca), clf)
     y = ~(np.arange(X.shape[0])
             < len(srms[exp]['non_scaf_units']))
     if validation is None:
