@@ -98,17 +98,10 @@ def separability(exp, scores):
     '''
     pak = ~(np.arange(scores.shape[0])
             < len(srms[exp]['non_scaf_units']))
-    pca = PCA(10)
-    pca.fit(scores)
-    scores = pca.transform(scores)
-    clf = SGDClassifier(loss='modified_huber', max_iter=1000000, n_jobs=12,
-                        tol=1e-6, penalty='l1', random_state=42)
+    clf = SGDClassifier(loss='modified_huber', max_iter=1000000,
+                        n_jobs=12, tol=1e-6, penalty='l1')
     clf.fit(scores, pak)
     return clf.score(scores, pak)
-
-separability_good = {exp: [separability(exp, scores.T)
-                           for scores in scoreses]
-                     for exp, scoreses in consistency_good.items()}
 
 def separability_on_fr(r):
     '''
@@ -122,11 +115,11 @@ def separability_on_fr(r):
     clf.fit(rates, pak)
     return clf.score(rates, pak)
 
-separability_scores = {
-    exp: np.subtract(separability_good[exp],
-                     separability_on_fr(r))
-    for exp,(r,_) in rasters.items()}
 
+separability_scores = {exp: [separability(exp, scores.T)
+                             for scores in scoreses
+                             for _ in range(100)]
+                       for exp, scoreses in consistency_good.items()}
 
 # %%
 
@@ -391,9 +384,16 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     H = f.subplots(1, 1, gridspec_kw=dict(top=GHtop, bottom=GHbot,
                                           left=0.5, right=0.98))
     H.violinplot(separability_scores.values(),
-                 positions=np.arange(len(experiments)))
+                 positions=np.arange(len(experiments)),
+                 showextrema=False, showmeans=True)
+    H.plot([], [], 'C0_', ms=10, label='By State Structure')
+    H.plot([separability_on_fr(r)
+            for (r,_) in rasters.values()],
+           '_', ms=10, label='By Firing Rate')
     H.set_xticks(range(len(experiments)),
                  [f'Org.\\ {i+1}' for i in range(len(experiments))])
-    ticks = H.get_yticks()
+    H.set_ylim([0.19, 1.01])
+    ticks = [0.2, 0.4, 0.6, 0.8, 1.0]
     H.set_yticks(ticks, [f'{100*t:.0f}\\%' for t in ticks])
     H.set_ylabel('Packet / Non-Packet Separability')
+    H.legend()
