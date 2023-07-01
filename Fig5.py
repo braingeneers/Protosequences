@@ -106,15 +106,15 @@ def separability(exp, X, pca=None, n_tries=100, validation=0.2):
     if validation is None:
         Xt = Xv = X
         yt = yv = y
-    scores = []
+    best, res = 0, 0
     for _ in range(n_tries):
         if validation is not None:
             Xt, Xv, yt, yv = train_test_split(
                 X, y, stratify=y, test_size=validation)
-        clf.fit(Xt, yt)
-        scores.append((clf.score(Xv, yv),
-                       clf.score(X, y)))
-    return max(scores, key=lambda x: x[0])[1]
+        score = clf.fit(Xt, yt).score(Xv, yv)
+        if score > best:
+            best, res = score, clf.score(X, y)
+    return res
 
 def separability_on_fr(r):
     '''
