@@ -1,6 +1,5 @@
-#  Fig5.py
+# Fig5.py
 # Generate most of figure 5 of the final manuscript.
-import itertools
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,8 +10,6 @@ from tqdm import tqdm
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import SGDClassifier
-from sklearn.cluster import KMeans
-
 
 experiments = [
     ('organoid', exp) for exp in all_experiments('organoid')
@@ -49,7 +46,8 @@ with tqdm(total=len(experiments)*(1+len(n_stateses))) as pbar:
         window[1] = max(window[1], 0.6)
         for n in n_stateses:
             rasters[exp][1].append(Model(source, exp, bin_size_ms, n,
-                                         surr, library=hmm_library))
+                                         surr, library=hmm_library,
+                                         recompute_ok=False))
             rasters[exp][1][-1].compute_entropy(rasters[exp][0], *window)
             pbar.update()
 
@@ -83,7 +81,7 @@ except FileNotFoundError:
             state_order = r.state_order(h, margins, n_states=n)
             pbar.update()
             scores[np.isnan(scores)] = 0
-            return scores[:, unit_order]
+            return scores[:, unit_order][state_order, :]
         consistency_good, consistency_bad = [
             {exp: [consistency_scores(source, exp, n, surr)
                    for n in n_stateses]
@@ -102,7 +100,7 @@ def separability(exp, X, pca=None, n_tries=100, validation=0.2):
     if pca is not None and pca < X.shape[1]:
         clf = make_pipeline(PCA(n_components=pca), clf)
     y = ~(np.arange(X.shape[0])
-            < len(srms[exp]['non_scaf_units']))
+          < len(srms[exp]['non_scaf_units']))
     if validation is None:
         Xt = Xv = X
         yt = yv = y
@@ -131,6 +129,7 @@ sep_on_states = {exp: [separability(exp, scores.T)
 
 sep_on_fr = {exp: separability_on_fr(r)
              for exp, (r,_) in rasters.items()}
+
 
 # %%
 
@@ -277,7 +276,7 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     for ax in deltas:
         ax.set_xticks([-3, 2])
         ax.set_xlim([-3, 2])
-        ax.set_xlabel('$\Delta$FR')
+        ax.set_xlabel('$\\Delta$FR')
     for ax in examples + rates + deltas:
         ax.set_yticks([])
         ax.set_ylim(0.5, rsub.shape[1]+0.5)
@@ -331,8 +330,8 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     t_ms = np.arange(lmargin*bin_size_ms, (rmargin+1)*bin_size_ms)
     for peak in peaks:
         peak_ms = int(round(peak * bin_size_ms))
-        burst = poprate[peak_ms+lmargin*bin_size_ms
-                        :peak_ms+(rmargin+1)*bin_size_ms]
+        burst = poprate[peak_ms+lmargin*bin_size_ms:
+                        peak_ms+(rmargin+1)*bin_size_ms]
         pr.plot(t_ms/1e3, burst, 'C0', alpha=0.1)
 
     en.set_xticks([])
@@ -366,13 +365,13 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
 
     # Subfigure F: explained variance ratio with inset.
     F = f.subplots(1, 1,
-                     gridspec_kw=dict(top=DEFtop, bottom=DEFbot,
-                                      wspace=0.4,
-                                      left=0.69, right=0.98))
+                   gridspec_kw=dict(top=DEFtop, bottom=DEFbot,
+                                    wspace=0.4,
+                                    left=0.69, right=0.98))
     F.plot(np.arange(n_states)+1, pca_good.explained_variance_ratio_,
-             label='Real')
+           label='Real')
     F.plot(np.arange(n_states)+1, pca_bad.explained_variance_ratio_,
-             label='Randomized')
+           label='Randomized')
     F.set_xticks([1, 15])
     F.set_xlabel('Principal Component')
     F.set_ylabel('Explained Variance Ratio')
@@ -386,7 +385,7 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     bp.set_xlim([0.6, 1.4])
     bp.set_xticks([])
     bp.set_yticks([])
-    F.indicate_inset_zoom(bp, edgecolor='black');
+    F.indicate_inset_zoom(bp, edgecolor='black')
 
     # Subfigure G: somehow show what's happening on the right.
     GHtop, GHbot = 0.25, 0.04
