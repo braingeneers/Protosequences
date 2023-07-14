@@ -1,23 +1,21 @@
-import itertools
 import functools
-import re
 import glob
 import os
-import sys
 import pickle
-import joblib
+import re
+import sys
+import tempfile
+from contextlib import contextmanager
+from io import BytesIO
+
+import awswrangler
 import h5py
 import mat73
 import numpy as np
 import scipy.io
-import awswrangler
-import tempfile
-from io import BytesIO
-from tqdm.auto import tqdm
-from contextlib import contextmanager
-from scipy import stats, signal, sparse, ndimage
 from braingeneers.analysis import read_phy_files, SpikeData
 from braingeneers.utils.smart_open_braingeneers import open
+from scipy import stats, signal, ndimage
 
 
 def s3_isdir(path):
@@ -195,111 +193,89 @@ class HMMMethod:
         self.states = states
         _HMM_METHODS[library] = self
 
-try:
+
+@Cache
+def _ssm_hmm(source, exp, bin_size_ms, n_states, surrogate,
+             verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
+    'Fit an HMM to data with SSM and return the model.'
     from ssm import HMM as SSMHMM
+    r = get_raster(source, exp, bin_size_ms, surrogate)
+    hmm = SSMHMM(K=n_states, D=r._raster.shape[1],
+                 observations='poisson')
+    hmm.fit(r._raster, verbose=2 if verbose else 0,
+            tolerance=atol, num_iters=n_iter)
+    return hmm
 
-    @Cache
-    def _ssm_hmm(source, exp, bin_size_ms, n_states, surrogate,
+def _ssm_states(hmm, raster):
+    'Return the most likely state sequence for the given raster.'
+    return hmm.most_likely_states(raster)
+
+SSMFit = HMMMethod('ssm', _ssm_hmm, _ssm_states)
+
+
+@Cache
+def _dynamax_hmm(source, exp, bin_size_ms, n_states, surrogate,
                  verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
-        'Fit an HMM to data with SSM and return the model.'
-        r = get_raster(source, exp, bin_size_ms, surrogate)
-        hmm = SSMHMM(K=n_states, D=r._raster.shape[1],
-                     observations='poisson')
-        hmm.fit(r._raster, verbose=2 if verbose else 0,
-                tolerance=atol, num_iters=n_iter)
-        return hmm
-
-    def _ssm_states(hmm, raster):
-        'Return the most likely state sequence for the given raster.'
-        return hmm.most_likely_states(raster)
-
-    SSMFit = HMMMethod('ssm', _ssm_hmm, _ssm_states)
-
-except ImportError:
-    pass
-
-try:
-    import nonexistent
+    'Fit an HMM to data with Dynamax and return the model.'
     from dynamax.hidden_markov_model import PoissonHMM as DynamaxHMM
     import jax.random as jr
+    r = get_raster(source, exp, bin_size_ms, surrogate)
+    hmm = DynamaxHMM(num_states=n_states, emission_dim=r._raster.shape[1])
+    hmm.params, props = hmm.initialize(jr.PRNGKey(np.random.randint(2**32)))
+    hmm.params, lls = hmm.fit_em(hmm.params, props, r._raster,
+                                 verbose=verbose, num_iters=n_iter)
+    return hmm
 
-    @Cache
-    def _dynamax_hmm(source, exp, bin_size_ms, n_states, surrogate,
-                     verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
-        'Fit an HMM to data with Dynamax and return the model.'
-        r = get_raster(source, exp, bin_size_ms, surrogate)
-        hmm = DynamaxHMM(num_states=n_states, emission_dim=r._raster.shape[1])
-        hmm.params, props = hmm.initialize(jr.PRNGKey(np.random.randint(2**32)))
-        hmm.params, lls = hmm.fit_em(hmm.params, props, r._raster,
-                                     verbose=verbose, num_iters=n_iter)
-        return hmm
+def _dynamax_states(hmm, raster):
+    'Return the most likely state sequence for the given raster.'
+    return hmm.most_likely_states(hmm.params, raster)
 
-    def _dynamax_states(hmm, raster):
-        'Return the most likely state sequence for the given raster.'
-        return hmm.most_likely_states(hmm.params, raster)
+DynamaxFit = HMMMethod('dynamax', _dynamax_hmm, _dynamax_states)
 
-    DynamaxFit = HMMMethod('dynamax', _dynamax_hmm, _dynamax_states)
 
-except ImportError:
-    pass
-
-try:
+@Cache
+def _hmmlearn_hmm(source, exp, bin_size_ms, n_states, surrogate,
+                  verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
+    'Fit an HMM to data with HMMLearn and return the model.'
     from hmmlearn.hmm import PoissonHMM as HMMLearnHMM
+    r = get_raster(source, exp, bin_size_ms, surrogate)
+    hmm = HMMLearnHMM(n_components=n_states, verbose=False,
+                      n_iter=n_iter, tol=atol)
+    hmm.fit(r._raster)
+    return hmm
 
-    @Cache
-    def _hmmlearn_hmm(source, exp, bin_size_ms, n_states, surrogate,
-                      verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
-        'Fit an HMM to data with HMMLearn and return the model.'
-        r = get_raster(source, exp, bin_size_ms, surrogate)
-        hmm = HMMLearnHMM(n_components=n_states, verbose=False,
-                          n_iter=n_iter, tol=atol)
-        hmm.fit(r._raster)
-        return hmm
+def _hmmlearn_states(hmm, raster):
+    'Return the most likely state sequence for the given raster.'
+    return hmm.predict(raster)
 
-    def _hmmlearn_states(hmm, raster):
-        'Return the most likely state sequence for the given raster.'
-        return hmm.predict(raster)
-
-    HMMLearnFit = HMMMethod('hmmlearn', _hmmlearn_hmm, _hmmlearn_states)
-
-except ImportError:
-    pass
+HMMLearnFit = HMMMethod('hmmlearn', _hmmlearn_hmm, _hmmlearn_states)
 
 
-try:
-    import nonexistent
-    from juliacall import Main as jl
-    jl.seval('using Pkg; Pkg.activate("NeuroHMM"); using NeuroHMM')
+jl = None
 
-    @Cache
-    def _hmmbase_hmm(source, exp, bin_size_ms, n_states, surrogate,
-                     verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
-        'Fit an HMM to data with NeuroHMM and return the model.'
-        r = get_raster(source, exp, bin_size_ms, surrogate)
-        display = jl.Symbol('iter' if verbose else 'none')
-        hmm, _ = jl.NeuroHMM.fit_hmm(n_states, r._raster, tol=atol,
-                                     maxiter=n_iter, display=display)
-        return hmm
+@Cache
+def _hmmbase_hmm(source, exp, bin_size_ms, n_states, surrogate,
+                 verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
+    'Fit an HMM to data with NeuroHMM and return the model.'
+    if jl is None:
+        global jl
+        from juliacall import Main as jl
+        jl.seval('using Pkg; Pkg.activate("NeuroHMM"); using NeuroHMM')
+    r = get_raster(source, exp, bin_size_ms, surrogate)
+    display = jl.Symbol('iter' if verbose else 'none')
+    hmm, _ = jl.NeuroHMM.fit_hmm(n_states, r._raster, tol=atol,
+                                 maxiter=n_iter, display=display)
+    return hmm
 
-    def _hmmbase_states(hmm, raster):
-        'Return the most likely state sequence for the given raster.'
-        return np.asarray(jl.NeuroHMM.viterbi(hmm, raster)) - 1
+def _hmmbase_states(hmm, raster):
+    'Return the most likely state sequence for the given raster.'
+    return np.asarray(jl.NeuroHMM.viterbi(hmm, raster)) - 1
 
-    HMMBaseFit = HMMMethod('hmmbase', _hmmbase_hmm, _hmmbase_states)
-
-except ImportError:
-    pass
+HMMBaseFit = HMMMethod('hmmbase', _hmmbase_hmm, _hmmbase_states)
 
 
-# Set the default HMM fitting method to the first available.
-if len(_HMM_METHODS) == 0:
-    raise ImportError('No HMM libraries found.')
-else:
-    first_method = next(iter(_HMM_METHODS.keys()))
-    default_method = os.environ.get('HMM_METHOD', first_method)
-    if default_method not in _HMM_METHODS:
-        raise ValueError(f'Invalid HMM_METHOD: {default_method}')
-    _HMM_METHODS['default'] = _HMM_METHODS[default_method]
+default_method = os.environ.get('HMM_METHOD', 'ssm')
+_HMM_METHODS['default'] = _HMM_METHODS[default_method]
 
 
 def is_cached(source, exp, bin_size_ms, n_states, surrogate='real',
@@ -476,7 +452,7 @@ class Raster(SpikeData):
             # fixed sample rate of 1 kHz, or possibly the spike_matrix is
             # dumped directory in the root of the mat file.
             if 'spike_matrix' in mat or 'SUA' in mat:
-                sm = (mat['SUA'][0,0]['spike_matrix'] if 'SUA' in mat 
+                sm = (mat['SUA'][0,0]['spike_matrix'] if 'SUA' in mat
                       else mat['spike_matrix'])
                 self._burst_default_rms = 6.0
                 idces, times = np.nonzero(sm)
@@ -514,7 +490,7 @@ class Raster(SpikeData):
                     f'Failed to load {source} {experiment}: {e}') from None
             self._burst_default_rms = None
             units, length = sd.train, sd.length
-            
+
         # Delegate out to the part that's useful to extract for subclass
         # constructors.
         self._init(source, experiment, bin_size_ms, units, length)
@@ -662,7 +638,7 @@ class Raster(SpikeData):
             state_seq = h[peak_bin+lmargin:peak_bin+rmargin+1]
             for i, s in enumerate(state_seq):
                 burst_relative_state_times[s].append(i+lmargin)
-        
+
         return np.argsort([np.median(times)
                            for times in burst_relative_state_times])
 
