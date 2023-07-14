@@ -54,9 +54,9 @@ def all_experiments(source):
         paths = awswrangler.s3.list_objects(path + '/')
     else:
         paths = glob.glob(os.path.join(path, '*'))
-    return sorted([
+    return sorted({
         os.path.splitext(os.path.basename(x))[0]
-        for x in paths])
+        for x in paths})
 
 
 CACHE_DIR = '.cache'
