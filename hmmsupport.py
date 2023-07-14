@@ -257,8 +257,8 @@ jl = None
 def _hmmbase_hmm(source, exp, bin_size_ms, n_states, surrogate,
                  verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
     'Fit an HMM to data with NeuroHMM and return the model.'
+    global jl
     if jl is None:
-        global jl
         from juliacall import Main as jl
         jl.seval('using Pkg; Pkg.activate("NeuroHMM"); using NeuroHMM')
     r = get_raster(source, exp, bin_size_ms, surrogate)
