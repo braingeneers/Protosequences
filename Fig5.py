@@ -198,11 +198,11 @@ alpha_rainbow = plt.matplotlib.colors.LinearSegmentedColormap.from_list(
 with figure(figure_name, figsize=(8.5, 11)) as f:
 
     # Subfigure A: example burst rasters.
-    axes = f.subplots(
+    A = f.subplots(
         1, 3, gridspec_kw=dict(wspace=0.1,
                                top=0.995, bottom=0.85,
                                left=0.04, right=0.95))
-    for ax, peak_float in zip(axes, peaks):
+    for ax, peak_float in zip(A, peaks):
         peak = int(round(peak_float))
         when = slice(peak+lmargin_h, peak+rmargin_h+1)
         rsub = r._raster[when, :] / bin_size_ms
@@ -231,7 +231,7 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
 
     ax2.set_ylabel('Population Rate (kHz)')
     ax2.set_yticks([0, 3])
-    axes[0].set_ylabel(r'Non-Packet \hspace{1.5em} Packet', y=1.03,
+    A[0].set_ylabel(r'Non-Packet \hspace{1.5em} Packet', y=1.03,
                        horizontalalignment='right')
 
     # Subfigure B: state heatmap.
@@ -308,7 +308,7 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     en, pr = f.subplots(2, 1,
                         gridspec_kw=dict(height_ratios=[3,2],
                                          top=DEFtop, bottom=DEFbot,
-                                         left=0.06, right=0.21))
+                                         left=0.06, right=0.31))
 
     lmargin, rmargin = model.burst_margins
     time_sec = np.arange(lmargin, rmargin+1) * bin_size_ms / 1000
@@ -344,30 +344,25 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     f.align_ylabels((en, pr))
 
     # Subfigure E: PCA of real vs. surrogate data.
-    E = f.subplots(1, 2,
-                   gridspec_kw=dict(wspace=-0.345, top=DEFtop, bottom=DEFbot,
-                                    left=0.225, right=0.675))
-    for ax, pca, ri, m in zip(E, [pca_good, pca_bad], [r, r_bad],
-                              [model, model_bad]):
-        ax.set_aspect('equal')
-        data = pca.transform(ri._raster)[:,1::-1]
-        ax.scatter(data[:,0], data[:,1], s=2, c=m.states(ri),
-                   cmap=alpha_rainbow)
-        ax.set_ylim([-3, 13])
-        ax.set_xlim([-3, 8])
-        ax.set_xlabel('PC2')
-        ax.set_xticks([0, 5])
-    E[0].set_ylabel('PC1')
-    E[0].set_yticks([0, 10])
-    E[1].set_yticks([])
-    E[0].set_title('Real')
-    E[1].set_title('Randomized')
+    E = f.subplots(1, 1,
+                   gridspec_kw=dict(top=DEFtop, bottom=DEFbot,
+                                    left=0.35, right=0.6))
+    E.set_aspect('equal')
+    data = pca_good.transform(r._raster)[:,1::-1]
+    E.scatter(data[:,0], data[:,1], s=2, c=model.states(r),
+              cmap=alpha_rainbow)
+    E.set_ylim([-3, 13])
+    E.set_xlim([-3, 8])
+    E.set_xlabel('PC2')
+    E.set_xticks([0, 5])
+    E.set_ylabel('PC1')
+    E.set_yticks([0, 5, 10])
 
     # Subfigure F: explained variance ratio with inset.
     F = f.subplots(1, 1,
                    gridspec_kw=dict(top=DEFtop, bottom=DEFbot,
                                     wspace=0.4,
-                                    left=0.69, right=0.98))
+                                    left=0.64, right=0.98))
     F.plot(np.arange(n_states)+1, pca_good.explained_variance_ratio_,
            label='Real')
     F.plot(np.arange(n_states)+1, pca_bad.explained_variance_ratio_,
@@ -388,33 +383,43 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     F.indicate_inset_zoom(bp, edgecolor='black')
 
     # Subfigure G: somehow show what's happening on the right.
-    GHtop, GHbot = 0.25, 0.04
-    G = f.subplot_mosaic('AA\nBC\nDD',
-                         width_ratios=[2,3],
-                         gridspec_kw=dict(top=GHtop, bottom=GHbot,
-                                          left=0.04, right=0.4))
-    for i, (_,exp) in enumerate(experiments[:4]):
-        ax = G['ABCD'[i]]
-        ax.imshow(consistency_good[exp][1])
-        ax.set_title(f'Organoid {i+1}', fontsize='medium')
-        ax.set_xticks([])
-        ax.set_yticks([])
-    G['D'].set_xlabel('Unit')
-    for c in 'ABD':
-        G[c].set_ylabel('State')
+    GHItop, GHIbot = 0.25, 0.04
+    G = f.subplots(1, 1, gridspec_kw=dict(top=GHItop, bottom=GHIbot,
+                                          left=0.063, right=0.3))
+    scores = consistency_good[exp][10]
+    G.imshow(scores, aspect='auto', interpolation='none')
+    # G.set_xticks([0, scores.shape[1]-1], [1, scores.shape[1]])
+    # G.set_yticks([0, scores.shape[0]-1], [1, scores.shape[0]])
+    G.set_xlabel('Unit')
+    G.set_ylabel('State')
 
-    # Subfigure H: per-organoid separability metric.
-    H = f.subplots(1, 1, gridspec_kw=dict(top=GHtop, bottom=GHbot,
-                                          left=0.5, right=0.98))
-    H.violinplot(sep_on_states.values(),
+    # Subfigure H: PCA of consistency scores for a single organoid, showing
+    # that it's sufficient to separate packet/non-packet units.
+    H = f.subplots(1, 1, gridspec_kw=dict(top=GHItop, bottom=GHIbot,
+                                          left=0.35, right=0.6))
+    scores = consistency_good[exp][10]
+    # is_packet = np.zeros(scores.shape[1], dtype=bool)
+    # is_packet[srms[experiments[0][1]]['scaf_units']-1] = True
+    is_packet = ~(np.arange(scores.shape[1])
+                  < len(srms[exp]['non_scaf_units']))
+    pca = PCA(n_components=2).fit_transform(scores.T)
+    H.set_aspect('equal')
+    H.scatter(pca[:,1], pca[:,0], c=is_packet)
+    H.set_ylabel('PC1')
+    H.set_xlabel('PC2')
+
+    # Subfigure I: per-organoid separability metric.
+    I = f.subplots(1, 1, gridspec_kw=dict(top=GHItop, bottom=GHIbot,
+                                          left=0.67, right=0.98))
+    I.violinplot(sep_on_states.values(),
                  positions=np.arange(len(experiments)),
                  showextrema=False, showmeans=True)
-    H.plot([], [], 'C0_', ms=10, label='By State Structure')
-    H.plot(sep_on_fr.values(), '_', ms=10, label='By Firing Rate')
-    H.set_xticks(range(len(experiments)),
+    I.plot([], [], 'C0_', ms=10, label='By State Structure')
+    I.plot(sep_on_fr.values(), '_', ms=10, label='By Firing Rate')
+    I.set_xticks(range(len(experiments)),
                  [f'Org.\\ {i+1}' for i in range(len(experiments))])
-    H.set_ylim([0.45, 1.05])
+    I.set_ylim([0.45, 1.05])
     ticks = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-    H.set_yticks(ticks, [f'{100*t:.0f}\\%' for t in ticks])
-    H.set_ylabel('Packet / Non-Packet Separability')
-    H.legend()
+    I.set_yticks(ticks, [f'{100*t:.0f}\\%' for t in ticks])
+    I.set_ylabel('Packet / Non-Packet Separability')
+    I.legend()
