@@ -12,10 +12,9 @@ if __name__ == '__main__':
         exps = all_experiments(uuid)
 
         for exp in exps:
-            print(uuid, exp, end=' ')
             try:
                 r = Raster(uuid, exp, 30)
                 pr = r.coarse_rate().max()
-                print(f'has {r.N} units, peak rate {pr}')
+                print(f'{uuid}/{exp} has {r.N} units, peak rate {pr}')
             except Exception as e:
-                print(type(e), e)
+                print(f'{uuid}/{exp} failed with {type(e).__name__}: {e}', file=sys.stderr)
