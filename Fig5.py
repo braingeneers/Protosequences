@@ -385,12 +385,12 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     # Subfigure G: somehow show what's happening on the right.
     GHItop, GHIbot = 0.25, 0.04
     G = f.subplots(1, 1, gridspec_kw=dict(top=GHItop, bottom=GHIbot,
-                                          left=0.063, right=0.3))
+                                          left=0.03, right=0.3))
     scores = consistency_good[exp][10]
     G.imshow(scores, aspect='auto', interpolation='none')
-    # G.set_xticks([0, scores.shape[1]-1], [1, scores.shape[1]])
-    # G.set_yticks([0, scores.shape[0]-1], [1, scores.shape[0]])
-    G.set_xlabel('Unit')
+    G.set_xticks([])
+    G.set_yticks([])
+    G.set_xlabel(r'Non-Packet \hspace{2.5cm} Packet')
     G.set_ylabel('State')
 
     # Subfigure H: PCA of consistency scores for a single organoid, showing
@@ -398,8 +398,6 @@ with figure(figure_name, figsize=(8.5, 11)) as f:
     H = f.subplots(1, 1, gridspec_kw=dict(top=GHItop, bottom=GHIbot,
                                           left=0.35, right=0.6))
     scores = consistency_good[exp][10]
-    # is_packet = np.zeros(scores.shape[1], dtype=bool)
-    # is_packet[srms[experiments[0][1]]['scaf_units']-1] = True
     is_packet = ~(np.arange(scores.shape[1])
                   < len(srms[exp]['non_scaf_units']))
     pca = PCA(n_components=2).fit_transform(scores.T)
