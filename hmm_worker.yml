@@ -4,7 +4,7 @@ metadata:
   name: $JOB_NAME
   labels:
     app: organoid-hmm
-    user: $USER
+    user: $S3_USER
 spec:
   ttlSecondsAfterFinished: 3600
   backoffLimit: 0
@@ -15,7 +15,7 @@ spec:
         image: atspaeth/organoid-hmm
         env:
           - name: S3_USER
-            value: $USER
+            value: $S3_USER
           - name: ENDPOINT
             value: http://rook-ceph-rgw-nautiluss3.rook
         imagePullPolicy: Always

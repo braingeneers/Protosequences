@@ -4,6 +4,7 @@
 # sizes, and numbers of hidden states, checks which of those models are not
 # cached, and either adds them to the HMM job queue or just runs them
 # locally, depending whether the option --local is provided.
+import os
 import sys
 import itertools
 import numpy as np
@@ -33,6 +34,10 @@ def parse_range_str(range_str):
 
 
 if __name__ == '__main__':
+    if not os.environ.get('S3_USER'):
+        print('$S3_USER must be defined.', file=sys.stderr)
+        sys.exit(1)
+
     dryrun = '--dryrun' in sys.argv
     if dryrun:
         sys.argv.remove('--dryrun')
