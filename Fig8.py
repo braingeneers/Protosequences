@@ -31,6 +31,7 @@ print("Loading fitted HMMs and calculating entropy.")
 rasters = {}
 for exp in tqdm(experiments):
     r = get_raster(source, exp, bin_size_ms, surr)
+    r._burst_default_rms = 4
 
     def process_model(n):
         m = Model(
