@@ -25,6 +25,6 @@ add-worker n="1":
     export PRP_MEMORY_LIMIT_GI
     for i in $(seq "{{n}}"); do
         stamp=$(printf '%(%m%d%H%M%S)T\n' -1)
-        export JOB_NAME=atspaeth-hmm-worker-$stamp
+        export JOB_NAME=atspaeth-hmm-worker--$stamp$i
         envsubst < hmm_worker.yml | kubectl apply -f -
     done
