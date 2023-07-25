@@ -26,7 +26,7 @@ def s3_isdir(path):
         return False
 
 
-DATA_DIR = 'data'
+DATA_DIR = "data"
 
 
 @functools.lru_cache
@@ -34,57 +34,59 @@ def data_dir(source):
     path = os.path.join(DATA_DIR, source)
     if os.path.isdir(path):
         return path
-    elif path.startswith('s3://') and s3_isdir(path):
+    elif path.startswith("s3://") and s3_isdir(path):
         return path
 
-    personal_s3 = 's3://braingeneers/personal/atspaeth/data/' + source
+    personal_s3 = "s3://braingeneers/personal/atspaeth/data/" + source
     if s3_isdir(personal_s3):
         return personal_s3
 
-    main_s3 = f's3://braingeneers/ephys/{source}/derived/kilosort2'
+    main_s3 = f"s3://braingeneers/ephys/{source}/derived/kilosort2"
     if s3_isdir(main_s3):
         return main_s3
 
-    raise FileNotFoundError(f'Could not find data for {source}')
+    raise FileNotFoundError(f"Could not find data for {source}")
 
 
 def all_experiments(source):
     path = data_dir(source)
-    if path.startswith('s3://'):
-        paths = awswrangler.s3.list_objects(path + '/')
+    if path.startswith("s3://"):
+        paths = awswrangler.s3.list_objects(path + "/")
     else:
-        paths = glob.glob(os.path.join(path, '*'))
-    return sorted({
-        os.path.splitext(os.path.basename(x))[0]
-        for x in paths})
+        paths = glob.glob(os.path.join(path, "*"))
+    return sorted({os.path.splitext(os.path.basename(x))[0] for x in paths})
 
 
-CACHE_DIR = '.cache'
-S3_USER = os.environ.get('S3_USER')
-S3_CACHE = f's3://braingeneers/personal/{S3_USER}/cache'
-CACHE_ROOTS = [root_path for (root_path, valid) in [
-    (CACHE_DIR, os.path.isdir(CACHE_DIR)),
-    (S3_CACHE, S3_USER is not None)
-] if valid]
+CACHE_DIR = ".cache"
+S3_USER = os.environ.get("S3_USER")
+S3_CACHE = f"s3://braingeneers/personal/{S3_USER}/cache"
+CACHE_ROOTS = [
+    root_path
+    for (root_path, valid) in [
+        (CACHE_DIR, os.path.isdir(CACHE_DIR)),
+        (S3_CACHE, S3_USER is not None),
+    ]
+    if valid
+]
 
 
 def _store(obj, path):
-    '''
+    """
     Pickle an object to a path.
 
     If the path is local, ensure that it exists before trying to open the
     file.
-    '''
-    iss3 = path.startswith('s3://')
+    """
+    iss3 = path.startswith("s3://")
     try:
         if not iss3:
             dirname = os.path.dirname(path)
             os.makedirs(dirname, exist_ok=True)
-        with open(path, 'wb') as f:
+        with open(path, "wb") as f:
             pickle.dump(obj, f)
     except Exception as e:
-        verb = 'upload' if iss3 else 'save'
-        print(f'Failed to {verb} {path}: {e}', file=sys.stderr)
+        verb = "upload" if iss3 else "save"
+        print(f"Failed to {verb} {path}: {e}", file=sys.stderr)
 
 
 class Cache:
@@ -93,14 +95,14 @@ class Cache:
         functools.update_wrapper(self, func)
 
     def _cache_names(self, source, exp, bin_size_ms, n_states, surrogate):
-        'Local cache file and S3 object cache path.'
-        key = f'{source}_{exp}_{bin_size_ms}ms_{n_states}S_{surrogate}.pkl'
+        "Local cache file and S3 object cache path."
+        key = f"{source}_{exp}_{bin_size_ms}ms_{n_states}S_{surrogate}.pkl"
         file = os.path.join(CACHE_DIR, self.__name__, key)
-        s3_object = '/'.join((S3_CACHE, self.__name__, key))
+        s3_object = "/".join((S3_CACHE, self.__name__, key))
         return file, s3_object
 
     def _cache_path(self, *args):
-        'The nearest possible cache path to read from, None if uncached.'
+        "The nearest possible cache path to read from, None if uncached."
         filename, s3_object = self._cache_names(*args)
 
         if os.path.isdir(CACHE_DIR) and os.path.isfile(filename):
@@ -111,25 +113,25 @@ class Cache:
             return None
 
     def is_cached(self, *args):
-        'Whether the given parameters are cached.'
+        "Whether the given parameters are cached."
         return self._cache_path(*args) is not None
 
     def get_cached(self, *args):
-        '''
+        """
         Get the cached object, or None if unavailable.
 
         Additionally, if restoring the object from S3 when a local cache is
         present, add the object to the local cache.
-        '''
+        """
         path = self._cache_path(*args)
 
         if path is None:
             return None
 
-        with open(path, 'rb') as f:
+        with open(path, "rb") as f:
             ret = pickle.load(f)
 
-        if path.startswith('s3://') and os.path.isdir(CACHE_DIR):
+        if path.startswith("s3://") and os.path.isdir(CACHE_DIR):
             _store(ret, self._cache_names(*args)[0])
 
         return ret
@@ -154,29 +156,32 @@ class Cache:
 def figdir(path=None):
     if path is not None:
         path = os.path.expanduser(path.strip())
-        if path == '':
-            figdir.dir = 'figures'
-        elif path[0] == '/':
+        if path == "":
+            figdir.dir = "figures"
+        elif path[0] == "/":
             figdir.dir = path
         else:
-            figdir.dir = os.path.join('figures', path)
+            figdir.dir = os.path.join("figures", path)
         if not os.path.exists(figdir.dir):
             os.makedirs(figdir.dir)
     return os.path.abspath(figdir.dir)
-figdir('')
+
+
+figdir("")
 
 
 def experiment_parts(experiment):
-    '''
+    """
     Separate the given experiment name into three parts: base name, file
     extension (following the last dot which is not the first character), and
     slice component (delimited by square brackets). Extension and slice are
     both optional.
-    '''
+    """
     basename, extension, slice_text = re.match(
-        r'^(.*?)(?:\.(\w+))?(?:\[(.*)\])?$', experiment).groups()
+        r"^(.*?)(?:\.(\w+))?(?:\[(.*)\])?$", experiment
+    ).groups()
 
-    if basename == '':
+    if basename == "":
         basename, extension = extension, None
 
     return basename, extension, slice_text
@@ -186,6 +191,8 @@ FIT_ATOL = 1e-3
 FIT_N_ITER = 5000
 
 _HMM_METHODS = {}
+
+
 class HMMMethod:
     def __init__(self, library, fit, states):
         self.library = library
@@ -195,100 +202,152 @@ class HMMMethod:
 
 
 @Cache
-def _ssm_hmm(source, exp, bin_size_ms, n_states, surrogate,
-             verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
-    'Fit an HMM to data with SSM and return the model.'
+def _ssm_hmm(
+    source,
+    exp,
+    bin_size_ms,
+    n_states,
+    surrogate,
+    verbose=False,
+    atol=FIT_ATOL,
+    n_iter=FIT_N_ITER,
+):
+    "Fit an HMM to data with SSM and return the model."
     from ssm import HMM as SSMHMM
+
     r = get_raster(source, exp, bin_size_ms, surrogate)
-    hmm = SSMHMM(K=n_states, D=r._raster.shape[1],
-                 observations='poisson')
-    hmm.fit(r._raster, verbose=2 if verbose else 0,
-            tolerance=atol, num_iters=n_iter)
+    hmm = SSMHMM(K=n_states, D=r._raster.shape[1], observations="poisson")
+    hmm.fit(r._raster, verbose=2 if verbose else 0, tolerance=atol, num_iters=n_iter)
     return hmm
 
+
 def _ssm_states(hmm, raster):
-    'Return the most likely state sequence for the given raster.'
+    "Return the most likely state sequence for the given raster."
     return hmm.most_likely_states(raster)
 
-SSMFit = HMMMethod('ssm', _ssm_hmm, _ssm_states)
+
+SSMFit = HMMMethod("ssm", _ssm_hmm, _ssm_states)
 
 
 @Cache
-def _dynamax_hmm(source, exp, bin_size_ms, n_states, surrogate,
-                 verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
-    'Fit an HMM to data with Dynamax and return the model.'
+def _dynamax_hmm(
+    source,
+    exp,
+    bin_size_ms,
+    n_states,
+    surrogate,
+    verbose=False,
+    atol=FIT_ATOL,
+    n_iter=FIT_N_ITER,
+):
+    "Fit an HMM to data with Dynamax and return the model."
     from dynamax.hidden_markov_model import PoissonHMM as DynamaxHMM
     import jax.random as jr
+
     r = get_raster(source, exp, bin_size_ms, surrogate)
     hmm = DynamaxHMM(num_states=n_states, emission_dim=r._raster.shape[1])
     hmm.params, props = hmm.initialize(jr.PRNGKey(np.random.randint(2**32)))
-    hmm.params, lls = hmm.fit_em(hmm.params, props, r._raster,
-                                 verbose=verbose, num_iters=n_iter)
+    hmm.params, lls = hmm.fit_em(
+        hmm.params, props, r._raster, verbose=verbose, num_iters=n_iter
+    )
     return hmm
 
+
 def _dynamax_states(hmm, raster):
-    'Return the most likely state sequence for the given raster.'
+    "Return the most likely state sequence for the given raster."
     return hmm.most_likely_states(hmm.params, raster)
 
-DynamaxFit = HMMMethod('dynamax', _dynamax_hmm, _dynamax_states)
+
+DynamaxFit = HMMMethod("dynamax", _dynamax_hmm, _dynamax_states)
 
 
 @Cache
-def _hmmlearn_hmm(source, exp, bin_size_ms, n_states, surrogate,
-                  verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
-    'Fit an HMM to data with HMMLearn and return the model.'
+def _hmmlearn_hmm(
+    source,
+    exp,
+    bin_size_ms,
+    n_states,
+    surrogate,
+    verbose=False,
+    atol=FIT_ATOL,
+    n_iter=FIT_N_ITER,
+):
+    "Fit an HMM to data with HMMLearn and return the model."
     from hmmlearn.hmm import PoissonHMM as HMMLearnHMM
+
     r = get_raster(source, exp, bin_size_ms, surrogate)
-    hmm = HMMLearnHMM(n_components=n_states, verbose=False,
-                      n_iter=n_iter, tol=atol)
+    hmm = HMMLearnHMM(n_components=n_states, verbose=False, n_iter=n_iter, tol=atol)
     hmm.fit(r._raster)
     return hmm
 
+
 def _hmmlearn_states(hmm, raster):
-    'Return the most likely state sequence for the given raster.'
+    "Return the most likely state sequence for the given raster."
     return hmm.predict(raster)
 
-HMMLearnFit = HMMMethod('hmmlearn', _hmmlearn_hmm, _hmmlearn_states)
+
+HMMLearnFit = HMMMethod("hmmlearn", _hmmlearn_hmm, _hmmlearn_states)
 
 
 jl = None
 
+
 @Cache
-def _hmmbase_hmm(source, exp, bin_size_ms, n_states, surrogate,
-                 verbose=False, atol=FIT_ATOL, n_iter=FIT_N_ITER):
-    'Fit an HMM to data with NeuroHMM and return the model.'
+def _hmmbase_hmm(
+    source,
+    exp,
+    bin_size_ms,
+    n_states,
+    surrogate,
+    verbose=False,
+    atol=FIT_ATOL,
+    n_iter=FIT_N_ITER,
+):
+    "Fit an HMM to data with NeuroHMM and return the model."
     global jl
     if jl is None:
         from juliacall import Main as jl
+
         jl.seval('using Pkg; Pkg.activate("NeuroHMM"); using NeuroHMM')
     r = get_raster(source, exp, bin_size_ms, surrogate)
-    display = jl.Symbol('iter' if verbose else 'none')
-    hmm, _ = jl.NeuroHMM.fit_hmm(n_states, r._raster, tol=atol,
-                                 maxiter=n_iter, display=display)
+    display = jl.Symbol("iter" if verbose else "none")
+    hmm, _ = jl.NeuroHMM.fit_hmm(
+        n_states, r._raster, tol=atol, maxiter=n_iter, display=display
+    )
     return hmm
 
+
 def _hmmbase_states(hmm, raster):
-    'Return the most likely state sequence for the given raster.'
+    "Return the most likely state sequence for the given raster."
     return np.asarray(jl.NeuroHMM.viterbi(hmm, raster)) - 1
 
-HMMBaseFit = HMMMethod('hmmbase', _hmmbase_hmm, _hmmbase_states)
+
+HMMBaseFit = HMMMethod("hmmbase", _hmmbase_hmm, _hmmbase_states)
 
 
-default_method = os.environ.get('HMM_METHOD', 'ssm')
-_HMM_METHODS['default'] = _HMM_METHODS[default_method]
+default_method = os.environ.get("HMM_METHOD", "ssm")
+_HMM_METHODS["default"] = _HMM_METHODS[default_method]
 
 
-def is_cached(source, exp, bin_size_ms, n_states, surrogate='real',
-              library='default'):
-    'Return whether the given model is cached.'
-    return _HMM_METHODS[library].fit.is_cached(source, exp, bin_size_ms,
-                                               n_states, surrogate)
+def is_cached(source, exp, bin_size_ms, n_states, surrogate="real", library="default"):
+    "Return whether the given model is cached."
+    return _HMM_METHODS[library].fit.is_cached(
+        source, exp, bin_size_ms, n_states, surrogate
+    )
 
 
-def get_fitted_hmm(source, exp, bin_size_ms, n_states, surrogate='real',
-                   recompute_ok=False, library='default', verbose=False):
+def get_fitted_hmm(
+    source,
+    exp,
+    bin_size_ms,
+    n_states,
+    surrogate="real",
+    recompute_ok=False,
+    library="default",
+    verbose=False,
+):
     if verbose:
-        print(f'Running {source}/{exp}:{bin_size_ms}ms, K={n_states}')
+        print(f"Running {source}/{exp}:{bin_size_ms}ms, K={n_states}")
     params = source, exp, bin_size_ms, n_states, surrogate
     method = _HMM_METHODS[library]
     if recompute_ok:
@@ -298,15 +357,28 @@ def get_fitted_hmm(source, exp, bin_size_ms, n_states, surrogate='real',
 
 
 class Model:
-    def __init__(self, source, exp, bin_size_ms, n_states,
-                 surrogate='real', library='default',
-                 verbose=False, recompute_ok=True):
-
+    def __init__(
+        self,
+        source,
+        exp,
+        bin_size_ms,
+        n_states,
+        surrogate="real",
+        library="default",
+        verbose=False,
+        recompute_ok=True,
+    ):
         # Retrieve the (hopefully cached) model.
-        self._hmm = get_fitted_hmm(source, exp, bin_size_ms, n_states,
-                                   surrogate, library=library,
-                                   verbose=verbose,
-                                   recompute_ok=recompute_ok)
+        self._hmm = get_fitted_hmm(
+            source,
+            exp,
+            bin_size_ms,
+            n_states,
+            surrogate,
+            library=library,
+            verbose=verbose,
+            recompute_ok=recompute_ok,
+        )
 
         # Save metadata.
         self.source = source
@@ -324,8 +396,7 @@ class Model:
         # provide it, as it is cached in the kernel and there's no reason
         # to compute entropy on the wrong data.
         if raster is None:
-            raster = get_raster(self.source, self.exp, self.bin_size_ms,
-                                self.surrogate)
+            raster = get_raster(self.source, self.exp, self.bin_size_ms, self.surrogate)
 
         # Save the burst margins in units of bins.
         lmargin = int(lmargin_sec * 1000 / self.bin_size_ms)
@@ -335,39 +406,43 @@ class Model:
         # Recompute all the entropy measurements based on them.
         h = self.states(raster)
         self.obs_state_prob = raster.observed_state_probs(
-            h, n_states=self.n_states,
-            burst_margins=self.burst_margins)
+            h, n_states=self.n_states, burst_margins=self.burst_margins
+        )
 
         self.state_order = self.obs_state_prob.argmax(axis=1).argsort()
 
         overall_dist = np.zeros(self.n_states)
         for s in h:
-            overall_dist[s] += 1/len(h)
+            overall_dist[s] += 1 / len(h)
         self.baseline_entropy = stats.entropy(overall_dist, base=2)
 
         self.mean_entropy = stats.entropy(self.obs_state_prob, axis=0, base=2)
 
     def dump(self, path):
-        '''
+        """
         Dump the parameters of this HMM to a .mat file.
-        '''
+        """
         mat = dict(
-            state_means=np.exp(self._hmm.observations.log_lambdas
-                               )[self._hmm.state_order,:],
-            state_sequence=[np.nonzero(self._hmm.state_order == s)[0][0]
-                            for s in self.states()],
+            state_means=np.exp(self._hmm.observations.log_lambdas)[
+                self._hmm.state_order, :
+            ],
+            state_sequence=[
+                np.nonzero(self._hmm.state_order == s)[0][0] for s in self.states()
+            ],
             n_states=self.hmm.K,
-            bin_size_ms=self.hmm.bin_size_ms)
+            bin_size_ms=self.hmm.bin_size_ms,
+        )
         # This will be a regular file, not S3, so don't bother with the
         # BytesIO workaround.
-        with open(os.path.join(figdir(), path), 'wb') as f:
+        with open(os.path.join(figdir(), path), "wb") as f:
             scipy.io.savemat(f, mat)
 
 
 @contextmanager
-def figure(name, save_args={}, save_exts=['png'], **kwargs):
+def figure(name, save_args={}, save_exts=["png"], **kwargs):
     import matplotlib.pyplot as plt
-    'Create a named figure and save it when done.'
+
+    "Create a named figure and save it when done."
     f = plt.figure(name, **kwargs)
     try:
         f.clf()
@@ -377,19 +452,19 @@ def figure(name, save_args={}, save_exts=['png'], **kwargs):
 
     yield f
 
-    fname = name.lower().strip().replace(' ', '-')
+    fname = name.lower().strip().replace(" ", "-")
     for ext in save_exts:
-        if ext[0] != '.':
-            ext = '.' + ext
+        if ext[0] != ".":
+            ext = "." + ext
         path = os.path.join(figdir(), fname + ext)
         f.savefig(path, **save_args)
 
 
 def _load73(filename, only_include=None):
-    '''
+    """
     Load raw data from a Matlab 7.3 file on disk, only including the
     specified variables. Silently ignore missing entries.
-    '''
+    """
     # Mat73 doesn't support silently ignoring, so we have to actually filter
     # them out. Fortunately, we only care about top-level variables, so this
     # is easy to do.
@@ -400,27 +475,26 @@ def _load73(filename, only_include=None):
 
 
 def load_raw(source, filename, only_include=None):
-    'Load raw data from a .mat file under a data directory.'
+    "Load raw data from a .mat file under a data directory."
 
     # We have to do this manually since we're using open() instead of
     # loadmat() directly.
-    if not filename.endswith('.mat'):
-        filename = filename + '.mat'
+    if not filename.endswith(".mat"):
+        filename = filename + ".mat"
 
-    full_path = data_dir(source) + '/' + filename
+    full_path = data_dir(source) + "/" + filename
 
     try:
-        with open(full_path, 'rb') as f:
-            return scipy.io.loadmat(BytesIO(f.read()),
-                                    variable_names=only_include)
+        with open(full_path, "rb") as f:
+            return scipy.io.loadmat(BytesIO(f.read()), variable_names=only_include)
 
     # This is horrific, but apparently none of the libraries for opening the
     # new Matlab format accept file-like objects. Since they require
     # a string path, if the file is nonlocal, I have to download it to
     # a tempfile first.
     except NotImplementedError:
-        if full_path.startswith('s3://'):
-            with tempfile.NamedTemporaryFile(suffix='.mat') as f:
+        if full_path.startswith("s3://"):
+            with tempfile.NamedTemporaryFile(suffix=".mat") as f:
                 awswrangler.s3.download(full_path, f)
                 return _load73(f.name, only_include)
         else:
@@ -436,28 +510,40 @@ def get_raster(source, experiment, bin_size_ms, surrogate=None):
 
 class Raster(SpikeData):
     surrogates: dict[str, type] = {}
-    surrogate_name = 'Real Data'
+    surrogate_name = "Real Data"
 
     def __init__(self, source, experiment, bin_size_ms):
-
         # First try loading the data from .mat files, in either Mattia's or
         # Tal's format...
         try:
             # Save memory by only loading variables we'll actually use.
-            mat = load_raw(source, experiment, only_include=[
-                'spike_matrix', 'SUA', 'spike_train', 'fs', 'units',
-                'spike_times', '#refs#'])
+            mat = load_raw(
+                source,
+                experiment,
+                only_include=[
+                    "spike_matrix",
+                    "SUA",
+                    "spike_train",
+                    "fs",
+                    "units",
+                    "spike_times",
+                    "#refs#",
+                ],
+            )
 
             # Mattia's data is formatted with something called a SUA, with
             # fixed sample rate of 1 kHz, or possibly the spike_matrix is
             # dumped directory in the root of the mat file.
-            if 'spike_matrix' in mat or 'SUA' in mat:
-                sm = (mat['SUA'][0,0]['spike_matrix'] if 'SUA' in mat
-                      else mat['spike_matrix'])
+            if "spike_matrix" in mat or "SUA" in mat:
+                sm = (
+                    mat["SUA"][0, 0]["spike_matrix"]
+                    if "SUA" in mat
+                    else mat["spike_matrix"]
+                )
                 self._burst_default_rms = 6.0
                 idces, times = np.nonzero(sm)
                 units = [times[idces == i] for i in range(sm.shape[0])]
-                length=sm.shape[1]*1.0
+                length = sm.shape[1] * 1.0
 
             # Tal and TJ's data is organized as units instead. For the UCSB
             # recordings, fs is stored and duration is not, so just assume
@@ -467,27 +553,29 @@ class Raster(SpikeData):
             # times because they're a bit higher resolution and the spike
             # matrix seems to have dropped some spikes.
             else:
-                if 'spike_times' in mat:
+                if "spike_times" in mat:
                     units = []
-                    for times in mat['spike_times']:
+                    for times in mat["spike_times"]:
                         while len(times) == 1:
                             times = times[0]
                         units.append(times * 1e3)
                 else:
                     units = [
-                        (unit[0][0]['spike_train']/mat['fs']*1e3)[0,:]
-                        for unit in mat['units'][0]]
-                length = 1e3*np.ceil(max(unit.max() for unit in units)/1e3)
+                        (unit[0][0]["spike_train"] / mat["fs"] * 1e3)[0, :]
+                        for unit in mat["units"][0]
+                    ]
+                length = 1e3 * np.ceil(max(unit.max() for unit in units) / 1e3)
                 self._burst_default_rms = 3.0
 
         # If those .mat files don't exist, instead load from Sury's phy
         # zips. This can't work if the data is in a mat format, though.
         except (OSError, FileNotFoundError):
             try:
-                sd = read_phy_files(f'{data_dir(source)}/{experiment}.zip')
+                sd = read_phy_files(f"{data_dir(source)}/{experiment}.zip")
             except AssertionError as e:
                 raise FileNotFoundError(
-                    f'Failed to load {source} {experiment}: {e}') from None
+                    f"Failed to load {source} {experiment}: {e}"
+                ) from None
             self._burst_default_rms = None
             units, length = sd.train, sd.length
 
@@ -496,14 +584,14 @@ class Raster(SpikeData):
         self._init(source, experiment, bin_size_ms, units, length)
 
     def _init(self, source, experiment, bin_size_ms, units, length):
-        '''
+        """
         The boilerplate that should be used in subclass constructors to make
         sure the correct attributes get assigned.
-        '''
+        """
         self.bin_size_ms = bin_size_ms
         self.source = source
         self.experiment = experiment
-        self.tag = f'{source}_{experiment}_{bin_size_ms}ms'
+        self.tag = f"{source}_{experiment}_{bin_size_ms}ms"
         super().__init__(units, length=length)
         self._poprate = self.binned(1)
         self._raster = self.raster(bin_size_ms).T
@@ -515,7 +603,7 @@ class Raster(SpikeData):
         return self.poprate(5, 5)
 
     def poprate(self, square_width_ms=0, gaussian_width_ms=None):
-        '''
+        """
         Calculate population rate with a two-stage filter.
 
         The first stage is square and the second Gaussian. If one argument
@@ -526,7 +614,7 @@ class Raster(SpikeData):
         standard deviation because TJ uses an FIR Gaussian filter whose
         parameter is its support. The one here is actually IIR, but the
         difference is very small.
-        '''
+        """
         ret = self._poprate * 1.0
 
         if square_width_ms > 0:
@@ -535,7 +623,7 @@ class Raster(SpikeData):
         if gaussian_width_ms is None:
             gaussian_width_ms = square_width_ms
         if gaussian_width_ms > 0:
-            ret = ndimage.gaussian_filter1d(ret, gaussian_width_ms/5)
+            ret = ndimage.gaussian_filter1d(ret, gaussian_width_ms / 5)
 
         return ret
 
@@ -554,10 +642,9 @@ class Raster(SpikeData):
         if rms is None:
             rms = self._burst_default_rms
             if self._burst_default_rms is None:
-                raise ValueError('No default rms value set for this data.')
+                raise ValueError("No default rms value set for this data.")
         height = rms * np.sqrt(np.mean(r_coarse**2))
-        peaks_ms = signal.find_peaks(r_coarse, height=height,
-                                     distance=700)[0]
+        peaks_ms = signal.find_peaks(r_coarse, height=height, distance=700)[0]
 
         # Descend from those peaks in both directions to find the first
         # points where the coarse rate is below 10% of the peak value.
@@ -565,26 +652,33 @@ class Raster(SpikeData):
         edges = np.zeros((n, 2), int)
         for i, peak in enumerate(peaks_ms):
             min_height = 0.1 * r_coarse[peak]
-            while (peak + edges[i,0] >= 0
-                   and r_coarse[peak + edges[i,0]] > min_height):
-                edges[i,0] -= 1
-            while (peak + edges[i,1] < len(r_coarse)
-                   and r_coarse[peak + edges[i,1]] > min_height):
-                edges[i,1] += 1
+            while peak + edges[i, 0] >= 0 and r_coarse[peak + edges[i, 0]] > min_height:
+                edges[i, 0] -= 1
+            while (
+                peak + edges[i, 1] < len(r_coarse)
+                and r_coarse[peak + edges[i, 1]] > min_height
+            ):
+                edges[i, 1] += 1
         return peaks_ms, edges
 
     def find_bursts(self, margins=None, rms=None):
-        '''
+        """
         Find the locations of burst peaks in units of bins, filtered to only
         those with the desired margins.
-        '''
+        """
         r_fine = self.fine_rate()
         peaks, edges = self.find_burst_edges(rms=rms)
-        peaks = np.array([
-            peaks[i] + edges[i,0] + np.argmax(
-                r_fine[peaks[i] + edges[i,0]:peaks[i] + edges[i,1]])
-            for i in range(len(peaks))
-        ]) / self.bin_size_ms
+        peaks = (
+            np.array(
+                [
+                    peaks[i]
+                    + edges[i, 0]
+                    + np.argmax(r_fine[peaks[i] + edges[i, 0] : peaks[i] + edges[i, 1]])
+                    for i in range(len(peaks))
+                ]
+            )
+            / self.bin_size_ms
+        )
 
         # Filter out peaks too close to the edges of the recording.
         if margins is not None:
@@ -592,61 +686,60 @@ class Raster(SpikeData):
                 lmargin, rmargin = margins
             except TypeError:
                 lmargin, rmargin = -margins, margins
-            peaks = peaks[(peaks + lmargin >= 0)
-                          & (peaks + rmargin < self._raster.shape[0])]
+            peaks = peaks[
+                (peaks + lmargin >= 0) & (peaks + rmargin < self._raster.shape[0])
+            ]
 
         return peaks
 
-    def observed_state_probs(self, h, burst_margins, burst_rms=None,
-                             n_states=None):
-        '''
+    def observed_state_probs(self, h, burst_margins, burst_rms=None, n_states=None):
+        """
         Return a probability distribution of the states in h over time
         relative to each of this Raster's burst peaks. Automatically
         determines how many states to include, but can be overridden by
         passing n_states.
-        '''
+        """
         if n_states is None:
-            n_states = h.max()+1
+            n_states = h.max() + 1
         peaks = self.find_bursts(margins=burst_margins, rms=burst_rms)
         lmargin, rmargin = burst_margins
-        state_prob = np.zeros((n_states, rmargin-lmargin+1))
+        state_prob = np.zeros((n_states, rmargin - lmargin + 1))
 
         for peak in peaks:
             peak_bin = int(round(peak))
-            state_seq = h[peak_bin+lmargin:peak_bin+rmargin+1]
+            state_seq = h[peak_bin + lmargin : peak_bin + rmargin + 1]
             for i, s in enumerate(state_seq):
-                state_prob[s,i] += 1 / len(peaks)
+                state_prob[s, i] += 1 / len(peaks)
 
         return state_prob
 
     def state_order(self, h, burst_margins, burst_rms=None, n_states=None):
-        '''
+        """
         Return an order of the states based on the median burst-relative
         time at which they occur.
 
         Automatically determines how many states to include, but can be
         overridden by passing n_states.
-        '''
+        """
         if n_states is None:
-            n_states = h.max()+1
+            n_states = h.max() + 1
         peaks = self.find_bursts(margins=burst_margins, rms=burst_rms)
         lmargin, rmargin = burst_margins
 
         burst_relative_state_times = [[] for _ in range(n_states)]
         for peak in peaks:
             peak_bin = int(round(peak))
-            state_seq = h[peak_bin+lmargin:peak_bin+rmargin+1]
+            state_seq = h[peak_bin + lmargin : peak_bin + rmargin + 1]
             for i, s in enumerate(state_seq):
-                burst_relative_state_times[s].append(i+lmargin)
+                burst_relative_state_times[s].append(i + lmargin)
 
-        return np.argsort([np.median(times)
-                           for times in burst_relative_state_times])
+        return np.argsort([np.median(times) for times in burst_relative_state_times])
 
 
 def surrogate(name=None):
     def wrap(subclass):
         lname = name or subclass.__name__
-        if lname.startswith('_'):
+        if lname.startswith("_"):
             lname = lname[1:]
 
         Raster.surrogates[lname] = subclass
@@ -654,19 +747,21 @@ def surrogate(name=None):
 
     return wrap
 
-Raster.surrogates['real'] = lambda x: x
+
+Raster.surrogates["real"] = lambda x: x
 
 
-@surrogate('rsm')
+@surrogate("rsm")
 class RandSpikeMatrix(Raster):
-    surrogate_name = 'Randomized Spike Matrix'
+    surrogate_name = "Randomized Spike Matrix"
+
     def __init__(self, raster):
-        '''
+        """
         Return a raster which preserves the population rate and mean firing
         rate of each neuron by randomly reallocating all spike times to
         different neurons, using resampling to maintain the invariant that
         no neuron spikes twice in the same millisecond.
-        '''
+        """
         # Collect the spikes of the original raster.
         sm = raster.sparse_raster(1)
         rsm = np.zeros(sm.shape, int)
@@ -682,13 +777,13 @@ class RandSpikeMatrix(Raster):
         for unit in unit_order:
             n_spikes = n_spikeses[unit]
             p = weights / weights.sum()
-            rand_frames = rng.choice(
-                rsm.shape[1], n_spikes, replace=False, p=p)
+            rand_frames = rng.choice(rsm.shape[1], n_spikes, replace=False, p=p)
             weights[rand_frames] -= 1
-            rsm[unit,rand_frames] = 1
+            rsm[unit, rand_frames] = 1
 
         idces, times = np.nonzero(rsm)
         train = [times[idces == i] for i in range(sm.shape[0])]
-        self._init(raster.source, raster.experiment, raster.bin_size_ms,
-                   train, raster.length)
+        self._init(
+            raster.source, raster.experiment, raster.bin_size_ms, train, raster.length
+        )
         self._burst_default_rms = raster._burst_default_rms
