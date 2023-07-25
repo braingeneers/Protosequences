@@ -34,10 +34,6 @@ def parse_range_str(range_str):
 
 
 if __name__ == "__main__":
-    if not os.environ.get("S3_USER"):
-        print("$S3_USER must be defined.", file=sys.stderr)
-        sys.exit(1)
-
     dryrun = "--dryrun" in sys.argv
     if dryrun:
         sys.argv.remove("--dryrun")
@@ -45,6 +41,9 @@ if __name__ == "__main__":
     local = "--local" in sys.argv
     if local:
         sys.argv.remove("--local")
+    elif not os.environ.get("S3_USER"):
+        print("$S3_USER must be defined.", file=sys.stderr)
+        sys.exit(1)
 
     # Validate the arguments.
     try:
