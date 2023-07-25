@@ -1,3 +1,6 @@
+list:
+    @just --list
+
 build:
     docker build -t atspaeth/organoid-hmm .  
 
