@@ -25,11 +25,11 @@ spec:
         resources:
           requests:
             cpu: 1
-            memory: "12Gi"
+            memory: "${PRP_MEMORY_GI}Gi"
             nvidia.com/gpu: 0
           limits:
             cpu: 1
-            memory: "16Gi"
+            memory: "${PRP_MEMORY_LIMIT_GI}Gi"
             nvidia.com/gpu: 0
         command: ["python", "hmm_worker.py"]
       restartPolicy: Never
