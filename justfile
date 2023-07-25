@@ -11,7 +11,7 @@ push: build
     docker push atspaeth/organoid-hmm
 
 queue src exp bin_size ks surrogate="real" method="default":
-    python queue_hmms.py "{{src}}" "{{exp}}" "{{bin_size}}" "{{ks}}" "{{surrogate}}" "{{method}}"
+    python fit_hmms.py "{{src}}" "{{exp}}" "{{bin_size}}" "{{ks}}" "{{surrogate}}" "{{method}}"
 
 add-worker n="1":
     #! /usr/bin/bash
