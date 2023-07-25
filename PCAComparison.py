@@ -12,9 +12,9 @@ import joblib
 plt.ion()
 hmmsupport.figdir("pca")
 
-source = "organoid"
+source = "new_neuropixel"
 bin_size_ms = 30
-n_stateses = np.arange(10, 51)
+n_stateses = np.arange(10, 21)
 
 experiments = all_experiments(source)
 if source == "organoid":
@@ -152,6 +152,17 @@ elif source == "mouse":
         ax.set_xlabel("Mean Components Required Across Models")
         ax.set_ylabel("Number of Experiments")
 
+elif source == "new_neuropixel":
+    with figure("Components Required for Neuropixel") as f:
+        ax = f.gca()
+        ax.violinplot(
+            [components_required(exp) for exp in experiments],
+            showmeans=True,
+            showextrema=False,
+        )
+        ax.set_xticks(np.arange(1,8), [f'rec{i}' for i in range(7)])
+        ax.set_ylabel("Components Required to Match Surrogate")
+
 
 # %%
 
@@ -172,6 +183,18 @@ if source == "mouse":
     # temporal structure.
     key_exps = ["1009-3", "1005-1", "366-2"]
     with figure("Key Mouse Surrogate Comparison", figsize=(4 * len(key_exps), 6)) as f:
+        axes = f.subplots(
+            2, len(key_exps), squeeze=False, subplot_kw=dict(projection="3d")
+        )
+        for j, exp in enumerate(key_exps):
+            axes[0, j].set_title(f"{exp}: {rasters[exp].N} units")
+            for i, bad in enumerate([False, True]):
+                axes[i, j].plot(*transformed_data(exp, bad), color="grey", lw=0.1)
+                axes[i, j].plot(*transformed_states(exp, bad), "o")
+
+elif source == "new_neuropixel":
+    key_exps = ['rec0_curated', 'rec2_curated', 'rec6_curated']
+    with figure("Neuropixel Surrogate Comparison", figsize=(4 * len(key_exps), 6)) as f:
         axes = f.subplots(
             2, len(key_exps), squeeze=False, subplot_kw=dict(projection="3d")
         )
