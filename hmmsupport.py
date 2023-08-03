@@ -519,6 +519,7 @@ class Raster(SpikeData):
                 experiment,
                 only_include=[
                     "spike_matrix",
+                    "t_spk_mat",
                     "SUA",
                     "spike_train",
                     "fs",
@@ -550,9 +551,15 @@ class Raster(SpikeData):
             # times because they're a bit higher resolution and the spike
             # matrix seems to have dropped some spikes.
             else:
-                if "spike_times" in mat:
+                if "t_spk_mat" in mat:
+                    times, idces = np.nonzero(mat["t_spk_mat"])
+                    units = [
+                        times[idces == i] for i in range(mat["t_spk_mat"].shape[1])
+                    ]
+                elif "spike_times" in mat:
                     units = []
                     for times in mat["spike_times"]:
+                        # Breaks L1_t_spk_mat_sorted
                         while len(times) == 1:
                             times = times[0]
                         units.append(times * 1e3)
