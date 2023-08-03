@@ -13,7 +13,7 @@ import h5py
 import mat73
 import numpy as np
 import scipy.io
-from braingeneers.analysis import read_phy_files, SpikeData
+from braingeneers.analysis import load_spike_data, SpikeData
 from braingeneers.utils.smart_open_braingeneers import open
 from scipy import stats, signal, ndimage
 
@@ -571,7 +571,8 @@ class Raster(SpikeData):
         # zips. This can't work if the data is in a mat format, though.
         except (OSError, FileNotFoundError):
             try:
-                sd = read_phy_files(f"{data_dir(source)}/{experiment}.zip")
+                full_path = f"{data_dir(source)}/{experiment}.zip"
+                sd = load_spike_data(None, full_path=full_path)
             except AssertionError as e:
                 raise FileNotFoundError(
                     f"Failed to load {source} {experiment}: {e}"
