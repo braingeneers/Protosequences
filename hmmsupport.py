@@ -503,9 +503,9 @@ def load_raw(source, filename, only_include=None):
 
 @functools.lru_cache
 def get_raster(source, experiment, bin_size_ms, surrogate=None):
-    if surrogate is None:
-        return Raster(source, experiment, bin_size_ms)
-    return get_raster(source, experiment, bin_size_ms).get_surrogate(surrogate)
+    if surrogate == "rsm":
+        return get_raster(source, experiment, bin_size_ms).randomized(seed=2953)
+    return Raster(source, experiment, bin_size_ms)
 
 
 class Raster(SpikeData):
@@ -735,55 +735,10 @@ class Raster(SpikeData):
 
         return np.argsort([np.median(times) for times in burst_relative_state_times])
 
-
-def surrogate(name=None):
-    def wrap(subclass):
-        lname = name or subclass.__name__
-        if lname.startswith("_"):
-            lname = lname[1:]
-
-        Raster.surrogates[lname] = subclass
-        return subclass
-
-    return wrap
-
-
-Raster.surrogates["real"] = lambda x: x
-
-
-@surrogate("rsm")
-class RandSpikeMatrix(Raster):
-    surrogate_name = "Randomized Spike Matrix"
-
-    def __init__(self, raster):
-        """
-        Return a raster which preserves the population rate and mean firing
-        rate of each neuron by randomly reallocating all spike times to
-        different neurons, using resampling to maintain the invariant that
-        no neuron spikes twice in the same millisecond.
-        """
-        # Collect the spikes of the original raster.
-        sm = raster.sparse_raster(1)
-        rsm = np.zeros(sm.shape, int)
-        weights = sm.sum(0)
-
-        # Iterate over the units in order of how many spikes they have.
-        n_spikeses = sm.sum(1)
-        unit_order = np.argsort(n_spikeses)[::-1]
-        unit_order = unit_order[n_spikeses[unit_order] > 0]
-
-        # Choose spike times from the big list for each unit.
-        rng = np.random.RandomState(2953)
-        for unit in unit_order:
-            n_spikes = n_spikeses[unit]
-            p = weights / weights.sum()
-            rand_frames = rng.choice(rsm.shape[1], n_spikes, replace=False, p=p)
-            weights[rand_frames] -= 1
-            rsm[unit, rand_frames] = 1
-
-        idces, times = np.nonzero(rsm)
-        train = [times[idces == i] for i in range(sm.shape[0])]
-        self._init(
-            raster.source, raster.experiment, raster.bin_size_ms, train, raster.length
-        )
-        self._burst_default_rms = raster._burst_default_rms
+    def randomized(self, dt=1.0, seed=2953):
+        "As SpikeData.randomized(), but return a Raster."
+        sd = super().randomized(dt=dt, seed=seed)
+        ret = self.__class__.__new__(self.__class__)
+        ret._init(self.source, self.experiment, self.bin_size_ms, sd.train, sd.length)
+        ret._burst_default_rms = self._burst_default_rms
+        return ret
