@@ -509,9 +509,6 @@ def get_raster(source, experiment, bin_size_ms, surrogate=None):
 
 
 class Raster(SpikeData):
-    surrogates: dict[str, type] = {}
-    surrogate_name = "Real Data"
-
     def __init__(self, source, experiment, bin_size_ms):
         # First try loading the data from .mat files, in either Mattia's or
         # Tal's format...
@@ -627,9 +624,6 @@ class Raster(SpikeData):
             ret = ndimage.gaussian_filter1d(ret, gaussian_width_ms / 5)
 
         return ret
-
-    def get_surrogate(self, which):
-        return Raster.surrogates[which](self)
 
     def average_burst_bounds_ms(self, rms=None):
         "Average peak-relative start and end across all bursts."
