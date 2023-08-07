@@ -4,7 +4,7 @@ list:
     @just --list
 
 build:
-    docker build -t $container .  
+    docker build -t $container .
 
 debug: pull
     docker run --rm -it $container bash
@@ -31,5 +31,5 @@ add-worker n="1":
     for i in $(seq "{{n}}"); do
         stamp=$(printf '%(%m%d%H%M%S)T\n' -1)
         export JOB_NAME=atspaeth-hmm-worker--$stamp$i
-        envsubst < hmm_worker.yml \| kubectl apply -f -
+        envsubst < hmm_worker.yml | kubectl apply -f -
     done
