@@ -1,14 +1,19 @@
+export container := "atspaeth/organoid-hmm"
+
 list:
     @just --list
 
 build:
-    docker build -t atspaeth/organoid-hmm .  
+    docker build -t $container .  
 
-debug: build
-    docker run --rm -it atspaeth/organoid-hmm bash
+debug: pull
+    docker run --rm -it $container bash
+
+pull:
+    docker pull $container
 
 push: build
-    docker push atspaeth/organoid-hmm
+    docker push $container
 
 queue src exp bin_size ks surrogate="real" method="default":
     python fit_hmms.py "{{src}}" "{{exp}}" "{{bin_size}}" "{{ks}}" "{{surrogate}}" "{{method}}"
@@ -26,5 +31,5 @@ add-worker n="1":
     for i in $(seq "{{n}}"); do
         stamp=$(printf '%(%m%d%H%M%S)T\n' -1)
         export JOB_NAME=atspaeth-hmm-worker--$stamp$i
-        envsubst < hmm_worker.yml | kubectl apply -f -
+        envsubst < hmm_worker.yml \| kubectl apply -f -
     done
