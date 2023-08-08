@@ -130,7 +130,7 @@ def do_the_whole_giant_figure(base_exp=experiments[0], n_states=15):
     state_order = np.argsort(np.argmax(state_prob, axis=1))
     lmargin, rmargin = model.burst_margins
     unit_order, inverse_unit_order = load_unit_order(base_exp)
-    states = args.states or state_prob[state_order, :].max(1).argsort()[-3:]
+    states = sorted(args.states or state_prob[state_order, :].max(1).argsort()[-3:])
     with figure(f"{source} {base_exp}", figsize=(8.5, 8.5)) as f:
         # Subfigure A: example burst rasters.
         idces, times_ms = r.idces_times()
