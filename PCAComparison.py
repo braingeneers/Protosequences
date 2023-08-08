@@ -2,17 +2,19 @@
 #
 # Compare the variance explained by the first few principal components in
 # each of the experiments under a given heading.
-from tqdm.auto import tqdm
+import joblib
+import matplotlib.pyplot as plt
 import numpy as np
+from tqdm.auto import tqdm
+
 import hmmsupport
 from hmmsupport import get_raster, all_experiments, Model, figure
-import matplotlib.pyplot as plt
-import joblib
+
 
 plt.ion()
 hmmsupport.figdir("pca")
 
-source = "new_neuropixel"
+source = "org_and_slice"
 bin_size_ms = 30
 n_stateses = np.arange(10, 21)
 
@@ -72,8 +74,6 @@ bad_models = {
 }
 
 # %%
-
-from sklearn.decomposition import PCA
 
 
 def stateses(exp: str, bad: bool):
@@ -160,8 +160,23 @@ elif source == "new_neuropixel":
             showmeans=True,
             showextrema=False,
         )
-        ax.set_xticks(np.arange(1,8), [f'rec{i}' for i in range(7)])
+        ax.set_xticks(np.arange(1, 8), [f"rec{i}" for i in range(7)])
         ax.set_ylabel("Components Required to Match Surrogate")
+
+elif source == "org_and_slice":
+    for prefix in ["L", "M", "Pr"]:
+        with figure(f"Components Required ({prefix}*)") as f:
+            ax = f.gca()
+            expsub = [exp for exp in experiments if exp.startswith(prefix)]
+            ax.violinplot(
+                [components_required(exp) for exp in expsub],
+                showmeans=True,
+                showextrema=False,
+            )
+            ax.set_xticks(
+                np.arange(1, len(expsub) + 1), [exp.split("_")[0] for exp in expsub]
+            )
+            ax.set_ylabel("Components Required to Match Surrogate")
 
 
 # %%
@@ -193,13 +208,26 @@ if source == "mouse":
                 axes[i, j].plot(*transformed_states(exp, bad), "o")
 
 elif source == "new_neuropixel":
-    key_exps = ['rec0_curated', 'rec2_curated', 'rec6_curated']
+    key_exps = ["rec0_curated", "rec2_curated", "rec6_curated"]
     with figure("Neuropixel Surrogate Comparison", figsize=(4 * len(key_exps), 6)) as f:
         axes = f.subplots(
             2, len(key_exps), squeeze=False, subplot_kw=dict(projection="3d")
         )
         for j, exp in enumerate(key_exps):
             axes[0, j].set_title(f"{exp}: {rasters[exp].N} units")
+            for i, bad in enumerate([False, True]):
+                axes[i, j].plot(*transformed_data(exp, bad), color="grey", lw=0.1)
+                axes[i, j].plot(*transformed_states(exp, bad), "o")
+
+elif source == "org_and_slice":
+    key_exps = ["L2", "M2S2", "Pr2"]
+    with figure("Surrogate Comparison", figsize=(4 * len(key_exps), 6)) as f:
+        axes = f.subplots(
+            2, len(key_exps), squeeze=False, subplot_kw=dict(projection="3d")
+        )
+        for j, expname in enumerate(key_exps):
+            exp = expname + "_t_spk_mat_sorted"
+            axes[0, j].set_title(f"{expname}: {rasters[exp].N} units")
             for i, bad in enumerate([False, True]):
                 axes[i, j].plot(*transformed_data(exp, bad), color="grey", lw=0.1)
                 axes[i, j].plot(*transformed_states(exp, bad), "o")
