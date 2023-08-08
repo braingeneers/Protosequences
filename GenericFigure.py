@@ -1,12 +1,50 @@
-# Fig8.py
-# Generate my part of figure 8 of the final manuscript.
-import numpy as np
+# GenericFigure.py
+# Generate a figure like Fig 5, but for an arbitrary subset of experiments.
+import argparse
+import fnmatch
+import sys
+
+import joblib
 import matplotlib.pyplot as plt
+import numpy as np
+from tqdm import tqdm
+
 import hmmsupport
 from hmmsupport import get_raster, figure, load_raw, Model
-from tqdm import tqdm
-import joblib
 
+
+def three_ints(arg: str):
+    a, b, c = arg.split(",")
+    return int(a), int(b), int(c)
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("source", type=str, help="Experiment group name")
+parser.add_argument(
+    "experiments", type=str, default="*", help="Glob pattern for experiments"
+)
+parser.add_argument(
+    "base_exp", type=str, default=None, help="Base experiment for the figure"
+)
+parser.add_argument("--name", type=str, default=None, help="Name for the output figure")
+parser.add_argument(
+    "--states", type=three_ints, default=None, help="3 states to compare"
+)
+args = parser.parse_args()
+
+source = args.source
+experiments = [
+    exp
+    for exp in hmmsupport.all_experiments(source)
+    if fnmatch.fnmatch(exp, args.experiments)
+]
+base_exp = args.base_exp or experiments[0]
+name = args.name or f"{source} {args.experiments}"
+states = np.subtract(args.states or [8, 9, 10], 1)
+
+if base_exp not in experiments:
+    print(f"Invalid experiment {base_exp} not in {experiments}", file=sys.stderr)
+    sys.exit(1)
 
 surr = "real"
 hmm_library = "default"
@@ -17,15 +55,11 @@ if hmm_library != "default":
 if surr != "real":
     figure_name += " Surrogate"
 
-plt.ion()
 hmmsupport.figdir("paper")
 
 bin_size_ms = 30
 n_states = 10, 20
 n_stateses = np.arange(n_states[0], n_states[-1] + 1)
-
-source = "new_neuropixel"
-experiments = hmmsupport.all_experiments(source)
 
 print("Loading fitted HMMs and calculating entropy.")
 rasters = {}
@@ -75,7 +109,6 @@ for exp in good_experiments:
 # %%
 
 n_states = 15
-base_exp = "rec3_curated"
 r = rasters[base_exp][0]
 model = rasters[base_exp][1][np.where(n_stateses == n_states)[0][0]]
 h = model.states(r)
@@ -84,10 +117,25 @@ peaks = r.find_bursts(margins=burst_margins)
 state_prob = r.observed_state_probs(h, burst_margins=burst_margins)
 state_order = np.argsort(np.argmax(state_prob, axis=1))
 lmargin, rmargin = model.burst_margins
-
 mat = load_raw(source, base_exp)
 
-with figure("Fig8", figsize=(8.5, 8.5)) as f:
+try:
+    srm = load_raw(
+        "metrics",
+        base_exp.split("_")[0] + "_single_recording_metrics",
+        only_include=["mean_rate_ordering"],
+    )
+    unit_order = np.int32(srm["mean_rate_ordering"].flatten() - 1)
+    print("Using metadata metrics for ordering.")
+except OSError:
+    unit_order = np.arange(r.N)
+    print("Metrics not found.")
+
+# inverse_unit_order[i] is the index of unit i in unit_order.
+inverse_unit_order = np.zeros_like(unit_order)
+inverse_unit_order[unit_order] = np.arange(len(unit_order))
+
+with figure(name, figsize=(8.5, 8.5)) as f:
     # Subfigure A: example burst rasters.
     idces, times_ms = r.idces_times()
     axes = f.subplots(
@@ -116,7 +164,7 @@ with figure("Fig8", figsize=(8.5, 8.5)) as f:
             when.start * bin_size_ms, when.stop * bin_size_ms
         ).idces_times()
         times = (times_ms - (peak_float - when.start) * bin_size_ms) / 1000
-        ax.plot(times, idces + 1, "ko", markersize=0.5)
+        ax.plot(times, inverse_unit_order[idces] + 1, "ko", markersize=0.5)
         ax.set_ylim(0.5, r.N + 0.5)
         ax.set_xticks([0, 0.5])
         ax.set_xlim(t_sec[0], t_sec[-1])
@@ -181,12 +229,12 @@ with figure("Fig8", figsize=(8.5, 8.5)) as f:
     A.set_ylabel("Neuron Unit ID")
     A.set_yticks([1, r.N])
 
-    states = np.subtract([8, 10, 11], 1)
     for axS, axH, s in zip(examples, rates, states):
-        data = r._raster[h == state_order[s], :][:60, :]
+        data = r._raster[h == state_order[s], :][:, unit_order]
+        data_sub = data[np.random.choice(data.shape[0], 60), :]
         axS.set_title(f"State {s+1}")
         axS.imshow(
-            data.T,
+            data_sub.T,
             aspect="auto",
             interpolation="none",
             extent=[0, 1, r.N + 0.5, 0.5],
@@ -203,7 +251,7 @@ with figure("Fig8", figsize=(8.5, 8.5)) as f:
         mu0 = r._raster[h == state_order[s0], :].mean(0)
         mu1 = r._raster[h == state_order[s1], :].mean(0)
         delta = mu1 - mu0
-        ax.plot(delta, np.arange(r.N) + 1, c="C3", alpha=0.3)
+        ax.plot(delta[unit_order], np.arange(r.N) + 1, c="C3", alpha=0.3)
 
     # Subfigure C: state heatmap.
     axes[0].set_ylabel("Neuron Unit ID")
@@ -268,3 +316,5 @@ with figure("Fig8", figsize=(8.5, 8.5)) as f:
     pr.set_ylabel("Normalized Pop. FR")
     pr.set_xlabel("Time from Burst Peak (s)")
     f.align_ylabels([en, pr])
+
+    plt.show()
