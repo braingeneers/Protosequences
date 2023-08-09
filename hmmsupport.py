@@ -4,12 +4,10 @@ import os
 import pickle
 import re
 import sys
-import tempfile
 from contextlib import contextmanager
 from io import BytesIO
 
 import awswrangler
-import h5py
 import mat73
 import numpy as np
 import scipy.io
@@ -432,8 +430,6 @@ class Model:
             n_states=self.hmm.K,
             bin_size_ms=self.hmm.bin_size_ms,
         )
-        # This will be a regular file, not S3, so don't bother with the
-        # BytesIO workaround.
         with open(os.path.join(figdir(), path), "wb") as f:
             scipy.io.savemat(f, mat)
 
@@ -460,56 +456,36 @@ def figure(name, save_args={}, save_exts=["png"], **kwargs):
         f.savefig(path, **save_args)
 
 
-def _load73(filename, only_include=None):
+def load_raw(source, filename, only_include=None, error=True):
     """
-    Load raw data from a Matlab 7.3 file on disk, only including the
-    specified variables. Silently ignore missing entries.
+    Load raw data from a .mat file under a data directory. If the file cannot be
+    found, return None if error=False, otherwise raise an exception.
+    Optionally only include a subset of variables, but for now this still loads
+    the entire file into memory.
     """
-    # Mat73 doesn't support silently ignoring missing variables, so we have
-    # to actually filter them out. Fortunately, we only care about top-level
-    # variables, so this is easy to do.
-    if only_include is not None:
-        with h5py.File(filename) as f:
-            only_include = [k for k in only_include if k in f]
-    return mat73.loadmat(filename, only_include=only_include)
-
-
-def load_raw(source, filename, only_include=None):
-    "Load raw data from a .mat file under a data directory."
 
     # We have to do this manually since we're using open() instead of
     # loadmat() directly.
     if not filename.endswith(".mat"):
         filename = filename + ".mat"
 
-    full_path = data_dir(source) + "/" + filename
-
+    # Load into memory because these methods use a ton of random
+    # access and it gets really slow with smart_open.
     try:
-        with open(full_path, "rb") as f:
-            return scipy.io.loadmat(BytesIO(f.read()), variable_names=only_include)
-
-    # Mat73 requires a string path, so download to a tempfile first.
+        with open(data_dir(source) + "/" + filename, "rb") as f:
+            contents = BytesIO(f.read())
+        return scipy.io.loadmat(contents, variable_names=only_include)
     except NotImplementedError:
-        if full_path.startswith("s3://"):
-            with tempfile.NamedTemporaryFile(suffix=".mat") as f:
-                awswrangler.s3.download(full_path, f)
-                return _load73(f.name, only_include)
-        else:
-            return _load73(full_path, only_include)
-
-
-def load_metrics(exp, only_include=None, error=True):
-    """
-    Load metrics from a .mat file under a data directory, optionally only
-    including certain keys. If the file cannot be found, return None if
-    error=False, otherwise raise an exception.
-    """
-    filename = exp.split("_", 1)[0] + "_single_recording_metrics.mat"
-    try:
-        return load_raw("metrics", filename, only_include)
+        return mat73.loadmat(contents, only_include=only_include, verbose=False)
     except (OSError, FileNotFoundError):
         if error:
             raise
+
+
+def load_metrics(exp, only_include=None, error=True):
+    "Use load_raw to get the metrics for an experiment."
+    filename = exp.split("_", 1)[0] + "_single_recording_metrics.mat"
+    return load_raw("metrics", filename, only_include, error)
 
 
 @functools.lru_cache
