@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import hmmsupport
-from hmmsupport import get_raster, figure, load_raw, Model, all_experiments
+from hmmsupport import get_raster, figure, load_metrics, Model, all_experiments
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 from sklearn.pipeline import make_pipeline
@@ -36,7 +36,7 @@ srms = {}
 with tqdm(total=len(experiments) * (1 + len(n_stateses))) as pbar:
     rasters = {}
     for source, exp in experiments:
-        srms[exp] = load_raw("metrics", exp.split("_")[0] + "_single_recording_metrics")
+        srms[exp] = load_metrics(exp)
         rasters[exp] = get_raster(source, exp, bin_size_ms, surr), []
         pbar.update()
         window = srms[exp]["burst_window"][0, :] / 1e3

@@ -10,7 +10,7 @@ import numpy as np
 from tqdm import tqdm
 
 import hmmsupport
-from hmmsupport import get_raster, figure, load_raw, Model
+from hmmsupport import get_raster, figure, load_metrics, Model
 
 
 def three_ints(arg: str):
@@ -104,14 +104,10 @@ def load_unit_order(exp):
     a valid unit order that does nothing if used. Also return the "inverse
     unit order" such that inverse_unit_order[i] is the index of unit i.
     """
-    try:
-        srm = load_raw(
-            "metrics",
-            exp.split("_")[0] + "_single_recording_metrics",
-            only_include=["mean_rate_ordering"],
-        )
+    srm = load_metrics(exp, only_include=["mean_rate_ordering"])
+    if srm:
         unit_order = np.int32(srm["mean_rate_ordering"].flatten() - 1)
-    except OSError:
+    else:
         print("⚠ Metrics not found, cannot separate packet/non-packet units.")
         unit_order = np.arange(rasters[exp][0].N)
 

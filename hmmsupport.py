@@ -465,9 +465,9 @@ def _load73(filename, only_include=None):
     Load raw data from a Matlab 7.3 file on disk, only including the
     specified variables. Silently ignore missing entries.
     """
-    # Mat73 doesn't support silently ignoring, so we have to actually filter
-    # them out. Fortunately, we only care about top-level variables, so this
-    # is easy to do.
+    # Mat73 doesn't support silently ignoring missing variables, so we have
+    # to actually filter them out. Fortunately, we only care about top-level
+    # variables, so this is easy to do.
     if only_include is not None:
         with h5py.File(filename) as f:
             only_include = [k for k in only_include if k in f]
@@ -488,10 +488,7 @@ def load_raw(source, filename, only_include=None):
         with open(full_path, "rb") as f:
             return scipy.io.loadmat(BytesIO(f.read()), variable_names=only_include)
 
-    # This is horrific, but apparently none of the libraries for opening the
-    # new Matlab format accept file-like objects. Since they require
-    # a string path, if the file is nonlocal, I have to download it to
-    # a tempfile first.
+    # Mat73 requires a string path, so download to a tempfile first.
     except NotImplementedError:
         if full_path.startswith("s3://"):
             with tempfile.NamedTemporaryFile(suffix=".mat") as f:
@@ -499,6 +496,20 @@ def load_raw(source, filename, only_include=None):
                 return _load73(f.name, only_include)
         else:
             return _load73(full_path, only_include)
+
+
+def load_metrics(exp, only_include=None, error=True):
+    """
+    Load metrics from a .mat file under a data directory, optionally only
+    including certain keys. If the file cannot be found, return None if
+    error=False, otherwise raise an exception.
+    """
+    filename = exp.split("_", 1)[0] + "_single_recording_metrics.mat"
+    try:
+        return load_raw("metrics", filename, only_include)
+    except (OSError, FileNotFoundError):
+        if error:
+            raise
 
 
 @functools.lru_cache
