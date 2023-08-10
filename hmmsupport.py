@@ -482,6 +482,7 @@ def load_raw(source, filename, only_include=None, error=True):
             raise
 
 
+@functools.lru_cache
 def load_metrics(exp, only_include=None, error=True):
     "Use load_raw to get the metrics for an experiment."
     filename = exp.split("_", 1)[0] + "_single_recording_metrics.mat"
