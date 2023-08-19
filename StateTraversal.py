@@ -1,3 +1,5 @@
+import itertools
+
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
@@ -10,9 +12,11 @@ plt.ion()
 
 source = "org_and_slice"
 exps = hmmsupport.all_experiments(source)
-mice = [e for e in exps if e[0] == "M"]
-orgs = [e for e in exps if e[0] == "L"]
-prims = [e for e in exps if e[0] == "P"]
+subsets = {
+    "Mouse": [e for e in exps if e[0] == "M"],
+    "Organoid": [e for e in exps if e[0] == "L"],
+    "Primary": [e for e in exps if e[0] == "P"],
+}
 
 srms = {
     exp: hmmsupport.load_metrics(exp, error=False)
@@ -34,33 +38,48 @@ rasters = {
 # %%
 
 
-def average_states_traversed(exp):
-    peaks = srms[exp]["tburst"].ravel()
+def list_of_states_traversed(exp):
+    """
+    For each model for the given experiment, return the average number of
+    distinct states traversed per second in the scaffold window.
+    """
     start, stop = srms[exp]["scaf_window"].ravel()
-    states_traversed = []
+
+    def rd(x):
+        return int(round(x / 30))
+
     for model in models[exp]:
         h = model.states(rasters[exp])
-        states_traversed.append(0)
+        yield [
+            h[rd(peak + start) : rd(peak + stop) + 1]
+            for peak in srms[exp]["tburst"].ravel()
+        ]
 
-        def rd(x):
-            return int(round(x / 30))
 
-        for peak in peaks:
-            states_traversed[-1] += len(set(h[rd(peak + start) : rd(peak + stop) + 1]))
-        states_traversed[-1] /= len(peaks) * (stop - start)*1e-3
-
-    return states_traversed
+def distinct_states_traversed(exp):
+    """
+    Calculate the average number of distinct states traversed per second
+    in the scaffold window for each model for the provided experiment.
+    """
+    return [
+        1e3 * np.mean([len(set(states)) / len(states) for states in model_states])
+        for model_states in list_of_states_traversed(exp)
+    ]
 
 
 traversed = {
-    "Mouse": np.hstack([average_states_traversed(exp) for exp in mice]),
-    "Primary": np.hstack([average_states_traversed(exp) for exp in prims]),
-    "Organoid": np.hstack([average_states_traversed(exp) for exp in orgs]),
+    k: np.hstack([distinct_states_traversed(exp) for exp in tqdm(exps, desc=k)])
+    for k, exps in subsets.items()
 }
 
 plt.boxplot(traversed.values(), labels=traversed.keys())
 plt.ylabel("Average States Traversed in Per Second in Scaffold Window")
 
-print(stats.ks_2samp(traversed["Mouse"], traversed["Primary"]))
-print(stats.ks_2samp(traversed["Mouse"], traversed["Organoid"]))
-print(stats.ks_2samp(traversed["Organoid"], traversed["Primary"]))
+
+for a, b in itertools.combinations(subsets.keys(), 2):
+    ks = stats.ks_2samp(traversed[a], traversed[b])
+    if (p := ks.pvalue) < 1e-3:
+        stat = ks.statistic
+        print(f"{a} vs. {b} is significant at ks = {stat:.2}, p = {100*p:.1e}% < 0.1%")
+    else:
+        print(f"{a} vs. {b} is insignificant ({p = :.1%})")
