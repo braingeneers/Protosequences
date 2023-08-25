@@ -107,7 +107,7 @@ bad_tev = {
 }
 bad_pev = {e: bad_tev[e] / bad_tev[e].sum(axis=1, keepdims=True) for e in experiments}
 
-if source in ["organoid", "eth"]:
+if len(experiments) < 20:
     for exp in tqdm(experiments):
         with figure(exp, save_exts=[]) as f:
             ax = f.gca()
@@ -125,26 +125,24 @@ def components_required(exp: str):
     return np.argmax(np.cumsum(pev[exp], axis=1) >= bad_pev[exp][:, [0]], axis=1)
 
 
+def plot_components_required(ax, experiments, get_label):
+    ax.violinplot(
+        [components_required(exp) for exp in experiments],
+        showmeans=True,
+        showextrema=False,
+    )
+    xs = np.arange(1, len(experiments) + 1)
+    ax.set_xticks(xs, [get_label(i, e) for i, e in enumerate(experiments)])
+    ax.set_ylabel("Components Required to Match Surrogate")
+
+
 if source == "organoid":
     with figure("Components Required") as f:
-        ax = f.gca()
-        ax.violinplot(
-            [components_required(exp) for exp in experiments],
-            showmeans=True,
-            showextrema=False,
-        )
-        ax.set_xticks(np.arange(1, 5), [f"Organoid {i}" for i in range(1, 5)])
-        ax.set_ylabel("Components Required to Match Surrogate")
+        plot_components_required(f.gca(), experiments, lambda i, _: f"Organoid {i}")
 
 elif source == "eth":
     with figure("Companents Required for ETH Organoids") as f:
-        ax = f.gca()
-        ax.violinplot(
-            [components_required(exp) for exp in experiments],
-            showmeans=True,
-            showextrema=False,
-        )
-        ax.set_xticks(np.arange(1, 5), [f"Well {i}" for i in range(2, 6)])
+        plot_components_required(f.gca(), experiments, lambda i, _: f"Well {i}")
 
 elif source == "mouse":
     with figure("Mouse Dimensionality") as f:
@@ -155,29 +153,19 @@ elif source == "mouse":
 
 elif source == "new_neuropixel":
     with figure("Components Required for Neuropixel") as f:
-        ax = f.gca()
-        ax.violinplot(
-            [components_required(exp) for exp in experiments],
-            showmeans=True,
-            showextrema=False,
-        )
-        ax.set_xticks(np.arange(1, 8), [f"rec{i}" for i in range(7)])
-        ax.set_ylabel("Components Required to Match Surrogate")
+        plot_components_required(f.gca(), experiments, lambda _, e: e.split("_")[0])
 
 elif source == "org_and_slice":
     for prefix in ["L", "M", "Pr"]:
         with figure(f"Components Required ({prefix}*)") as f:
-            ax = f.gca()
-            expsub = [exp for exp in experiments if exp.startswith(prefix)]
-            ax.violinplot(
-                [components_required(exp) for exp in expsub],
-                showmeans=True,
-                showextrema=False,
+            plot_components_required(
+                f.gca(),
+                [exp for exp in experiments if exp.startswith(prefix)],
+                lambda _,e: e.split("_")[0]
             )
-            ax.set_xticks(
-                np.arange(1, len(expsub) + 1), [exp.split("_")[0] for exp in expsub]
-            )
-            ax.set_ylabel("Components Required to Match Surrogate")
+
+
+# %%
 
 
 # %%
