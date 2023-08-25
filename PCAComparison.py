@@ -119,10 +119,18 @@ if len(experiments) < 20:
 
 
 # %%
+# Plot the number of components required to explain as much variance as the first
+# dimension of the surrogate data.
 
 
-def components_required(exp: str):
-    return np.argmax(np.cumsum(pev[exp], axis=1) >= bad_pev[exp][:, [0]], axis=1)
+def components_required(exp: str, thresh=None):
+    if thresh is None:
+        thresh = bad_pev[exp][:, [0]]
+    enough = np.cumsum(pev[exp], axis=1) > thresh
+    return [
+        np.argmax(enough[i, :]) + 1 if np.any(enough[i, :]) else enough.shape[1] + 1
+        for i in range(enough.shape[0])
+    ]
 
 
 def plot_components_required(ax, experiments, get_label):
@@ -161,7 +169,7 @@ elif source == "org_and_slice":
             plot_components_required(
                 f.gca(),
                 [exp for exp in experiments if exp.startswith(prefix)],
-                lambda _,e: e.split("_")[0]
+                lambda _, e: e.split("_")[0],
             )
 
 
