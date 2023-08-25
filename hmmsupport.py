@@ -725,9 +725,9 @@ class Raster(SpikeData):
 
         return np.argsort([np.median(times) for times in burst_relative_state_times])
 
-    def randomized(self, dt=1.0, seed=2953):
+    def randomized(self, bin_size=1.0, seed=2953):
         "As SpikeData.randomized(), but return a Raster."
-        sd = super().randomized(dt=dt, seed=seed)
+        sd = super().randomized(bin_size, seed)
         ret = self.__class__.__new__(self.__class__)
         ret._init(self.source, self.experiment, self.bin_size_ms, sd.train, sd.length)
         ret._burst_default_rms = self._burst_default_rms
