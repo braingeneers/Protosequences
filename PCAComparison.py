@@ -19,8 +19,6 @@ bin_size_ms = 30
 n_stateses = np.arange(10, 21)
 
 experiments = all_experiments(source)
-if source == "organoid":
-    experiments = [e for e in experiments if e.startswith("L")]
 
 
 def raster_valid(exp: str):
@@ -33,7 +31,7 @@ def raster_valid(exp: str):
 
 rasters: dict[str, hmmsupport.Raster] = {
     exp: get_raster(source, exp, bin_size_ms)
-    for exp in tqdm(experiments)
+    for exp in tqdm(experiments, desc="Loading rasters")
     if raster_valid(exp)
 }
 experiments = list(rasters.keys())
@@ -41,7 +39,8 @@ experiments = list(rasters.keys())
 print(len(experiments), "experiments have any data")
 
 bad_rasters: dict[str, hmmsupport.Raster] = {
-    exp: get_raster(source, exp, bin_size_ms, "rsm") for exp in tqdm(experiments)
+    exp: get_raster(source, exp, bin_size_ms, "rsm")
+    for exp in tqdm(experiments, desc="Loading surrogate rasters")
 }
 
 models: dict[str, list[Model]] = {
@@ -49,7 +48,7 @@ models: dict[str, list[Model]] = {
         joblib.delayed(Model)(source, exp, bin_size_ms, n, recompute_ok=False)
         for n in n_stateses
     )
-    for exp in tqdm(experiments)
+    for exp in tqdm(experiments, desc="Loading models")
 }
 
 bad_models: dict[str, list[Model]] = {
@@ -57,7 +56,7 @@ bad_models: dict[str, list[Model]] = {
         joblib.delayed(Model)(source, exp, bin_size_ms, n, "rsm", recompute_ok=False)
         for n in n_stateses
     )
-    for exp in tqdm(experiments)
+    for exp in tqdm(experiments, desc="Loading surrogate models")
 }
 
 are_ok = {
@@ -74,6 +73,8 @@ bad_models = {
 }
 
 # %%
+
+from sklearn.decomposition import PCA
 
 
 def stateses(exp: str, bad: bool):

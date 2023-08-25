@@ -11,9 +11,9 @@ from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import SGDClassifier
 
-experiments = [
-    ("organoid", exp) for exp in all_experiments("organoid") if exp.startswith("L")
-] + [("eth", exp) for exp in all_experiments("eth")]
+experiments = [("organoid", exp) for exp in all_experiments("organoid")] + [
+    ("eth", exp) for exp in all_experiments("eth")
+]
 
 surr = "real"
 hmm_library = "default"
