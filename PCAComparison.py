@@ -2,10 +2,12 @@
 #
 # Compare the variance explained by the first few principal components in
 # each of the experiments under a given heading.
+import itertools
 import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm.auto import tqdm
+from scipy import stats
 
 import hmmsupport
 from hmmsupport import get_raster, all_experiments, Model, figure
@@ -123,10 +125,10 @@ if len(experiments) < 20:
 # dimension of the surrogate data.
 
 
-def components_required(exp: str, thresh=None):
+def components_required(exp: str, thresh=None, bad=False):
     if thresh is None:
         thresh = bad_pev[exp][:, [0]]
-    enough = np.cumsum(pev[exp], axis=1) > thresh
+    enough = np.cumsum((bad_pev if bad else pev)[exp], axis=1) > thresh
     return [
         np.argmax(enough[i, :]) + 1 if np.any(enough[i, :]) else enough.shape[1] + 1
         for i in range(enough.shape[0])
@@ -174,7 +176,60 @@ elif source == "org_and_slice":
 
 
 # %%
+# Plot the dimensionality of each dataset as a function of the threshold for explained
+# variance, comparing the surrogate data to the real data.
 
+
+def pev_vs_thresholds(experiments, xs, bad=False):
+    return np.array(
+        [
+            np.hstack(
+                [components_required(exp, thresh=x, bad=bad) for exp in experiments]
+            )
+            for x in xs
+        ]
+    )
+
+
+def plot_pev(ax, color, experiments, label, bad=False):
+    xs = np.linspace(0.705, 1)
+    pev = pev_vs_thresholds(experiments, xs, bad=bad)
+    ys = pev.mean(axis=1)
+    ystd = pev.std(axis=1)
+    ax.fill_between(xs, ys - ystd, ys + ystd, alpha=0.2, color=color, label=label)
+    ax.plot(xs, ys, color=color)
+
+
+def ks_compare_pev(As, Bs):
+    xs = np.linspace(0.7, 1)
+    Apev = pev_vs_thresholds(As, xs)
+    Bpev = pev_vs_thresholds(Bs, xs)
+    kses = [stats.ks_2samp(Apev[i,:], Bpev[i,:]) for i in range(len(xs))]
+    statistic = np.mean([ks.statistic for ks in kses])
+    pvalue = stats.gmean([ks.pvalue for ks in kses])
+    return statistic, pvalue
+
+
+if source == "org_and_slice":
+    group_name = dict(L="Organoid", M="Mouse", Pr="Primary")
+    with figure("Dimensionality vs Threshold") as f:
+        ax = f.gca()
+        for i, prefix in enumerate(["L", "M", "Pr"]):
+            expsub = [exp for exp in experiments if exp.startswith(prefix)]
+            plot_pev(ax, f"C{i}", expsub, group_name[prefix])
+        plot_pev(ax, "red", experiments, "Surrogate", True)
+        ax.legend(loc="upper left")
+        ax.set_xlabel("Explained Variance Threshold")
+        ax.set_ylabel("Dimensions Required")
+        ax.set_ylim(1, 6)
+        ax.set_xlim(0.7, 1)
+
+    for a,b in itertools.combinations(group_name, 2):
+        effect, pvalue = ks_compare_pev(
+            [exp for exp in experiments if exp.startswith(a)],
+            [exp for exp in experiments if exp.startswith(b)],
+        )
+        print(f"{group_name[a]} vs {group_name[b]}: {effect:.2f}, p = {pvalue*100:.2e}%")
 
 # %%
 
