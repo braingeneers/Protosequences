@@ -204,7 +204,7 @@ def ks_compare_pev(As, Bs):
     xs = np.linspace(0.7, 1)
     Apev = pev_vs_thresholds(As, xs)
     Bpev = pev_vs_thresholds(Bs, xs)
-    kses = [stats.ks_2samp(Apev[i,:], Bpev[i,:]) for i in range(len(xs))]
+    kses = [stats.ks_2samp(Apev[i, :], Bpev[i, :]) for i in range(len(xs))]
     statistic = np.mean([ks.statistic for ks in kses])
     pvalue = stats.gmean([ks.pvalue for ks in kses])
     return statistic, pvalue
@@ -224,12 +224,14 @@ if source == "org_and_slice":
         ax.set_ylim(1, 6)
         ax.set_xlim(0.7, 1)
 
-    for a,b in itertools.combinations(group_name, 2):
+    for a, b in itertools.combinations(group_name, 2):
         effect, pvalue = ks_compare_pev(
             [exp for exp in experiments if exp.startswith(a)],
             [exp for exp in experiments if exp.startswith(b)],
         )
-        print(f"{group_name[a]} vs {group_name[b]}: {effect:.2f}, p = {pvalue*100:.2e}%")
+        print(
+            f"{group_name[a]} vs {group_name[b]}: {effect:.2f}, p = {pvalue*100:.2e}%"
+        )
 
 # %%
 
