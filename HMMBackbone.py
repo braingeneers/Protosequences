@@ -4,7 +4,6 @@
 # they are within different HMM states. Also check the consistency of this measurement
 # across the different models trained for a given experiment.
 import functools
-import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -24,6 +23,7 @@ bin_size_ms = 30
 n_stateses = np.arange(10, 21)
 
 experiments = {v.split("_")[0]: v for v in all_experiments(source)}
+groups = dict(L="Organoid", M="Mouse", Pr="Primary")
 
 
 rasters, bad_rasters = {}, {}
@@ -185,7 +185,8 @@ def mean_consistency(scores_nobs, include_nan=True):
     scores, _ = scores_nobs
     # Compare in the correct sense so that NaNs are treated as "not
     # consistent", i.e. potentially Poisson, then invert.
-    return 1 - (scores < 0.01).mean(0, where=include_nan or ~np.isnan(scores))
+    ret = 1 - (scores < 0.01).mean(0, where=include_nan or ~np.isnan(scores))
+    return np.where(np.isnan(ret), 0.5, ret)
 
 
 def p_consistency(scores_nobs, include_nan=True):
@@ -203,10 +204,8 @@ def p_consistency(scores_nobs, include_nan=True):
             col[mask], method="stouffer", weights=weights[mask]
         ).pvalue
 
-    return np.apply_along_axis(_combine, 0, scores, nobs)
-
-
-# %%
+    ret = np.apply_along_axis(_combine, 0, scores, nobs)
+    return np.where(np.isnan(ret), 0.5, ret)
 
 
 def convertix(exp, key):
@@ -217,51 +216,53 @@ def convertix(exp, key):
     return np.int64(metrics[exp][key]).ravel() - 1
 
 
-def subgroup_ks(model):
-    c_bb = data.loc[
-        (data.model == model) & (data.backbone == "Backbone"), "consistency"
-    ]
-    c_nr = data.loc[
-        (data.model == model) & (data.backbone == "Non-Rigid"), "consistency"
-    ]
-    return stats.ks_2samp(c_bb, c_nr)
-
-
-groups = dict(L="Organoid", M="Mouse", Pr="Primary")
-
-
-conditions = [
-    ("p-Value", "$p$-value for Non-Poisson Firing", p_consistency),
-    ("Mean", "Fraction of States with Non-Poisson Firing", mean_consistency),
-]
-
-for (kind, label, score_combiner), include_nan, only_burst in itertools.product(
-    conditions, [False, True], [False, True]
-):
+def consistency_data(method, only_burst, include_nan):
+    """
+    Use the given consistency score combining method to create a dataframe of
+    consistency scores which can be used for further processing.
+    """
     consistencies = {}
     for k in tqdm(experiments, desc="Computing consistency"):
-        consistencies[k] = score_combiner(
+        consistencies[k] = method(
             all_the_scores(k, poisson_test_chi_square, only_burst),
             include_nan=include_nan,
         )
 
+    rows = []
+    for prefix in groups:
+        for exp in [e for e in experiments if e.startswith(prefix)]:
+            for key in ["scaf_units", "non_scaf_units"]:
+                rows.extend(
+                    dict(
+                        consistency=c,
+                        label=1 if key == "scaf_units" else 0,
+                        backbone="Backbone" if key == "scaf_units" else "Non-Rigid",
+                        model=prefix,
+                    )
+                    for c in consistencies[exp][convertix(exp, key)]
+                )
+    return pd.DataFrame(rows)
+
+
+# %%
+
+
+conditions = [
+    (combining, include_nan, only_burst)
+    for combining in [
+        ("p-Value", "$p$-value for Non-Poisson Firing", p_consistency),
+        ("Mean", "Fraction of States with Non-Poisson Firing", mean_consistency),
+    ]
+    for include_nan in [False, True]
+    for only_burst in [False, True]
+]
+
+
+for (kind, label, score_combiner), include_nan, only_burst in conditions:
+    data = consistency_data(score_combiner, only_burst, include_nan)
     nanlabel = "With NaN" if include_nan else "Without NaN"
     burstlabel = "Bursts Only" if only_burst else "All Bins"
     with figure(f"Unit {kind} Consistency, {nanlabel}, {burstlabel}") as f:
-        rows = []
-        for prefix in groups:
-            for exp in [e for e in experiments if e.startswith(prefix)]:
-                for key in ["scaf_units", "non_scaf_units"]:
-                    rows.extend(
-                        dict(
-                            consistency=c,
-                            backbone="Backbone" if key == "scaf_units" else "Non-Rigid",
-                            model=prefix,
-                        )
-                        for c in consistencies[exp][convertix(exp, key)]
-                    )
-        data = pd.DataFrame(rows)
-
         ax = f.gca()
         sns.violinplot(
             bw=0.1,
@@ -280,6 +281,45 @@ for (kind, label, score_combiner), include_nan, only_burst in itertools.product(
         ax.set_xlabel("")
         ax.legend()
 
+    for model in groups:
+        c_bb = data.loc[
+            (data.model == model) & (data.backbone == "Backbone"), "consistency"
+        ]
+        c_nr = data.loc[
+            (data.model == model) & (data.backbone == "Non-Rigid"), "consistency"
+        ]
+        print(f"{groups[model]}: {stats.ks_2samp(c_bb, c_nr)}")
 
-for group in groups:
-    print(f"{groups[group]}: {subgroup_ks(group)}")
+
+# %%
+
+
+from sklearn.metrics import roc_curve, roc_auc_score
+
+rows = []
+for (kind, label, combiner), include_nan, only_burst in conditions:
+    data = consistency_data(combiner, only_burst, include_nan)
+    nanlabel = "With NaN" if include_nan else "Without NaN"
+    burstlabel = "Bursts Only" if only_burst else "All Bins"
+    with figure(f"{kind} Consistency ROC, {nanlabel}, {burstlabel}"):
+        for group, subdata in data.groupby("model"):
+            fpr, tpr, _ = roc_curve(subdata.label, 1 - subdata.consistency)
+            auc = roc_auc_score(subdata.label, 1 - subdata.consistency)
+            rows.append(
+                dict(
+                    combiner=kind,
+                    include_nan=include_nan,
+                    nan=nanlabel,
+                    only_burst=only_burst,
+                    burst=burstlabel,
+                    prefix=group,
+                    group=groups[group],
+                    auc=auc,
+                )
+            )
+            plt.plot(fpr, tpr, label=groups[group])
+        plt.xlabel("False Positive Rate")
+        plt.ylabel("True Positive Rate")
+        plt.legend()
+
+aucs = pd.DataFrame(rows)
