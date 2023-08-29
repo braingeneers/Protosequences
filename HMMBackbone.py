@@ -135,7 +135,8 @@ def unit_consistency(model, raster: hmmsupport.Raster, poisson_test, only_burst=
     realizations of each state.
 
     Returns a matrix of shape (n_states, n_units) with the consistency of each
-    unit in each state.
+    unit in each state, and an array with shape (n_states,) with the number of
+    observations of each state.
     """
     K = model.n_states
     h = model.states(raster)
@@ -148,26 +149,28 @@ def unit_consistency(model, raster: hmmsupport.Raster, poisson_test, only_burst=
             ok[start:end] = True
         h[~ok] = -1
 
-    ret = [poisson_test(raster._raster[h == state, :]) for state in range(K)]
-    return np.array(ret)
+    rsubs = [raster._raster[h == state, :] for state in range(K)]
+    ret = [poisson_test(rsub) for rsub in rsubs]
+    return np.array(ret), np.array([rsub.shape[0] for rsub in rsubs])
 
 
 @functools.lru_cache(maxsize=50)
 def all_the_scores(exp, poisson_test, only_burst=False):
     """
-    Gather all the consistency scores across all states of all models. Don't
-    differentiate between states or models, yielding a 2D array with some large
-    number of rows and one column per unit.
+    Gather all the consistency scores and observation counts across all states of
+    all models. Don't differentiate between states or models, yielding a 2D array
+    with some large number of rows and one column per unit.
     """
-    return np.vstack(
-        [
-            unit_consistency(model, rasters[exp], poisson_test, only_burst)
-            for model in models[exp]
-        ]
-    )
+    scores_nobs = [
+        unit_consistency(model, rasters[exp], poisson_test, only_burst)
+        for model in models[exp]
+    ]
+    scores = np.vstack([s for s, _ in scores_nobs])
+    nobs = np.hstack([n for _, n in scores_nobs])
+    return scores, nobs
 
 
-def overall_consistency(scores, include_nan=True):
+def mean_consistency(scores_nobs, include_nan=True):
     """
     Combine consistency scores across all states of all models, reducing an array
     of size (M,N) to (N,) so that there is just one score per unit. Returns a
@@ -178,17 +181,35 @@ def overall_consistency(scores, include_nan=True):
     are included in the calculation and considered indistinguishable from
     Poisson. Otherwise, they are excluded from the calculation entirely.
     """
+    scores, _ = scores_nobs
     # Compare in the correct sense so that NaNs are treated as "not
     # consistent", i.e. potentially Poisson, then invert.
     return 1 - (scores < 0.01).mean(0, where=include_nan or ~np.isnan(scores))
 
 
+def p_consistency(scores_nobs, include_nan=True):
+    """
+    Combine the consistency scores using methods for combining the p-value
+    instead of just averaging like mean_consistency().
+    """
+    scores, nobs = scores_nobs
+    if include_nan:
+        scores = np.where(np.isnan(scores), 0.5, scores)
+
+    def _combine(col, weights):
+        mask = ~np.isnan(col)
+        return stats.combine_pvalues(
+            col[mask], method="stouffer", weights=weights[mask]
+        ).pvalue
+
+    return np.apply_along_axis(_combine, 0, scores, nobs)
+
+
 consistencies = {}
 for k in tqdm(experiments, desc="Computing consistency"):
-    consistencies[k] = overall_consistency(
-        all_the_scores(k, poisson_test_chi_square, True), True
+    consistencies[k] = p_consistency(
+        all_the_scores(k, poisson_test_chi_square, False), False
     )
-
 
 # %%
 
