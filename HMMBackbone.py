@@ -85,13 +85,15 @@ def poisson_test_chi_square(data, mean=None):
     This is even uniform under the null hypothesis when the mean is generated
     from the data. :D
     """
-    N, K = data.shape
+    if len(data) == 0:
+        return np.full_like(data.sum(0), np.nan)
+
     # Dividing by the expected variance, which for Poisson is the mean.
     mean = data.mean(0) if mean is None else mean
-    statistic = (N - 1) * data.var(0) / mean
+    statistic = (data.shape[0] - 1) * data.var(0) / mean
     # Use the CDF to get the p-value: how likely a χ² sample is to be smaller
     # than the observed test statistic.
-    return stats.chi2(N - 1).cdf(statistic)
+    return stats.chi2(data.shape[0] - 1).cdf(statistic)
 
 
 def poisson_test_monte_carlo(data, mean=None):
@@ -124,7 +126,7 @@ def poisson_test_monte_carlo(data, mean=None):
     )
 
 
-def unit_consistency(model, raster, poisson_test):
+def unit_consistency(model, raster: hmmsupport.Raster, poisson_test, only_burst=False):
     """
     Compute the consistency of each unit within each state of the given model,
     by grouping the time bins of the raster according to the state assigned by
@@ -136,35 +138,46 @@ def unit_consistency(model, raster, poisson_test):
     """
     K = model.n_states
     h = model.states(raster)
+
+    if only_burst:
+        peaks, bounds = raster.find_burst_edges()
+        edges = np.int64(np.round((peaks[:, None] + bounds) / raster.bin_size_ms))
+        ok = np.zeros_like(h, dtype=bool)
+        for start, end in edges:
+            ok[start:end] = True
+        h[~ok] = -1
+
     ret = [poisson_test(raster._raster[h == state, :]) for state in range(K)]
     return np.array(ret)
 
 
-def overall_consistency(exp, poisson_test):
+def overall_consistency(exp, poisson_test, only_burst=False):
     """
     Compute the consistency of each unit across all states of all models trained
     for the given experiment. Returns a vector of shape (n_units,) with the
     fraction of all states across all models where the Poisson null hypothesis
     failed to be rejected for that unit.
     """
+    # Gather all the consistency scores across all states of all models. Don't
+    # differentiate between states or models, yielding a 2D array with some large
+    # number of rows and one column per unit.
+    scores = np.vstack(
+            unit_consistency(model, rasters[exp], poisson_test, only_burst)
+            for model in models[exp]
+        )
+
     # Compare using less-than because the chi-squared test often returns NaN in
     # indeterminate cases. This way, those are marked NOT rejected.
-    reject = (
-        np.vstack(
-            [
-                unit_consistency(model, rasters[exp], poisson_test)
-                for model in models[exp]
-            ]
-        )
-        < 0.01
-    )
+    reject = scores < 0.01
+
     # Then take the complement so the score represents positive consistency.
-    return 1 - reject.mean(0)
+    # Disregard all (state, unit) combinations with zero events.
+    return 1 - reject.mean(0, where=~np.isnan(scores))
 
 
 consistencies = {}
 for k in tqdm(experiments, desc="Computing consistency"):
-    consistencies[k] = overall_consistency(k, poisson_test_chi_square)
+    consistencies[k] = overall_consistency(k, poisson_test_chi_square, only_burst=True)
 
 
 # %%
