@@ -10,6 +10,7 @@ import pandas as pd
 import seaborn as sns
 from scipy import stats
 from tqdm.auto import tqdm
+from sklearn.metrics import roc_curve, roc_auc_score, mutual_info_score
 
 import hmmsupport
 from hmmsupport import get_raster, all_experiments, Model, figure
@@ -23,7 +24,7 @@ bin_size_ms = 30
 n_stateses = np.arange(10, 21)
 
 experiments = {v.split("_")[0]: v for v in all_experiments(source)}
-groups = dict(L="Organoid", M="Mouse", Pr="Primary")
+groups = {"L": "Organoid", "M": "Mouse", "Pr": "Primary", "": "All"}
 
 
 rasters, bad_rasters = {}, {}
@@ -294,7 +295,22 @@ for (kind, label, score_combiner), include_nan, only_burst in conditions:
 # %%
 
 
-from sklearn.metrics import roc_curve, roc_auc_score
+def auc_pval(auc, labels):
+    """
+    Calculate a p-value for the given classifier AUC.
+    """
+    ep = (labels != 0).sum()
+    en = len(labels) - ep
+
+    # The Mann-Whitney statistic is normally distributed under the null
+    # hypothesis, with the following parameters.
+    μ = ep * en / 2
+    σ = np.sqrt(ep * en * (1 + ep + en) / 12)
+
+    # The Mann-Whitney statistic is equal to ep*en*(1 - AUC), so use the SF
+    # directly to calculate the p-value of an AUC this large.
+    return stats.norm(μ, σ).cdf((1 - auc) * ep * en)
+
 
 rows = []
 for (kind, label, combiner), include_nan, only_burst in conditions:
@@ -302,9 +318,17 @@ for (kind, label, combiner), include_nan, only_burst in conditions:
     nanlabel = "With NaN" if include_nan else "Without NaN"
     burstlabel = "Bursts Only" if only_burst else "All Bins"
     with figure(f"{kind} Consistency ROC, {nanlabel}, {burstlabel}"):
-        for group, subdata in data.groupby("model"):
-            fpr, tpr, _ = roc_curve(subdata.label, 1 - subdata.consistency)
+        for i, (group, subdata) in enumerate(data.groupby("model")):
             auc = roc_auc_score(subdata.label, 1 - subdata.consistency)
+            fpr, tpr, thresh = roc_curve(subdata.label, 1 - subdata.consistency)
+            # Calculate the best accuracy as well as the null accuracy.
+            baserate = subdata.label.mean()
+            null_acc = max(baserate, 1 - baserate)
+            accuracy = tpr * baserate + (1 - fpr) * (1 - baserate)
+            # Calculate the mutual information at each value of the threshold.
+            mutual_info = mutual_info_score(subdata.label,
+                                            subdata.consistency) / np.log(2)
+            information = stats.entropy([baserate, 1 - baserate]) / np.log(2)
             rows.append(
                 dict(
                     combiner=kind,
@@ -315,6 +339,11 @@ for (kind, label, combiner), include_nan, only_burst in conditions:
                     prefix=group,
                     group=groups[group],
                     auc=auc,
+                    acc=accuracy.max(),
+                    null_acc=null_acc,
+                    pvalue=auc_pval(auc, subdata.label),
+                    information=information,
+                    mutual_info=mutual_info,
                 )
             )
             plt.plot(fpr, tpr, label=groups[group])
@@ -323,3 +352,17 @@ for (kind, label, combiner), include_nan, only_burst in conditions:
         plt.legend()
 
 aucs = pd.DataFrame(rows)
+
+
+# %%
+
+for key in ["nan", "burst", "combiner"]:
+    with figure(f"AUC by Model and {key}", save_exts=[]) as f:
+        sns.violinplot(
+            aucs,
+            x="group",
+            y="auc",
+            split=True,
+            hue=key,
+            inner="quartile",
+        )
