@@ -4,6 +4,7 @@
 # they are within different HMM states. Also check the consistency of this measurement
 # across the different models trained for a given experiment.
 import functools
+import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -205,12 +206,6 @@ def p_consistency(scores_nobs, include_nan=True):
     return np.apply_along_axis(_combine, 0, scores, nobs)
 
 
-consistencies = {}
-for k in tqdm(experiments, desc="Computing consistency"):
-    consistencies[k] = p_consistency(
-        all_the_scores(k, poisson_test_chi_square, False), False
-    )
-
 # %%
 
 
@@ -222,42 +217,6 @@ def convertix(exp, key):
     return np.int64(metrics[exp][key]).ravel() - 1
 
 
-groups = dict(L="Organoid", M="Mouse", Pr="Primary")
-
-with figure("Unit Consistency") as f:
-    rows = []
-    for prefix in groups:
-        for exp in [e for e in experiments if e.startswith(prefix)]:
-            for key in ["scaf_units", "non_scaf_units"]:
-                rows.extend(
-                    dict(
-                        consistency=c,
-                        backbone="Backbone" if key == "scaf_units" else "Non-Rigid",
-                        model=prefix,
-                    )
-                    for c in consistencies[exp][convertix(exp, key)]
-                )
-    data = pd.DataFrame(rows)
-
-    ax = f.gca()
-    sns.violinplot(
-        data=data,
-        ax=ax,
-        split=True,
-        x="model",
-        y="consistency",
-        hue="backbone",
-        inner="quartile",
-        saturation=0.7,
-        cut=0,
-        scale="count",
-    )
-    ax.set_xticks([0, 1, 2], [groups[g] for g in groups])
-    ax.set_ylabel("Fraction of States Indistinguishable from Poisson")
-    ax.set_xlabel("")
-    ax.legend()
-
-
 def subgroup_ks(model):
     c_bb = data.loc[
         (data.model == model) & (data.backbone == "Backbone"), "consistency"
@@ -266,6 +225,60 @@ def subgroup_ks(model):
         (data.model == model) & (data.backbone == "Non-Rigid"), "consistency"
     ]
     return stats.ks_2samp(c_bb, c_nr)
+
+
+groups = dict(L="Organoid", M="Mouse", Pr="Primary")
+
+
+conditions = [
+    ("p-Value", "$p$-value for Non-Poisson Firing", p_consistency),
+    ("Mean", "Fraction of States with Non-Poisson Firing", mean_consistency),
+]
+
+for (kind, label, score_combiner), include_nan, only_burst in itertools.product(
+    conditions, [False, True], [False, True]
+):
+    consistencies = {}
+    for k in tqdm(experiments, desc="Computing consistency"):
+        consistencies[k] = score_combiner(
+            all_the_scores(k, poisson_test_chi_square, only_burst),
+            include_nan=include_nan,
+        )
+
+    nanlabel = "With NaN" if include_nan else "Without NaN"
+    burstlabel = "Bursts Only" if only_burst else "All Bins"
+    with figure(f"Unit {kind} Consistency, {nanlabel}, {burstlabel}") as f:
+        rows = []
+        for prefix in groups:
+            for exp in [e for e in experiments if e.startswith(prefix)]:
+                for key in ["scaf_units", "non_scaf_units"]:
+                    rows.extend(
+                        dict(
+                            consistency=c,
+                            backbone="Backbone" if key == "scaf_units" else "Non-Rigid",
+                            model=prefix,
+                        )
+                        for c in consistencies[exp][convertix(exp, key)]
+                    )
+        data = pd.DataFrame(rows)
+
+        ax = f.gca()
+        sns.violinplot(
+            bw=0.1,
+            data=data,
+            ax=ax,
+            split=True,
+            x="model",
+            y="consistency",
+            hue="backbone",
+            inner="quartile",
+            cut=0,
+            scale="count",
+        )
+        ax.set_xticks([0, 1, 2], [groups[g] for g in groups])
+        ax.set_ylabel(label)
+        ax.set_xlabel("")
+        ax.legend()
 
 
 for group in groups:
