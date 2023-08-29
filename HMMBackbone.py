@@ -53,39 +53,75 @@ with tqdm(desc="Loading SRMs", total=len(experiments), delay=0.1) as pbar:
 # %%
 
 
-def poisson_test_students_t(data, axis=0):
+def poisson_test_students_t(data, mean=None):
     """
-    Test the null hypothesis that the given data has no less variance than a
-    Poisson distribution with the same mean, using a t-test to check whether the
-    second moment is consistent with the first.
+    Test the null hypothesis that the given data of shape (N,K) has no less
+    variance than a K-dimensional multivariate Poisson distribution with the same
+    mean, using a t-test to check whether the second moment is consistent with the
+    first.
+
+    Provide the mean (derived from some other source) if you want to take the
+    p-value seriously! It has degrees-of-freedom problems when the mean is
+    estimated from the data, and the variance of the test statistic ends up way
+    too small.
     """
     if len(data) == 0:
-        return np.full_like(data.sum(axis), np.nan)
+        return np.full_like(data.sum(0), np.nan)
 
     # Expected value of y² when y ~ Poisson(λ) is λ² + λ.
-    λ = data.mean(axis=axis, keepdims=True)
+    λ = data.mean(0, keepdims=True) if mean is None else mean
     return stats.ttest_1samp(
-        data**2, λ**2 + λ, axis=axis, alternative="less"
-    ).pvalue
+        data**2, λ**2 + λ, axis=0, alternative="less"
+    ).statistic
 
 
-def poisson_test_monte_carlo(data, axis=0):
+def poisson_test_chi_square(data, mean=None):
     """
-    Test the null hypothesis that the given data has no less variance than a
-    Poisson distribution with the same mean, using an explicit Monte Carlo test
-    to check whether the sample variance is smaller than Poisson.
+    Test the null hypothesis that the given data of shape (N,K) has no less
+    variance than a K-dimensional multivariate Poisson distribution with the same
+    mean, using a chi-square test to check whether the second moment is consistent
+    with the first.
+
+    This is even uniform under the null hypothesis when the mean is generated
+    from the data. :D
+    """
+    N, K = data.shape
+    # Dividing by the expected variance, which for Poisson is the mean.
+    mean = data.mean(0) if mean is None else mean
+    statistic = (N - 1) * data.var(0) / mean
+    # Use the CDF to get the p-value: how likely a χ² sample is to be smaller
+    # than the observed test statistic.
+    return stats.chi2(N - 1).cdf(statistic)
+
+
+def poisson_test_monte_carlo(data, mean=None):
+    """
+    Test the null hypothesis that the given data of shape (N,K) has no less
+    variance than a K-dimensional multivariate Poisson distribution with the same
+    mean, using an explicit Monte Carlo test generating N samples from the same
+    distribution M times to check whether the sample variance is smaller than
+    Poisson.
+
+    All the random variables for each of the K input dimensions are generated in
+    one batch, so this function might use a lot of memory. It's also slow as heck,
+    and unavoidably so, so try to use the χ² test instead.
     """
     if len(data) == 0:
-        return np.full_like(data.sum(axis), np.nan)
+        return np.full_like(data.sum(0), np.nan)
 
-    return stats.monte_carlo_test(
-        data,
-        stats.poisson(data.mean()).rvs,
-        statistic=np.var,
-        alternative="less",
-        axis=axis,
-        n_resamples=1000,
-    ).pvalue
+    λ = data.mean(0) if mean is None else mean
+    return np.array(
+        [
+            stats.monte_carlo_test(
+                row,
+                stats.poisson(li).rvs,
+                np.var,
+                alternative="less",
+                n_resamples=1000,
+            ).pvalue
+            for li, row in zip(λ, data.T)
+        ]
+    )
 
 
 def unit_consistency(model, raster, poisson_test):
@@ -128,7 +164,7 @@ def overall_consistency(exp, poisson_test):
 
 consistencies = {}
 for k in tqdm(experiments, desc="Computing consistency"):
-    consistencies[k] = overall_consistency(k, poisson_test_students_t)
+    consistencies[k] = overall_consistency(k, poisson_test_chi_square)
 
 
 # %%
@@ -186,3 +222,7 @@ def subgroup_ks(model):
         (data.model == model) & (data.backbone == "Non-Rigid"), "consistency"
     ]
     return stats.ks_2samp(c_bb, c_nr)
+
+
+for group in groups:
+    print(f"{groups[group]}: {subgroup_ks(group)}")
