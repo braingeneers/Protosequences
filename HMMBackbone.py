@@ -67,7 +67,7 @@ def poisson_test_students_t(data, mean=None):
     too small.
     """
     if len(data) == 0:
-        return np.full_like(data.sum(0), np.nan)
+        return np.full(data.sum(0).shape, np.nan)
 
     # Expected value of y² when y ~ Poisson(λ) is λ² + λ.
     λ = data.mean(0, keepdims=True) if mean is None else mean
@@ -87,7 +87,7 @@ def poisson_test_chi_square(data, mean=None):
     from the data. :D
     """
     if len(data) == 0:
-        return np.full_like(data.sum(0), np.nan)
+        return np.full(data.sum(0).shape, np.nan)
 
     # Dividing by the expected variance, which for Poisson is the mean.
     mean = data.mean(0) if mean is None else mean
@@ -110,7 +110,7 @@ def poisson_test_monte_carlo(data, mean=None):
     and unavoidably so, so try to use the χ² test instead.
     """
     if len(data) == 0:
-        return np.full_like(data.sum(0), np.nan)
+        return np.full(data.sum(0).shape, np.nan)
 
     λ = data.mean(0) if mean is None else mean
     return np.array(
