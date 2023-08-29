@@ -3,6 +3,7 @@
 # Attempt to identify the backbone units within each recording based on how consistent
 # they are within different HMM states. Also check the consistency of this measurement
 # across the different models trained for a given experiment.
+import functools
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -151,33 +152,42 @@ def unit_consistency(model, raster: hmmsupport.Raster, poisson_test, only_burst=
     return np.array(ret)
 
 
-def overall_consistency(exp, poisson_test, only_burst=False):
+@functools.lru_cache(maxsize=50)
+def all_the_scores(exp, poisson_test, only_burst=False):
     """
-    Compute the consistency of each unit across all states of all models trained
-    for the given experiment. Returns a vector of shape (n_units,) with the
-    fraction of all states across all models where the Poisson null hypothesis
-    failed to be rejected for that unit.
+    Gather all the consistency scores across all states of all models. Don't
+    differentiate between states or models, yielding a 2D array with some large
+    number of rows and one column per unit.
     """
-    # Gather all the consistency scores across all states of all models. Don't
-    # differentiate between states or models, yielding a 2D array with some large
-    # number of rows and one column per unit.
-    scores = np.vstack(
+    return np.vstack(
+        [
             unit_consistency(model, rasters[exp], poisson_test, only_burst)
             for model in models[exp]
-        )
+        ]
+    )
 
-    # Compare using less-than because the chi-squared test often returns NaN in
-    # indeterminate cases. This way, those are marked NOT rejected.
-    reject = scores < 0.01
 
-    # Then take the complement so the score represents positive consistency.
-    # Disregard all (state, unit) combinations with zero events.
-    return 1 - reject.mean(0, where=~np.isnan(scores))
+def overall_consistency(scores, include_nan=True):
+    """
+    Combine consistency scores across all states of all models, reducing an array
+    of size (M,N) to (N,) so that there is just one score per unit. Returns a
+    vector of shape (n_units,) giving the fraction of all states across all models
+    where the Poisson null hypothesis failed to be rejected for that unit.
+
+    If `include_nan` is True, then (state, unit) combinations with zero events
+    are included in the calculation and considered indistinguishable from
+    Poisson. Otherwise, they are excluded from the calculation entirely.
+    """
+    # Compare in the correct sense so that NaNs are treated as "not
+    # consistent", i.e. potentially Poisson, then invert.
+    return 1 - (scores < 0.01).mean(0, where=include_nan or ~np.isnan(scores))
 
 
 consistencies = {}
 for k in tqdm(experiments, desc="Computing consistency"):
-    consistencies[k] = overall_consistency(k, poisson_test_chi_square, only_burst=True)
+    consistencies[k] = overall_consistency(
+        all_the_scores(k, poisson_test_chi_square, True), True
+    )
 
 
 # %%
