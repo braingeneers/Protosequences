@@ -5,11 +5,14 @@
 # across the different models trained for a given experiment.
 import matplotlib.pyplot as plt
 import numpy as np
-from tqdm.auto import tqdm
+import pandas as pd
+import seaborn as sns
 from scipy import stats
+from tqdm.auto import tqdm
 
 import hmmsupport
 from hmmsupport import get_raster, all_experiments, Model, figure
+
 
 plt.ion()
 hmmsupport.figdir("pca")
@@ -130,6 +133,7 @@ for k in tqdm(experiments, desc="Computing consistency"):
 
 # %%
 
+
 def convertix(exp, key):
     """
     Convert a weird 2D matrix with potentially floating-point "indices" into a
@@ -137,28 +141,48 @@ def convertix(exp, key):
     """
     return np.int64(metrics[exp][key]).ravel() - 1
 
-import pandas as pd
-import seaborn as sns
 
 groups = dict(L="Organoid", M="Mouse", Pr="Primary")
 
-with figure("Unit Consistency", save_exts=[]) as f:
+with figure("Unit Consistency") as f:
     rows = []
     for prefix in groups:
         for exp in [e for e in experiments if e.startswith(prefix)]:
             for key in ["scaf_units", "non_scaf_units"]:
-                rows.extend([dict(
-                    consistency=c,
-                    backbone="Backbone" if key == "scaf_units" else "Non-Rigid",
-                    model=prefix,
-                ) for c in consistencies[exp][convertix(exp, key)]])
+                rows.extend(
+                    dict(
+                        consistency=c,
+                        backbone="Backbone" if key == "scaf_units" else "Non-Rigid",
+                        model=prefix,
+                    )
+                    for c in consistencies[exp][convertix(exp, key)]
+                )
+    data = pd.DataFrame(rows)
 
     ax = f.gca()
-    sns.violinplot(data=pd.DataFrame(rows), ax=ax, split=True, x="model",
-                   y="consistency", hue="backbone", inner="quartile",
-                   saturation=0.7, cut=0, scale="count")
+    sns.violinplot(
+        data=data,
+        ax=ax,
+        split=True,
+        x="model",
+        y="consistency",
+        hue="backbone",
+        inner="quartile",
+        saturation=0.7,
+        cut=0,
+        scale="count",
+    )
     ax.set_xticks([0, 1, 2], [groups[g] for g in groups])
     ax.set_ylabel("Fraction of States Indistinguishable from Poisson")
     ax.set_xlabel("")
-    # ax.set_ylim(0.4, 1.0)
     ax.legend()
+
+
+def subgroup_ks(model):
+    c_bb = data.loc[
+        (data.model == model) & (data.backbone == "Backbone"), "consistency"
+    ]
+    c_nr = data.loc[
+        (data.model == model) & (data.backbone == "Non-Rigid"), "consistency"
+    ]
+    return stats.ks_2samp(c_bb, c_nr)
