@@ -172,7 +172,7 @@ def all_the_scores(exp, poisson_test, only_burst=False):
     return scores, nobs
 
 
-def mean_consistency(scores_nobs, include_nan=True):
+def mean_consistency(scores_nobs, include_nan=True, weight=True):
     """
     Combine consistency scores across all states of all models, reducing an array
     of size (M,N) to (N,) so that there is just one score per unit. Returns a
@@ -183,14 +183,18 @@ def mean_consistency(scores_nobs, include_nan=True):
     are included in the calculation and considered indistinguishable from
     Poisson. Otherwise, they are excluded from the calculation entirely.
     """
-    scores, _ = scores_nobs
+    scores, nobs = scores_nobs
+    if not include_nan:
+        scores = np.ma.array(scores, mask=np.isnan(scores))
     # Compare in the correct sense so that NaNs are treated as "not
     # consistent", i.e. potentially Poisson, then invert.
-    ret = 1 - (scores < 0.01).mean(0, where=include_nan or ~np.isnan(scores))
+    weights = nobs if weight else None
+    ret = 1 - np.ma.average(scores < 0.01, axis=0, weights=weights)
+    # We shouldn't see any NaNs here, but better safe than sorry. ;)
     return np.where(np.isnan(ret), 0.5, ret)
 
 
-def p_consistency(scores_nobs, include_nan=True):
+def p_consistency(scores_nobs, include_nan=True, method="stouffer"):
     """
     Combine the consistency scores using methods for combining the p-value
     instead of just averaging like mean_consistency().
@@ -202,7 +206,7 @@ def p_consistency(scores_nobs, include_nan=True):
     def _combine(col, weights):
         mask = ~np.isnan(col)
         return stats.combine_pvalues(
-            col[mask], method="stouffer", weights=weights[mask]
+            col[mask], method=method, weights=weights[mask]
         ).pvalue
 
     ret = np.apply_along_axis(_combine, 0, scores, nobs)
@@ -277,7 +281,7 @@ for (kind, label, score_combiner), include_nan, only_burst in conditions:
             cut=0,
             scale="count",
         )
-        ax.set_xticks([0, 1, 2], [groups[g] for g in groups])
+        ax.set_xticks([0, 1, 2, 3], [groups[g] for g in groups])
         ax.set_ylabel(label)
         ax.set_xlabel("")
         ax.legend()
@@ -326,8 +330,9 @@ for (kind, label, combiner), include_nan, only_burst in conditions:
             null_acc = max(baserate, 1 - baserate)
             accuracy = tpr * baserate + (1 - fpr) * (1 - baserate)
             # Calculate the mutual information at each value of the threshold.
-            mutual_info = mutual_info_score(subdata.label,
-                                            subdata.consistency) / np.log(2)
+            mutual_info = mutual_info_score(
+                subdata.label, subdata.consistency
+            ) / np.log(2)
             information = stats.entropy([baserate, 1 - baserate]) / np.log(2)
             rows.append(
                 dict(
@@ -357,7 +362,7 @@ aucs = pd.DataFrame(rows)
 # %%
 
 for key in ["nan", "burst", "combiner"]:
-    with figure(f"AUC by Model and {key}", save_exts=[]) as f:
+    with figure(f"AUC by Model and {key}") as f:
         sns.violinplot(
             aucs,
             x="group",
