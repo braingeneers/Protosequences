@@ -10,7 +10,7 @@ import pandas as pd
 import seaborn as sns
 from scipy import stats
 from tqdm.auto import tqdm
-from sklearn.metrics import roc_curve, roc_auc_score, mutual_info_score
+from sklearn.metrics import roc_curve, roc_auc_score
 
 import hmmsupport
 from hmmsupport import get_raster, all_experiments, Model, figure
@@ -336,7 +336,7 @@ def auc_pval(auc, labels):
 
 rows = []
 for (kind, label, combiner), include_nan, only_burst in conditions:
-    data = consistency_data(combiner, only_burst, include_nan)
+    data = consistency_data(combiner, only_burst, include_nan, False)
     nanlabel = "With NaN" if include_nan else "Without NaN"
     burstlabel = "Bursts Only" if only_burst else "All Bins"
     with figure(f"{kind} Consistency ROC, {nanlabel}, {burstlabel}"):
@@ -347,11 +347,6 @@ for (kind, label, combiner), include_nan, only_burst in conditions:
             baserate = subdata.label.mean()
             null_acc = max(baserate, 1 - baserate)
             accuracy = tpr * baserate + (1 - fpr) * (1 - baserate)
-            # Calculate the mutual information at each value of the threshold.
-            mutual_info = mutual_info_score(
-                subdata.label, subdata.consistency
-            ) / np.log(2)
-            information = stats.entropy([baserate, 1 - baserate]) / np.log(2)
             rows.append(
                 dict(
                     combiner=kind,
@@ -365,8 +360,6 @@ for (kind, label, combiner), include_nan, only_burst in conditions:
                     acc=accuracy.max(),
                     null_acc=null_acc,
                     pvalue=auc_pval(auc, subdata.label),
-                    information=information,
-                    mutual_info=mutual_info,
                 )
             )
             plt.plot(fpr, tpr, label=groups[group])
