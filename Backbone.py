@@ -10,6 +10,7 @@ import pandas as pd
 import seaborn as sns
 from scipy import stats
 from tqdm.auto import tqdm
+from matplotlib.ticker import PercentFormatter
 from sklearn.metrics import roc_curve, roc_auc_score
 
 import hmmsupport
@@ -24,7 +25,8 @@ bin_size_ms = 30
 n_stateses = np.arange(10, 21)
 
 experiments = {v.split("_")[0]: v for v in all_experiments(source)}
-groups = {"L": "Organoid", "M": "Mouse", "Pr": "Primary", "": "All"}
+groups = {"L": "Organoid", "M": "Mouse", "Pr": "Primary", "": "Overall"}
+exp_to_model = {e: next(k for k in groups if e.startswith(k)) for e in experiments}
 
 
 rasters, bad_rasters = {}, {}
@@ -247,18 +249,18 @@ def consistency_data(method, only_burst, include_nan, pbar=None):
         pbar.update()
 
     rows = []
-    for prefix in groups:
-        for exp in [e for e in experiments if e.startswith(prefix)]:
-            for key in ["scaf_units", "non_scaf_units"]:
-                rows.extend(
-                    dict(
-                        consistency=c,
-                        label=1 if key == "scaf_units" else 0,
-                        backbone="Backbone" if key == "scaf_units" else "Non-Rigid",
-                        model=prefix,
-                    )
-                    for c in consistencies[exp][convertix(exp, key)]
+    for exp in experiments:
+        for key in ["scaf_units", "non_scaf_units"]:
+            rows.extend(
+                dict(
+                    experiment=exp,
+                    model=groups[exp_to_model[exp]],
+                    consistency=c,
+                    label=1 if key == "scaf_units" else 0,
+                    backbone="Backbone" if key == "scaf_units" else "Non-Rigid",
                 )
+                for c in consistencies[exp][convertix(exp, key)]
+            )
     return pd.DataFrame(rows)
 
 
@@ -297,21 +299,16 @@ with tqdm(
                 cut=0,
                 scale="count",
             )
-            ax.set_xticks([0, 1, 2, 3], [groups[g] for g in groups])
             ax.set_ylabel(label)
             ax.set_xlabel("")
             ax.legend()
 
-        for model in groups:
-            c_bb = data.loc[
-                (data.model == model) & (data.backbone == "Backbone"), "consistency"
-            ]
-            c_nr = data.loc[
-                (data.model == model) & (data.backbone == "Non-Rigid"), "consistency"
-            ]
+        for model, subdata in data.groupby("model"):
+            c_bb = subdata.loc[data.backbone == "Backbone"].consistency
+            c_nr = data.loc[data.backbone == "Non-Rigid"].consistency
             stat = stats.ks_2samp(c_bb, c_nr)
             if stat.pvalue > 0.001:
-                print(f"{groups[model]}: {stats.ks_2samp(c_bb, c_nr)}")
+                print(f"{groups[model]}: {stat}")
 
 
 # %%
@@ -340,7 +337,8 @@ for (kind, label, combiner), include_nan, only_burst in conditions:
     nanlabel = "With NaN" if include_nan else "Without NaN"
     burstlabel = "Bursts Only" if only_burst else "All Bins"
     with figure(f"{kind} Consistency ROC, {nanlabel}, {burstlabel}"):
-        for i, (group, subdata) in enumerate(data.groupby("model")):
+        for i, (prefix, group) in enumerate(groups.items()):
+            subdata = data.loc[data.experiment.map(lambda x: x.startswith(prefix))]
             auc = roc_auc_score(subdata.label, 1 - subdata.consistency)
             fpr, tpr, thresh = roc_curve(subdata.label, 1 - subdata.consistency)
             # Calculate the best accuracy as well as the null accuracy.
@@ -354,18 +352,19 @@ for (kind, label, combiner), include_nan, only_burst in conditions:
                     nan=nanlabel,
                     only_burst=only_burst,
                     burst=burstlabel,
-                    prefix=group,
-                    group=groups[group],
+                    group=group,
                     auc=auc,
                     acc=accuracy.max(),
                     null_acc=null_acc,
                     pvalue=auc_pval(auc, subdata.label),
                 )
             )
-            plt.plot(fpr, tpr, label=groups[group])
+            plt.plot(fpr, tpr, label=f"{group} (AUC = {auc:.3f})")
         plt.xlabel("False Positive Rate")
         plt.ylabel("True Positive Rate")
         plt.legend()
+        plt.gca().xaxis.set_major_formatter(PercentFormatter(1.0))
+        plt.gca().yaxis.set_major_formatter(PercentFormatter(1.0))
 
 aucs = pd.DataFrame(rows)
 
