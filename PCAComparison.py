@@ -6,8 +6,11 @@ import itertools
 import joblib
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn as sns
 from tqdm.auto import tqdm
 from scipy import stats
+from matplotlib.ticker import PercentFormatter
 
 import hmmsupport
 from hmmsupport import get_raster, all_experiments, Model, figure
@@ -211,27 +214,49 @@ def ks_compare_pev(As, Bs):
 
 
 if source == "org_and_slice":
-    group_name = dict(L="Organoid", M="Mouse", Pr="Primary")
+    groups = dict(L="Organoid", M="Mouse", Pr="Primary")
     with figure("Dimensionality vs Threshold") as f:
         ax = f.gca()
-        for i, prefix in enumerate(["L", "M", "Pr"]):
+        for i, prefix in enumerate(groups):
             expsub = [exp for exp in experiments if exp.startswith(prefix)]
-            plot_pev(ax, f"C{i}", expsub, group_name[prefix])
+            plot_pev(ax, f"C{i}", expsub, groups[prefix])
         plot_pev(ax, "red", experiments, "Surrogate", True)
         ax.legend(loc="upper left")
         ax.set_xlabel("Explained Variance Threshold")
         ax.set_ylabel("Dimensions Required")
         ax.set_ylim(1, 6)
         ax.set_xlim(0.7, 1)
+        ax.xaxis.set_major_formatter(PercentFormatter(1, 0))
 
-    for a, b in itertools.combinations(group_name, 2):
+    for a, b in itertools.combinations(groups, 2):
         effect, pvalue = ks_compare_pev(
             [exp for exp in experiments if exp.startswith(a)],
             [exp for exp in experiments if exp.startswith(b)],
         )
         print(
-            f"{group_name[a]} vs {group_name[b]}: {effect:.2f}, p = {pvalue*100:.2e}%"
+            f"{groups[a]} vs {groups[b]}: {effect:.2f}, p = {pvalue*100:.2e}%"
         )
+
+    with figure("Dimensionality at 0.9 Slice") as f:
+        rows = [
+            dict(
+                group=next(groups[k] for k in groups if exp.startswith(k)),
+                dimensionality=c,
+            )
+            for exp in experiments
+            for c in components_required(exp, thresh=0.9, bad=False)
+        ]
+        rows.extend(
+            dict(
+                group="Surrogate",
+                dimensionality=c,
+            )
+            for exp in experiments
+            for c in components_required(exp, thresh=0.9, bad=True)
+        )
+        data = pd.DataFrame(rows)
+        sns.violinplot(data, x="group", y="dimensionality", ax=f.gca(), cut=0)
+
 
 # %%
 
