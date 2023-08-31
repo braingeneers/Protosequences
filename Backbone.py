@@ -221,17 +221,30 @@ def convertix(exp, key):
     return np.int64(metrics[exp][key]).ravel() - 1
 
 
-def consistency_data(method, only_burst, include_nan):
+def consistency_data(method, only_burst, include_nan, pbar=None):
     """
     Use the given consistency score combining method to create a dataframe of
     consistency scores which can be used for further processing.
+
+    Displays progress on a progress bar, which can be provided as an argument
+    (pass pbar=False to disable).
     """
+    # If pbar is None, create a new progress bar, but if it's False, don't show a
+    # progress bar at all. Otherwise, use the one passed in. Use the context
+    # manager to ensure the progress bar is closed when we're done.
+    if not pbar:
+        with tqdm(
+            total=len(experiments), desc="Computing consistency", disable=pbar == False
+        ) as pbar:
+            return consistency_data(method, only_burst, include_nan, pbar)
+
     consistencies = {}
-    for k in tqdm(experiments, desc="Computing consistency"):
+    for k in experiments:
         consistencies[k] = method(
             all_the_scores(k, poisson_test_chi_square, only_burst),
             include_nan=include_nan,
         )
+        pbar.update()
 
     rows = []
     for prefix in groups:
@@ -263,37 +276,42 @@ conditions = [
 ]
 
 
-for (kind, label, score_combiner), include_nan, only_burst in conditions:
-    data = consistency_data(score_combiner, only_burst, include_nan)
-    nanlabel = "With NaN" if include_nan else "Without NaN"
-    burstlabel = "Bursts Only" if only_burst else "All Bins"
-    with figure(f"Unit {kind} Consistency, {nanlabel}, {burstlabel}") as f:
-        ax = f.gca()
-        sns.violinplot(
-            bw=0.1,
-            data=data,
-            ax=ax,
-            split=True,
-            x="model",
-            y="consistency",
-            hue="backbone",
-            inner="quartile",
-            cut=0,
-            scale="count",
-        )
-        ax.set_xticks([0, 1, 2, 3], [groups[g] for g in groups])
-        ax.set_ylabel(label)
-        ax.set_xlabel("")
-        ax.legend()
+with tqdm(
+    total=len(conditions) * len(experiments), desc="Computing consistency"
+) as pbar:
+    for (kind, label, score_combiner), include_nan, only_burst in conditions:
+        data = consistency_data(score_combiner, only_burst, include_nan, pbar)
+        nanlabel = "With NaN" if include_nan else "Without NaN"
+        burstlabel = "Bursts Only" if only_burst else "All Bins"
+        with figure(f"Unit {kind} Consistency, {nanlabel}, {burstlabel}") as f:
+            ax = f.gca()
+            sns.violinplot(
+                bw=0.1,
+                data=data,
+                ax=ax,
+                split=True,
+                x="model",
+                y="consistency",
+                hue="backbone",
+                inner="quartile",
+                cut=0,
+                scale="count",
+            )
+            ax.set_xticks([0, 1, 2, 3], [groups[g] for g in groups])
+            ax.set_ylabel(label)
+            ax.set_xlabel("")
+            ax.legend()
 
-    for model in groups:
-        c_bb = data.loc[
-            (data.model == model) & (data.backbone == "Backbone"), "consistency"
-        ]
-        c_nr = data.loc[
-            (data.model == model) & (data.backbone == "Non-Rigid"), "consistency"
-        ]
-        print(f"{groups[model]}: {stats.ks_2samp(c_bb, c_nr)}")
+        for model in groups:
+            c_bb = data.loc[
+                (data.model == model) & (data.backbone == "Backbone"), "consistency"
+            ]
+            c_nr = data.loc[
+                (data.model == model) & (data.backbone == "Non-Rigid"), "consistency"
+            ]
+            stat = stats.ks_2samp(c_bb, c_nr)
+            if stat.pvalue > 0.001:
+                print(f"{groups[model]}: {stats.ks_2samp(c_bb, c_nr)}")
 
 
 # %%
