@@ -561,14 +561,12 @@ class Raster(SpikeData):
 
         # If those .mat files don't exist, instead load from Sury's phy
         # zips. This can't work if the data is in a mat format, though.
-        except (OSError, FileNotFoundError):
+        except OSError:
             try:
                 full_path = f"{data_dir(source)}/{experiment}.zip"
                 sd = load_spike_data(None, full_path=full_path)
-            except AssertionError as e:
-                raise FileNotFoundError(
-                    f"Failed to load {source} {experiment}: {e}"
-                ) from None
+            except OSError:
+                raise FileNotFoundError(f"Experiment {source}/{experiment} not found")
             self._burst_default_rms = None
             units, length = sd.train, sd.length
 
