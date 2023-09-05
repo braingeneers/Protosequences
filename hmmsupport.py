@@ -154,9 +154,7 @@ class Cache:
 def figdir(path=None):
     if path is not None:
         path = os.path.expanduser(path.strip())
-        if path == "":
-            figdir.dir = "figures"
-        elif path[0] == "/":
+        if path.startswith("/"):
             figdir.dir = path
         else:
             figdir.dir = os.path.join("figures", path)
@@ -435,25 +433,26 @@ class Model:
 
 
 @contextmanager
-def figure(name, save_args={}, save_exts=["png"], **kwargs):
+def figure(name, save_args={}, save=True, save_exts=["png"], **kwargs):
+    "Create a named figure and save it when done."
     import matplotlib.pyplot as plt
 
-    "Create a named figure and save it when done."
     f = plt.figure(name, **kwargs)
     try:
         f.clf()
     except Exception:
-        plt.close()
+        plt.close(f)
         f = plt.figure(name, **kwargs)
 
     yield f
 
-    fname = name.lower().strip().replace(" ", "-")
-    for ext in save_exts:
-        if ext[0] != ".":
-            ext = "." + ext
-        path = os.path.join(figdir(), fname + ext)
-        f.savefig(path, **save_args)
+    if save:
+        fname = name.lower().strip().replace(" ", "-")
+        for ext in save_exts:
+            if ext[0] != ".":
+                ext = "." + ext
+            path = os.path.join(figdir(), fname + ext)
+            f.savefig(path, **save_args)
 
 
 def load_raw(source, filename, only_include=None, error=True):
