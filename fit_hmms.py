@@ -42,19 +42,17 @@ def hmm_method_type(name):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-            prog="fit_hmms",
-            description="Fit HMMs locally or on NRP.")
-    parser.add_argument('source')
-    parser.add_argument('exp',
-            type=lambda x: x if x == "*" else ensure_list(x))
-    parser.add_argument('bin_sizes', type=parse_range_str)
-    parser.add_argument('n_stateses', type=parse_range_str)
-    parser.add_argument('surrs', default=["real"], type=ensure_list)
-    parser.add_argument('library', default="default", nargs='?',
-            type=hmm_method_type)
-    parser.add_argument('-n', '--dryrun', action='store_true')
-    parser.add_argument('-l', '--local', action='store_true')
-    parser.add_argument('--clear-queue', action='store_true')
+        prog="fit_hmms", description="Fit HMMs locally or on NRP."
+    )
+    parser.add_argument("source")
+    parser.add_argument("exp", type=lambda x: x if x == "*" else ensure_list(x))
+    parser.add_argument("bin_sizes", type=parse_range_str)
+    parser.add_argument("n_stateses", type=parse_range_str)
+    parser.add_argument("surrs", default=["real"], nargs="?", type=ensure_list)
+    parser.add_argument("library", default="default", nargs="?", type=hmm_method_type)
+    parser.add_argument("-n", "--dryrun", action="store_true")
+    parser.add_argument("-l", "--local", action="store_true")
+    parser.add_argument("--clear-queue", action="store_true")
     args = parser.parse_args()
 
     if not args.local and not os.environ.get("S3_USER"):
@@ -73,19 +71,18 @@ if __name__ == "__main__":
     print("Will use T in", args.bin_sizes)
 
     # Check which parameters actually need re-run.
-    needs_run = [
-        p
-        for p in itertools.product(args.exp, args.bin_sizes,
-            args.n_stateses, args.surrs)
-        if not hmmsupport.is_cached(args.source, *p, library=args.library)
-    ]
-    if not needs_run:
-        print("All HMMs are already cached.")
-        sys.exit(0)
+    print("Must fit...")
+    needs_run = []
+    for p in itertools.product(args.exp, args.bin_sizes, args.n_stateses, args.surrs):
+        if not hmmsupport.is_cached(args.source, *p, library=args.library):
+            needs_run.append(p)
+            print(f"  {args.source}/{p[0]}[{p[3]}] with T={p[1]}ms, K={p[2]}.")
 
-    print(f"{len(needs_run)} HMMs need to be fit:")
-    for exp, T, K, surrogate in needs_run:
-        print(f"  {args.source}/{exp}[{surrogate}] with {T=}ms, {K=}.")
+    if not needs_run:
+        print("Nothing. All HMMs are already cached.")
+        sys.exit()
+
+    print(f"({len(needs_run)} HMMs in total.)")
 
     # If this is a dry run, don't actually bother queueing anything.
     if args.dryrun:
@@ -95,10 +92,15 @@ if __name__ == "__main__":
     elif args.local:
         for exp, bin_size_ms, n_states, surrogate in needs_run:
             hmmsupport.get_fitted_hmm(
-                args.source, exp, bin_size_ms, n_states, surrogate,
-                args.library, verbose=True
+                args.source,
+                exp,
+                bin_size_ms,
+                n_states,
+                surrogate,
+                args.library,
+                verbose=True,
             )
-        sys.exit(0)
+        sys.exit()
 
     # Get the MQTT queue, clearing it if requested.
     queue_name = f"{os.environ.get('S3_USER')}/hmm-job-queue"
