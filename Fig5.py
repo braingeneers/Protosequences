@@ -18,7 +18,7 @@ plt.ion()
 hmmsupport.figdir("paper")
 
 bin_size_ms = 30
-n_states = 10, 20
+n_states = 10, 50
 n_stateses = np.arange(n_states[0], n_states[-1] + 1)
 
 print("Loading fitted HMMs and calculating entropy.")
@@ -233,29 +233,10 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
         r"Non-Rigid \hspace{1.5em} Backbone", y=1.0, horizontalalignment="right"
     )
 
-    # Subfigure B: state heatmap.
+    # Subfigure B: state examples.
     BCtop, BCbot = 0.70, 0.41
-    ax = f.subplots(gridspec_kw=dict(top=BCtop, bottom=BCbot, left=0.06, right=0.3))
-    im = ax.imshow(
-        state_prob[state_order, :],
-        vmin=0,
-        vmax=1,
-        extent=[t_sec[0], t_sec[-1], n_states + 0.5, 0.5],
-        interpolation="none",
-        aspect="auto",
-    )
-    ax.set_yticks([1, n_states])
-    ax.set_xticks(0.3 * np.arange(-1, 3))
-    ax.set_xlim(-0.3, 0.6)
-    ax.set_xlabel("Time From Burst Peak (s)")
-    ax.set_ylabel("Hidden State Number")
-    plt.colorbar(
-        im, ax=ax, label="Probability of Observing State", aspect=10, ticks=[0, 1]
-    )
-
-    # Subfigure C: state examples.
-    Cleft, Cwidth = 0.35, 0.65
-    (A, RA), (B, RB), (C, RC) = [
+    Bleft, Bwidth = 0.0, 0.65
+    (Ba, RA), (Bb, RB), (Bc, RC) = [
         f.subplots(
             1,
             2,
@@ -264,8 +245,8 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
                 bottom=BCbot,
                 width_ratios=[3, 1],
                 wspace=0,
-                left=Cleft + Cwidth * l,
-                right=Cleft + Cwidth * r,
+                left=Bleft + Bwidth * l,
+                right=Bleft + Bwidth * r,
             ),
         )
         for l, r in [(0.06, 0.26), (0.4, 0.61), (0.76, 0.96)]
@@ -275,18 +256,18 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
             gridspec_kw=dict(
                 top=BCtop,
                 bottom=BCbot,
-                left=Cleft + Cwidth * l,
-                right=Cleft + Cwidth * r,
+                left=Bleft + Bwidth * l,
+                right=Bleft + Bwidth * r,
             )
         )
         for l, r in [(0.305, 0.365), (0.655, 0.715)]
     ]
 
-    examples = [A, B, C]
+    examples = [Ba, Bb, Bc]
     rates = [RA, RB, RC]
     for ax in examples:
         ax.set_xticks([])
-        ax.set_xlabel("Realizations", rotation=35)
+        ax.set_xlabel("Realizations", rotation=25)
     for ax in rates:
         ax.set_xlim([0, 5])
         ax.set_xticks([0, 5])
@@ -299,7 +280,9 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
         ax.set_yticks([])
         ax.set_ylim(0.5, rsub.shape[1] + 0.5)
         ax.axhline(len(unit_order) - n_packet_units + 0.5, color="k", lw=0.5)
-    A.set_ylabel(r"Non-Rigid \hspace{2.2cm} Backbone", y=0.99, horizontalalignment="right")
+    Ba.set_ylabel(
+        r"Non-Rigid \hspace{2.2cm} Backbone", y=0.99, horizontalalignment="right"
+    )
 
     for axS, axH, s in zip(examples, rates, interesting_states):
         data = r._raster[h == state_order[s], :][:, unit_order]
@@ -328,8 +311,27 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
             delta[unit_order], np.arange(r._raster.shape[1]) + 1, c="red", alpha=0.3
         )
 
+    # Subfigure C: state heatmap.
+    ax = f.subplots(gridspec_kw=dict(top=BCtop, bottom=BCbot, left=0.71, right=0.96))
+    im = ax.imshow(
+        state_prob[state_order, :],
+        vmin=0,
+        vmax=1,
+        extent=[t_sec[0], t_sec[-1], n_states + 0.5, 0.5],
+        interpolation="none",
+        aspect="auto",
+    )
+    ax.set_yticks([1, n_states])
+    ax.set_xticks(0.3 * np.arange(-1, 3))
+    ax.set_xlim(-0.3, 0.6)
+    ax.set_xlabel("Time From Burst Peak (s)")
+    ax.set_ylabel("Hidden State Number")
+    plt.colorbar(
+        im, ax=ax, label="Probability of Observing State", aspect=10, ticks=[0, 1]
+    )
+
     # Subfigure D: somehow show what's happening on the right.
-    DEFtop, DEFbot = 0.33, 0.04
+    DEFtop, DEFbot = 0.33, 0.06
     D = f.subplots(
         1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot, left=0.03, right=0.3)
     )
@@ -340,7 +342,7 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
     D.set_xlabel(r"Non-Rigid \hspace{2.4cm} Backbone")
     D.set_ylabel("State")
 
-    # Subfigure H: PCA of consistency scores for a single organoid, showing
+    # Subfigure E: PCA of consistency scores for a single organoid, showing
     # that it's sufficient to separate packet/non-packet units.
     E = f.subplots(
         1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot, left=0.35, right=0.6)
@@ -353,9 +355,9 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
     E.set_ylabel("PC1")
     E.set_xlabel("PC2")
 
-    # Subfigure I: per-organoid separability metric.
+    # Subfigure F: per-organoid separability metric.
     F = f.subplots(
-        1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot+0.03, left=0.67, right=0.98)
+        1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot, left=0.67, right=0.98)
     )
     F.violinplot(
         sep_on_states.values(),
@@ -366,9 +368,7 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
     F.plot([], [], "C0_", ms=10, label="By State Structure")
     F.plot(sep_on_fr.values(), "_", ms=10, label="By Firing Rate")
     F.set_xlabel("Organoid")
-    F.set_xticks(
-        range(len(experiments)), [f"{i+1}" for i in range(len(experiments))]
-    )
+    F.set_xticks(range(len(experiments)), [f"{i+1}" for i in range(len(experiments))])
     F.set_ylim([0.45, 1.05])
     ticks = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
     F.set_yticks(ticks, [f"{100*t:.0f}\\%" for t in ticks])
