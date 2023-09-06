@@ -155,30 +155,6 @@ n_packet_units = len(srms[exp]["scaf_units"])
 inverse_unit_order = np.zeros_like(unit_order)
 inverse_unit_order[unit_order] = np.arange(len(unit_order))
 
-# Fit PCA to the states of the model up there as well as the same-parameter
-# model trained on the surrogate data.
-r_bad = get_raster(source, exp, bin_size_ms, "rsm")
-model_bad = Model(source, exp, bin_size_ms, n_states, "rsm")
-pca_good, pca_bad = [
-    PCA().fit(np.exp(m._hmm.observations.log_lambdas)) for m in [model, model_bad]
-]
-
-
-# Do a PCA like that for every trained model across all n_stateses and all
-# organoids, and store the fraction of variance explained by PC1 in two
-# arrays, one for the real and one for the surrogate data.
-def pve_score(surr):
-    scores = []
-    for exp in experiments:
-        for n in n_stateses:
-            m = Model(source, exp, bin_size_ms, n, surr)
-            pca = PCA().fit(np.exp(m._hmm.observations.log_lambdas))
-            scores.append(pca.explained_variance_ratio_[0])
-    return scores
-
-
-pve_good, pve_bad = [np.array(pve_score(surr)) for surr in ["real", "rsm"]]
-
 # Create a color map which is identical to gist_rainbow but with all the
 # colors rescaled by 0.3 to make them match the ones above that are
 # affected by alpha.
