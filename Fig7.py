@@ -3,7 +3,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import hmmsupport
-from hmmsupport import get_raster, figure, load_metrics, Model, all_experiments
+from hmmsupport import get_raster, figure, Model, all_experiments
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 from matplotlib.ticker import PercentFormatter
@@ -18,16 +18,11 @@ bin_size_ms = 30
 n_stateses = np.arange(10, 21)
 
 print("Loading real and surrogate rasters and doing PCA on HMMs.")
-srms = {}
 with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:
     rasters = {}
     rasters_bad = {}
     _rs = dict(real=rasters, rsm=rasters_bad)
     for exp in experiments:
-        srms[exp] = load_metrics(exp)
-        window = srms[exp]["burst_window"].ravel() / 1e3
-        window[0] = min(window[0], -0.3)
-        window[1] = max(window[1], 0.6)
         for surr in ["real", "rsm"]:
             _rs[surr][exp] = get_raster(source, exp, bin_size_ms, surr), []
             pbar.update()
