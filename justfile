@@ -31,6 +31,6 @@ add-worker for="hmm" n="1" memory_gi="4":
     echo "Running with {{memory_gi}}GiB RAM"
     for i in $(seq "{{n}}"); do
         stamp=$(printf '%(%m%d%H%M%S)T\n' -1)
-        export JOB_NAME=atspaeth-{{for}}-worker--$stamp$i
+        export JOB_NAME=$S3_USER-{{for}}-worker--$stamp$i
         envsubst < worker.yml | kubectl apply -f -
     done
