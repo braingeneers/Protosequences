@@ -10,7 +10,7 @@ if __name__ == "__main__":
             # Keep popping queue items and fitting HMMs with those parameters.
             try:
                 job = q.get()
-                get_fitted_hmm(verbose=True, recompute_ok=True, **job["params"])
+                get_fitted_hmm(verbose=True, **job["params"])
                 try:
                     q.task_done()
                 except ValueError as e:

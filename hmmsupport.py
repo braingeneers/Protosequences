@@ -13,7 +13,7 @@ import numpy as np
 import scipy.io
 from braingeneers.analysis import load_spike_data, SpikeData
 from braingeneers.utils.smart_open_braingeneers import open
-from scipy import stats, signal, ndimage
+from scipy import signal, ndimage
 
 
 def s3_isdir(path):
@@ -346,7 +346,7 @@ def get_fitted_hmm(
     bin_size_ms,
     n_states,
     surrogate="real",
-    recompute_ok=False,
+    recompute_ok=True,
     library="default",
     verbose=False,
 ):
@@ -370,7 +370,7 @@ class Model:
         surrogate="real",
         library="default",
         verbose=False,
-        recompute_ok=True,
+        recompute_ok=False,
     ):
         # Retrieve the (hopefully cached) model.
         self._hmm = get_fitted_hmm(

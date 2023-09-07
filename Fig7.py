@@ -38,7 +38,7 @@ with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:
             _rs[surr][exp] = get_raster(source, exp, bin_size_ms, surr), []
             pbar.update()
             for n in n_stateses:
-                m = Model(source, exp, bin_size_ms, n, surr, recompute_ok=False)
+                m = Model(source, exp, bin_size_ms, n, surr)
                 m.pca = PCA().fit(np.exp(m._hmm.observations.log_lambdas))
                 _rs[surr][exp][1].append(m)
                 pbar.update()

@@ -34,7 +34,7 @@ with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:
             rs[exp] = get_raster(source, exp, bin_size_ms), []
             pbar.update()
             for n in n_stateses:
-                m = Model(source, exp, bin_size_ms, n, recompute_ok=False)
+                m = Model(source, exp, bin_size_ms, n)
                 m.compute_consistency(rs[exp][0], metricses[exp])
                 rs[exp][1].append(m)
                 pbar.update()

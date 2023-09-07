@@ -21,7 +21,7 @@ r = get_raster(source, experiment, bin_size_ms)
 
 # Get state order from the model, same as Fig5.
 n_states = 15
-model = Model(source, experiment, bin_size_ms, n_states, recompute_ok=False)
+model = Model(source, experiment, bin_size_ms, n_states)
 h = model.states(r)
 burst_margins = -10, 20
 peaks = r.find_bursts(margins=burst_margins)
