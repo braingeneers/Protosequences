@@ -11,7 +11,10 @@ if __name__ == "__main__":
             try:
                 job = q.get()
                 get_fitted_hmm(verbose=True, recompute_ok=True, **job["params"])
-                q.task_done()
+                try:
+                    q.task_done()
+                except ValueError as e:
+                    print("Queue misaligned:", e)
 
             # If one of the fits fails, put it back on the queue with one less
             # retry allowed.
@@ -38,5 +41,8 @@ if __name__ == "__main__":
     except BaseException as e:
         print(f"Worker terminated with exception {e}.")
         q.put(job)
-        q.task_done()
-        print("Job successfully requeued.")
+        try:
+            q.task_done()
+        except ValueError:
+            pass
+        print("Job requeued.")
