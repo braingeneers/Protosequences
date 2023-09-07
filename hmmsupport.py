@@ -174,23 +174,6 @@ def figdir(path=None):
 figdir("")
 
 
-def experiment_parts(experiment):
-    """
-    Separate the given experiment name into three parts: base name, file
-    extension (following the last dot which is not the first character), and
-    slice component (delimited by square brackets). Extension and slice are
-    both optional.
-    """
-    basename, extension, slice_text = re.match(
-        r"^(.*?)(?:\.(\w+))?(?:\[(.*)\])?$", experiment
-    ).groups()
-
-    if basename == "":
-        basename, extension = extension, None
-
-    return basename, extension, slice_text
-
-
 FIT_ATOL = 1e-3
 FIT_N_ITER = 5000
 
@@ -232,101 +215,6 @@ def _ssm_states(hmm, raster):
 
 SSMFit = HMMMethod("ssm", _ssm_hmm, _ssm_states)
 
-
-@Cache
-def _dynamax_hmm(
-    source,
-    exp,
-    bin_size_ms,
-    n_states,
-    surrogate,
-    verbose=False,
-    atol=FIT_ATOL,
-    n_iter=FIT_N_ITER,
-):
-    "Fit an HMM to data with Dynamax and return the model."
-    from dynamax.hidden_markov_model import PoissonHMM as DynamaxHMM
-    import jax.random as jr
-
-    r = get_raster(source, exp, bin_size_ms, surrogate)
-    hmm = DynamaxHMM(num_states=n_states, emission_dim=r._raster.shape[1])
-    hmm.params, props = hmm.initialize(jr.PRNGKey(np.random.randint(2**32)))
-    hmm.params, lls = hmm.fit_em(
-        hmm.params, props, r._raster, verbose=verbose, num_iters=n_iter
-    )
-    return hmm
-
-
-def _dynamax_states(hmm, raster):
-    "Return the most likely state sequence for the given raster."
-    return hmm.most_likely_states(hmm.params, raster)
-
-
-DynamaxFit = HMMMethod("dynamax", _dynamax_hmm, _dynamax_states)
-
-
-@Cache
-def _hmmlearn_hmm(
-    source,
-    exp,
-    bin_size_ms,
-    n_states,
-    surrogate,
-    verbose=False,
-    atol=FIT_ATOL,
-    n_iter=FIT_N_ITER,
-):
-    "Fit an HMM to data with HMMLearn and return the model."
-    from hmmlearn.hmm import PoissonHMM as HMMLearnHMM
-
-    r = get_raster(source, exp, bin_size_ms, surrogate)
-    hmm = HMMLearnHMM(n_components=n_states, verbose=False, n_iter=n_iter, tol=atol)
-    hmm.fit(r._raster)
-    return hmm
-
-
-def _hmmlearn_states(hmm, raster):
-    "Return the most likely state sequence for the given raster."
-    return hmm.predict(raster)
-
-
-HMMLearnFit = HMMMethod("hmmlearn", _hmmlearn_hmm, _hmmlearn_states)
-
-
-jl = None
-
-
-@Cache
-def _hmmbase_hmm(
-    source,
-    exp,
-    bin_size_ms,
-    n_states,
-    surrogate,
-    verbose=False,
-    atol=FIT_ATOL,
-    n_iter=FIT_N_ITER,
-):
-    "Fit an HMM to data with NeuroHMM and return the model."
-    global jl
-    if jl is None:
-        from juliacall import Main as jl
-
-        jl.seval('using Pkg; Pkg.activate("NeuroHMM"); using NeuroHMM')
-    r = get_raster(source, exp, bin_size_ms, surrogate)
-    display = jl.Symbol("iter" if verbose else "none")
-    hmm, _ = jl.NeuroHMM.fit_hmm(
-        n_states, r._raster, tol=atol, maxiter=n_iter, display=display
-    )
-    return hmm
-
-
-def _hmmbase_states(hmm, raster):
-    "Return the most likely state sequence for the given raster."
-    return np.asarray(jl.NeuroHMM.viterbi(hmm, raster)) - 1
-
-
-HMMBaseFit = HMMMethod("hmmbase", _hmmbase_hmm, _hmmbase_states)
 
 
 default_method = os.environ.get("HMM_METHOD", "ssm")
