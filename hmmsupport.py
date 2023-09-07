@@ -292,6 +292,7 @@ class Model:
         self.bin_size_ms = bin_size_ms
         self.n_states = n_states
         self.surrogate = surrogate
+        self.tag = f"{source}_{exp}_{bin_size_ms}ms_K{n_states}_{surrogate}"
         self.library = library
 
     def compute_consistency(self, raster, metrics):
