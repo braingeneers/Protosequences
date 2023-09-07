@@ -28,8 +28,8 @@ n_stateses = np.arange(10, 51)
 
 print("Loading real and surrogate rasters and doing PCA on HMMs.")
 with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:
-    rasters, rasters_bad, backbone, nonrigid = {}, {}, {}, {}
-    _rs = dict(real=rasters, rsm=rasters_bad)
+    rasters_real, rasters_rsm, backbone, nonrigid = {}, {}, {}, {}
+    _rs = dict(real=rasters_real, rsm=rasters_rsm)
     for exp in experiments:
         metrics = load_metrics(exp, only_include=["scaf_units", "non_scaf_units"])
         backbone[exp] = np.int32(metrics["scaf_units"].ravel()) - 1
@@ -43,10 +43,10 @@ with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:
                 _rs[surr][exp][1].append(m)
                 pbar.update()
 
-for k, (r, _) in rasters.items():
-    nunits = r._raster.shape[1]
-    meanfr = r._raster.mean() / r.bin_size_ms * 1000
-    nbursts = len(r.find_bursts())
+for k, (r_real, _) in rasters_real.items():
+    nunits = r_real._raster.shape[1]
+    meanfr = r_real._raster.mean() / r_real.bin_size_ms * 1000
+    nbursts = len(r_real.find_bursts())
     print(
         f"{k} has {nunits} units firing at {meanfr:0.2f} " f"Hz with {nbursts} bursts"
     )
@@ -59,45 +59,45 @@ for k, (r, _) in rasters.items():
 exp = "L1_t_spk_mat_sorted"
 n_states = 15
 n_states_index = np.nonzero(n_stateses == n_states)[0][0]
-r, models = rasters[exp]
-model = rasters[exp][1][n_states_index]
-r_bad, models_bad = rasters_bad[exp]
-model_bad = rasters_bad[exp][1][n_states_index]
+r_real, models_real = rasters_real[exp]
+model_real = rasters_real[exp][1][n_states_index]
+r_rsm, models_rsm = rasters_rsm[exp]
+model_rsm = rasters_rsm[exp][1][n_states_index]
 
 
 # Vectors of the first ten explained variance ratios for all of the
 # experiments.
-pve, pve_bad = [
+pve_real, pve_rsm = [
     {
         e: np.array([m.pca.explained_variance_ratio_[:10] for m in ms])
         for e, (_, ms) in rs.items()
     }
-    for rs in [rasters, rasters_bad]
+    for rs in [rasters_real, rasters_rsm]
 ]
 
 
-def components_required(exp, thresh, bad=False):
-    enough = np.cumsum((pve_bad if bad else pve)[exp], axis=1) > thresh
+def components_required(exp, thresh, rsm=False):
+    enough = np.cumsum((pve_rsm if rsm else pve_real)[exp], axis=1) > thresh
     return [
         np.argmax(enough[i, :]) + 1 if np.any(enough[i, :]) else enough.shape[1] + 1
         for i in range(enough.shape[0])
     ]
 
 
-def pev_vs_thresholds(experiments, xs, bad=False):
+def pev_vs_thresholds(experiments, xs, rsm=False):
     return np.array(
         [
             np.hstack(
-                [components_required(exp, thresh=x, bad=bad) for exp in experiments]
+                [components_required(exp, thresh=x, rsm=rsm) for exp in experiments]
             )
             for x in xs
         ]
     )
 
 
-def plot_pev(ax, color, experiments, label, bad=False):
+def plot_pev(ax, color, experiments, label, rsm=False):
     xs = np.linspace(0.705, 1)
-    pev = pev_vs_thresholds(experiments, xs, bad=bad)
+    pev = pev_vs_thresholds(experiments, xs, rsm=rsm)
     ys = pev.mean(axis=1)
     ystd = pev.std(axis=1)
     ax.fill_between(xs, ys - ystd, ys + ystd, alpha=0.2, color=color, label=label)
@@ -132,8 +132,8 @@ def all_the_scores(exp, only_burst=False):
     with some large number of rows and one column per unit.
     """
     scores_nobs = [
-        unit_consistency(model, rasters[exp][0], only_burst)
-        for model in rasters[exp][1]
+        unit_consistency(model, rasters_real[exp][0], only_burst)
+        for model in rasters_real[exp][1]
     ]
     scores = np.vstack([s for s, _ in scores_nobs])
     nobs = np.hstack([n for _, n in scores_nobs])
@@ -258,8 +258,8 @@ with figure("Fig7", figsize=(8.5, 5.5)) as f:
 
     # Subfigure A: PCA of real vs. surrogate data.
     A.set_aspect("equal")
-    data = model.pca.transform(r._raster)[:, 1::-1]
-    A.scatter(data[:, 0], data[:, 1], s=2, c=model.states(r), cmap=alpha_rainbow)
+    data = model_real.pca.transform(r_real._raster)[:, 1::-1]
+    A.scatter(data[:, 0], data[:, 1], s=2, c=model_real.states(r_real), cmap=alpha_rainbow)
     A.set_ylim([-3, 13])
     A.set_xlim([-3, 8])
     A.set_xlabel("PC2")
@@ -271,12 +271,12 @@ with figure("Fig7", figsize=(8.5, 5.5)) as f:
     states_upto = 10
     B.plot(
         np.arange(states_upto) + 1,
-        model.pca.explained_variance_ratio_[:states_upto],
+        model_real.pca.explained_variance_ratio_[:states_upto],
         label="Real",
     )
     B.plot(
         np.arange(states_upto) + 1,
-        model_bad.pca.explained_variance_ratio_[:states_upto],
+        model_rsm.pca.explained_variance_ratio_[:states_upto],
         label="Random",
     )
     B.set_xticks([1, states_upto])
@@ -285,7 +285,7 @@ with figure("Fig7", figsize=(8.5, 5.5)) as f:
     B.set_yticks([0, 1])
     B.legend(ncol=2, loc="upper right")
     bp = B.inset_axes([0.3, 0.2, 0.6, 0.6])
-    for ps, x in zip([pve[exp][:, 0], pve_bad[exp][:, 0]], [0.8, 1.2]):
+    for ps, x in zip([pve_real[exp][:, 0], pve_rsm[exp][:, 0]], [0.8, 1.2]):
         bp.violinplot(
             ps, showmedians=True, showextrema=False, positions=[x], widths=0.2
         )
@@ -299,7 +299,7 @@ with figure("Fig7", figsize=(8.5, 5.5)) as f:
     for i, prefix in enumerate(groups):
         expsub = [e for e in experiments if e.startswith(prefix)]
         plot_pev(C, f"C{i}", expsub, groups[prefix])
-    plot_pev(C, "red", experiments, "Surrogate", bad=True)
+    plot_pev(C, "red", experiments, "Surrogate", rsm=True)
     C.legend(loc="upper left")
     C.set_xlabel("Explained Variance Threshold")
     C.set_ylabel("Dimensions Required")

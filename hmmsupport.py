@@ -392,35 +392,27 @@ class Model:
         self.surrogate = surrogate
         self.library = library
 
+    def compute_consistency(self, raster, metrics):
+        """
+        Compute an n_states x n_units array indicating how likely a unit is
+        to have nonzero firings in each time bin of a given state.
+        """
+        abs_margin = int(1e3 / self.bin_size_ms)
+        self.burst_margins = -abs_margin, abs_margin
+
+        self.h = self.states(raster)
+        scores = np.array(
+            [(raster._raster[self.h == i, :] > 0).mean(0) for i in range(self.n_states)]
+        )
+        self.unit_order = np.int32(metrics["mean_rate_ordering"].flatten()) - 1
+        self.state_order = raster.state_order(
+            self.h, self.burst_margins, n_states=self.n_states
+        )
+        scores[np.isnan(scores)] = 0
+        self.consistency = scores[:, self.unit_order][self.state_order, :]
+
     def states(self, raster):
         return _HMM_METHODS[self.library].states(self._hmm, raster._raster)
-
-    def compute_state_order(self, raster=None, lmargin_sec=-1.0, rmargin_sec=1.0):
-        # Load the raster if not provided. You shouldn't actually need to
-        # provide it, as it is cached in the kernel and there's no reason
-        # to compute entropy on the wrong data.
-        if raster is None:
-            raster = get_raster(self.source, self.exp, self.bin_size_ms, self.surrogate)
-
-        # Save the burst margins in units of bins.
-        lmargin = int(lmargin_sec * 1000 / self.bin_size_ms)
-        rmargin = int(rmargin_sec * 1000 / self.bin_size_ms)
-        self.burst_margins = (lmargin, rmargin)
-
-        # Recompute all the entropy measurements based on them.
-        h = self.states(raster)
-        self.obs_state_prob = raster.observed_state_probs(
-            h, n_states=self.n_states, burst_margins=self.burst_margins
-        )
-
-        self.state_order = self.obs_state_prob.argmax(axis=1).argsort()
-
-        overall_dist = np.zeros(self.n_states)
-        for s in h:
-            overall_dist[s] += 1 / len(h)
-        self.baseline_entropy = stats.entropy(overall_dist, base=2)
-
-        self.mean_entropy = stats.entropy(self.obs_state_prob, axis=0, base=2)
 
     def dump(self, path):
         """

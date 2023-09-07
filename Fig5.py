@@ -18,27 +18,28 @@ plt.ion()
 hmmsupport.figdir("paper")
 
 bin_size_ms = 30
-n_states = 10, 50
-n_stateses = np.arange(n_states[0], n_states[-1] + 1)
+n_stateses = np.arange(10, 51)
 
-print("Loading fitted HMMs and calculating state order.")
-metrics = {}
-with tqdm(total=len(experiments) * (1 + len(n_stateses))) as pbar:
-    rasters = {}
+print("Loading fitted HMMs and calculating consistency.")
+metricses = {}
+with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:
+    rasters_real, rasters_rsm = {}, {}
+    rasterses = dict(real=rasters_real, rsm=rasters_rsm)
     for exp in experiments:
-        metrics[exp] = load_metrics(exp)
-        rasters[exp] = get_raster(source, exp, bin_size_ms), []
-        pbar.update()
-        window = metrics[exp]["burst_window"].ravel() / 1e3
+        metricses[exp] = load_metrics(exp)
+        window = metricses[exp]["burst_window"].ravel() / 1e3
         window[0] = min(window[0], -0.3)
         window[1] = max(window[1], 0.6)
-        for n in n_stateses:
-            m = Model(source, exp, bin_size_ms, n, recompute_ok=False)
-            m.compute_state_order(rasters[exp][0], *window)
-            rasters[exp][1].append(m)
+        for surr, rs in rasterses.items():
+            rs[exp] = get_raster(source, exp, bin_size_ms), []
             pbar.update()
+            for n in n_stateses:
+                m = Model(source, exp, bin_size_ms, n, recompute_ok=False)
+                m.compute_consistency(rs[exp][0], metricses[exp])
+                rs[exp][1].append(m)
+                pbar.update()
 
-for k, (r, _) in rasters.items():
+for k, (r, _) in rasters_real.items():
     nunits = r._raster.shape[1]
     meanfr = r._raster.mean() / r.bin_size_ms * 1000
     nbursts = len(r.find_bursts())
@@ -47,39 +48,10 @@ for k, (r, _) in rasters.items():
     )
 
 
-try:
-    with open(".cache/consistencies.pickle", "rb") as f:
-        consistency_good, consistency_bad = pickle.load(f)
-    print("Loaded consistency scores from file.")
-except FileNotFoundError:
-    print("Calculating consistency scores per neuron.")
-    with tqdm(total=len(experiments) * len(n_stateses) * 2) as pbar:
-
-        def consistency_scores(exp, n, surr):
-            """
-            Compute an n_states x n_units array indicating how likely a unit is
-            to have nonzero firings in each time bin of a given state.
-            """
-            r = get_raster(source, exp, bin_size_ms, surr)
-            m = Model(source, exp, bin_size_ms, n, surr)
-            h = m.states(r)
-            scores = np.array([(r._raster[h == i, :] > 0).mean(0) for i in range(n)])
-            unit_order = np.int32(metrics[exp]["mean_rate_ordering"].flatten()) - 1
-            margins = rasters[exp][1][0].burst_margins
-            state_order = r.state_order(h, margins, n_states=n)
-            pbar.update()
-            scores[np.isnan(scores)] = 0
-            return scores[:, unit_order][state_order, :]
-
-        consistency_good, consistency_bad = [
-            {
-                exp: [consistency_scores(exp, n, surr) for n in n_stateses]
-                for exp in experiments
-            }
-            for surr in ["real", "rsm"]
-        ]
-    with open(".cache/consistencies.pickle", "wb") as f:
-        pickle.dump((consistency_good, consistency_bad), f)
+consistency_real, consistency_rsm = [
+    {exp: [m.consistency for m in ms] for exp, (r, ms) in rs.items()}
+    for rs in rasterses.values()
+]
 
 
 def separability(exp, X, pca=None, n_tries=100, validation=0.2):
@@ -90,7 +62,7 @@ def separability(exp, X, pca=None, n_tries=100, validation=0.2):
     clf = SGDClassifier(n_jobs=12)
     if pca is not None and pca < X.shape[1]:
         clf = make_pipeline(PCA(n_components=pca), clf)
-    y = ~(np.arange(X.shape[0]) < len(metrics[exp]["non_scaf_units"]))
+    y = ~(np.arange(X.shape[0]) < len(metricses[exp]["non_scaf_units"]))
     if validation is None:
         Xt = Xv = X
         yt = yv = y
@@ -115,10 +87,10 @@ def separability_on_fr(r):
 
 sep_on_states = {
     exp: [separability(exp, scores.T) for scores in scoreses]
-    for exp, scoreses in consistency_good.items()
+    for exp, scoreses in consistency_real.items()
 }
 
-sep_on_fr = {exp: separability_on_fr(r) for exp, (r, _) in rasters.items()}
+sep_on_fr = {exp: separability_on_fr(r) for exp, (r, _) in rasters_real.items()}
 
 
 # %%
@@ -129,7 +101,7 @@ sep_on_fr = {exp: separability_on_fr(r) for exp, (r, _) in rasters.items()}
 # specific trained model we're looking at...
 exp = "L1_t_spk_mat_sorted"
 n_states = 15
-r, models = rasters[exp]
+r, models = rasters_real[exp]
 model = models[np.nonzero(n_stateses == n_states)[0][0]]
 interesting_states = [8, 9, 10]
 
@@ -141,8 +113,8 @@ peaks = r.find_bursts(margins=model.burst_margins)
 state_prob = r.observed_state_probs(h, burst_margins=model.burst_margins)
 state_order = r.state_order(h, model.burst_margins, n_states=n_states)
 poprate = r.coarse_rate()
-unit_order = np.int32(metrics[exp]["mean_rate_ordering"].flatten()) - 1
-n_packet_units = len(metrics[exp]["scaf_units"])
+unit_order = np.int32(metricses[exp]["mean_rate_ordering"].flatten()) - 1
+n_packet_units = len(metricses[exp]["scaf_units"])
 
 # inverse_unit_order[i] is the index of unit i in unit_order.
 inverse_unit_order = np.zeros_like(unit_order)
@@ -185,7 +157,7 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
         ax.plot(times, inverse_unit_order[idces] + 1, "ko", markersize=0.5)
         ax.set_ylim(0.5, rsub.shape[1] + 0.5)
         ax.set_xticks([0, 0.5])
-        ax.set_xlim(*metrics[exp]["burst_window"].ravel() / 1e3)
+        ax.set_xlim(*metricses[exp]["burst_window"].ravel() / 1e3)
         ax.axhline(len(unit_order) - n_packet_units + 0.5, color="k", lw=0.5)
         ax.set_xlabel("Time from Peak (s)")
         ax.set_yticks([])
@@ -304,7 +276,7 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
     D = f.subplots(
         1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot, left=0.03, right=0.3)
     )
-    scores = consistency_good[exp][10]
+    scores = consistency_real[exp][10]
     D.imshow(scores, aspect="auto", interpolation="none")
     D.set_xticks([])
     D.set_yticks([])
@@ -316,8 +288,8 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
     E = f.subplots(
         1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot, left=0.35, right=0.6)
     )
-    scores = consistency_good[exp][10]
-    is_packet = ~(np.arange(scores.shape[1]) < len(metrics[exp]["non_scaf_units"]))
+    scores = consistency_real[exp][10]
+    is_packet = ~(np.arange(scores.shape[1]) < len(metricses[exp]["non_scaf_units"]))
     pca = PCA(n_components=2).fit_transform(scores.T)
     E.set_aspect("equal")
     E.scatter(pca[:, 1], pca[:, 0], c=is_packet)
