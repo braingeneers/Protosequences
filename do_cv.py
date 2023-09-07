@@ -7,9 +7,8 @@ import os
 import sys
 import itertools
 import numpy as np
-import hmmsupport
+from hmmsupport import _HMM_METHODS, all_experiments
 import argparse
-from tqdm import tqdm
 from braingeneers.iot.messaging import MessageBroker
 
 
@@ -35,7 +34,7 @@ def parse_range_str(range_str):
 
 
 def hmm_method_type(name):
-    if name not in hmmsupport._HMM_METHODS:
+    if name not in _HMM_METHODS:
         raise ValueError
     return name
 
@@ -66,7 +65,7 @@ if __name__ == "__main__":
 
     # Can't be part of the type because it depends on source.
     if args.exp == "*":
-        args.exp = hmmsupport.all_experiments(args.source)
+        args.exp = all_experiments(args.source)
 
     # Verbosely print the full parameter set.
     print("Cross-validating HMMs on the following experiments:")

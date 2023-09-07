@@ -317,9 +317,9 @@ class Model:
     def states(self, raster):
         return _HMM_METHODS[self.library].states(self._hmm, raster._raster)
 
-    def cross_validate(self, raster, n_folds):
+    def cross_validate(self, raster, n_folds, verbose=False):
         return _HMM_METHODS[self.library].cross_validate(
-            self._hmm, raster._raster, n_folds
+            self._hmm, raster._raster, n_folds, verbose=verbose
         )
 
     def dump(self, path):

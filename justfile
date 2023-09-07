@@ -15,8 +15,11 @@ pull:
 push: build
     docker push $container
 
-queue src exp bin_size ks surrogate="real" method="default":
+queue-hmm src exp bin_size ks surrogate="real" method="default":
     python fit_hmms.py "{{src}}" "{{exp}}" "{{bin_size}}" "{{ks}}" "{{surrogate}}" "{{method}}"
+
+queue-cv src exp bin_size ks surrogate="real":
+    python do_cv.py "{{src}}" "{{exp}}" "{{bin_size}}" "{{ks}}" "{{surrogate}}"
 
 add-worker for="hmm" n="1" memory_gi="4":
     #! /usr/bin/bash
