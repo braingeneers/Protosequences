@@ -181,10 +181,11 @@ _HMM_METHODS = {}
 
 
 class HMMMethod:
-    def __init__(self, library, fit, states):
+    def __init__(self, library, fit, states, cross_validate):
         self.library = library
         self.fit = fit
         self.states = states
+        self.cross_validate = cross_validate
         _HMM_METHODS[library] = self
 
 
@@ -213,8 +214,21 @@ def _ssm_states(hmm, raster):
     return hmm.most_likely_states(raster)
 
 
-SSMFit = HMMMethod("ssm", _ssm_hmm, _ssm_states)
+def _ssm_cv(hmm, raster, n_folds, atol=FIT_ATOL, n_iter=FIT_N_ITER, verbose=False):
+    "Return validation and training scores on cross-validation folds."
+    from ssm.model_selection import cross_val_scores
 
+    return cross_val_scores(
+        hmm,
+        raster,
+        n_repeats=n_folds,
+        tolerance=atol,
+        num_iters=n_iter,
+        verbose=2 if verbose else 0,
+    )
+
+
+SSMFit = HMMMethod("ssm", _ssm_hmm, _ssm_states, _ssm_cv)
 
 
 default_method = os.environ.get("HMM_METHOD", "ssm")
@@ -301,6 +315,11 @@ class Model:
 
     def states(self, raster):
         return _HMM_METHODS[self.library].states(self._hmm, raster._raster)
+
+    def cross_validate(self, raster, n_folds):
+        return _HMM_METHODS[self.library].cross_validate(
+            self._hmm, raster._raster, n_folds
+        )
 
     def dump(self, path):
         """
