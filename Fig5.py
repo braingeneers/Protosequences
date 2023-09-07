@@ -21,7 +21,7 @@ bin_size_ms = 30
 n_states = 10, 50
 n_stateses = np.arange(n_states[0], n_states[-1] + 1)
 
-print("Loading fitted HMMs and calculating entropy.")
+print("Loading fitted HMMs and calculating state order.")
 metrics = {}
 with tqdm(total=len(experiments) * (1 + len(n_stateses))) as pbar:
     rasters = {}
@@ -33,16 +33,9 @@ with tqdm(total=len(experiments) * (1 + len(n_stateses))) as pbar:
         window[0] = min(window[0], -0.3)
         window[1] = max(window[1], 0.6)
         for n in n_stateses:
-            rasters[exp][1].append(
-                Model(
-                    source,
-                    exp,
-                    bin_size_ms,
-                    n,
-                    recompute_ok=False,
-                )
-            )
-            rasters[exp][1][-1].compute_entropy(rasters[exp][0], *window)
+            m = Model(source, exp, bin_size_ms, n, recompute_ok=False)
+            m.compute_state_order(rasters[exp][0], *window)
+            rasters[exp][1].append(m)
             pbar.update()
 
 for k, (r, _) in rasters.items():

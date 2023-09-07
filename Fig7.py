@@ -24,7 +24,7 @@ plt.ion()
 hmmsupport.figdir("paper")
 
 bin_size_ms = 30
-n_stateses = np.arange(10, 21)
+n_stateses = np.arange(10, 51)
 
 print("Loading real and surrogate rasters and doing PCA on HMMs.")
 with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:

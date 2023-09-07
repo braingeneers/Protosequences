@@ -395,7 +395,7 @@ class Model:
     def states(self, raster):
         return _HMM_METHODS[self.library].states(self._hmm, raster._raster)
 
-    def compute_entropy(self, raster=None, lmargin_sec=-1.0, rmargin_sec=1.0):
+    def compute_state_order(self, raster=None, lmargin_sec=-1.0, rmargin_sec=1.0):
         # Load the raster if not provided. You shouldn't actually need to
         # provide it, as it is cached in the kernel and there's no reason
         # to compute entropy on the wrong data.
