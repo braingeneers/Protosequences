@@ -11,8 +11,8 @@ spec:
   template:
     spec:
       containers:
-      - name: hmm-worker
-        image: atspaeth/organoid-hmm
+      - name: ${WORKER_TYPE}-worker
+        image: ${CONTAINER_IMAGE}
         env:
           - name: S3_USER
             value: $S3_USER
@@ -25,13 +25,13 @@ spec:
         resources:
           requests:
             cpu: 1
-            memory: "${PRP_MEMORY_GI}Gi"
+            memory: "${NRP_MEMORY_GI}Gi"
             nvidia.com/gpu: 0
           limits:
             cpu: 1
-            memory: "${PRP_MEMORY_LIMIT_GI}Gi"
+            memory: "${NRP_MEMORY_LIMIT_GI}Gi"
             nvidia.com/gpu: 0
-        command: ["python", "hmm_worker.py"]
+        command: ["python", "${WORKER_TYPE}_worker.py"]
       restartPolicy: Never
       volumes:
         - name: prp-s3-credentials
