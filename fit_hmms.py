@@ -10,6 +10,7 @@ import itertools
 import numpy as np
 import hmmsupport
 import argparse
+from tqdm import tqdm
 from braingeneers.iot.messaging import MessageBroker
 
 
@@ -50,9 +51,21 @@ if __name__ == "__main__":
     parser.add_argument("n_stateses", type=parse_range_str)
     parser.add_argument("surrs", default=["real"], nargs="?", type=ensure_list)
     parser.add_argument("library", default="default", nargs="?", type=hmm_method_type)
-    parser.add_argument("-n", "--dryrun", action="store_true")
-    parser.add_argument("-l", "--local", action="store_true")
-    parser.add_argument("--clear-queue", action="store_true")
+    parser.add_argument(
+        "-n", "--dryrun", action="store_true", help="just print what would be done"
+    )
+    parser.add_argument(
+        "-l",
+        "--local",
+        action="store_true",
+        help="fit HMMs locally instead of queueing jobs",
+    )
+    parser.add_argument(
+        "--clear-queue",
+        action="store_true",
+        help="clear the queue before adding new jobs",
+    )
+    parser.add_argument("--pbar", action="store_true", help="show a progress bar")
     args = parser.parse_args()
 
     if not args.local and not os.environ.get("S3_USER"):
@@ -73,10 +86,13 @@ if __name__ == "__main__":
     # Check which parameters actually need re-run.
     print("Must fit...")
     needs_run = []
-    for p in itertools.product(args.exp, args.bin_sizes, args.n_stateses, args.surrs):
+    needs_check = list(
+        itertools.product(args.exp, args.bin_sizes, args.n_stateses, args.surrs)
+    )
+    for p in tqdm(needs_check, total=len(needs_check), disable=not args.pbar):
         if not hmmsupport.is_cached(args.source, *p, library=args.library):
             needs_run.append(p)
-            print(f"  {args.source}/{p[0]}[{p[3]}] with T={p[1]}ms, K={p[2]}.")
+            tqdm.write(f"  {args.source}/{p[0]}[{p[3]}] with T={p[1]}ms, K={p[2]}.")
 
     if not needs_run:
         print("Nothing. All HMMs are already cached.")
