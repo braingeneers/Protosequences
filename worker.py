@@ -24,7 +24,6 @@ def become_worker(what, how):
         while True:
             # Keep popping queue items and fitting HMMs with those parameters.
             job = Job(q, q.get())
-            print(f"Job received: ", job.params)
 
             try:
                 how(job)
