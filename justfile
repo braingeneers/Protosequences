@@ -1,4 +1,5 @@
-export container := "atspaeth/organoid-hmm"
+export hash := `git log -n 1 --pretty=format:"%h"`
+export container := "atspaeth/organoid-hmm:" + hash
 
 help:
     @just --list
@@ -14,6 +15,7 @@ pull:
 
 push: build
     docker push $container
+    @echo Current commit uploaded to $container
 
 queue-hmm src exp bin_size ks surrogate="real" method="default":
     python fit_hmms.py "{{src}}" "{{exp}}" "{{bin_size}}" "{{ks}}" "{{surrogate}}" "{{method}}"
