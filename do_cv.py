@@ -47,7 +47,6 @@ if __name__ == "__main__":
     parser.add_argument("exp", type=lambda x: x if x == "*" else ensure_list(x))
     parser.add_argument("bin_sizes", type=parse_range_str)
     parser.add_argument("n_stateses", type=parse_range_str)
-    parser.add_argument("surrs", default=["real"], nargs="?", type=ensure_list)
     parser.add_argument(
         "-n", "--dryrun", action="store_true", help="just print what would be done"
     )
@@ -69,14 +68,14 @@ if __name__ == "__main__":
 
     # Verbosely print the full parameter set.
     print("Cross-validating HMMs on the following experiments:")
-    for exp, surr in itertools.product(args.exp, args.surrs):
-        print(f"  {args.source}/{exp}[{surr}]")
+    for exp in args.exp:
+        print(f"  {args.source}/{exp}")
     print("Will use K in", args.n_stateses)
     print("Will use T in", args.bin_sizes)
 
     # Check which parameters actually need re-run.
     needs_run = list(
-        itertools.product(args.exp, args.bin_sizes, args.n_stateses, args.surrs)
+        itertools.product(args.exp, args.bin_sizes, args.n_stateses)
     )
 
     print(f"Queueing {len(needs_run)} CV jobs...")
@@ -93,7 +92,7 @@ if __name__ == "__main__":
     q = mb.get_queue(queue_name)
 
     # Add all the jobs to the queue.
-    for exp, bin_size_ms, n_states, surrogate in needs_run:
+    for exp, bin_size_ms, n_states in needs_run:
         q.put(
             dict(
                 retries_allowed=3,
@@ -102,7 +101,6 @@ if __name__ == "__main__":
                     exp=exp,
                     bin_size_ms=bin_size_ms,
                     n_states=n_states,
-                    surrogate=surrogate,
                 ),
             )
         )
