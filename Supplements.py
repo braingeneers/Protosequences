@@ -1,5 +1,10 @@
+import os
+import glob
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
 import hmmsupport
 from hmmsupport import get_raster, Model, figure
 
@@ -36,3 +41,47 @@ with figure("Population Rate by State") as f:
     ax.set_xticks(np.arange(1, n_states + 1))
     ax.set_ylabel("Population rate (kHz)")
     ax.set_xlabel("Hidden State")
+
+
+# %%
+# Cross-validation proving that the model performance is better for the real data than
+# for the shuffled data.
+
+source = "org_and_slice"
+cv_score_files = glob.glob(f".cache/cv_scores/{source}_*")
+df = []
+for path in cv_score_files:
+    # Load the scores from the file itself.
+    with open(path, "rb") as f:
+        scores = pickle.load(f)
+
+    # Extract some metadata from the filename.
+    basename = os.path.basename(path).removesuffix(".pickle")
+    _, _, _, organoid, _, _, _, _, bin_size, states, surr = basename.split("_")
+
+    # Combine those into dataframe rows, one per score rather than one per file like a
+    # db normalization because plotting will expect that later anyway.
+    df.extend(
+        dict(
+            organoid=organoid,
+            bin_size=int(bin_size.removesuffix("ms")),
+            states=int(states.removeprefix("K")),
+            set=key,
+            surr=surr,
+            score=value,
+        )
+        for key, values in scores.items()
+        for value in values
+    )
+df = pd.DataFrame(df)
+
+with figure("Cross-Validation Scores") as f:
+    ax = f.gca()
+    sns.violinplot(
+        data=df[df.set == "validation"],
+        x="organoid",
+        y="score",
+        hue="surr",
+        split=True,
+        ax=ax,
+    )
