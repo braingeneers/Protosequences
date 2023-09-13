@@ -1,8 +1,8 @@
 # Fig5.py
 # Generate figure 5 of the final manuscript.
-import pickle
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as cor
 import hmmsupport
 from hmmsupport import get_raster, figure, load_metrics, Model, all_experiments
 from sklearn.decomposition import PCA
@@ -274,31 +274,42 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
     # Subfigure D: somehow show what's happening on the right.
     DEFtop, DEFbot = 0.33, 0.06
     D = f.subplots(
-        1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot, left=0.03, right=0.3)
+        1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot, left=0.04, right=0.3)
     )
     scores = consistency_real[exp][10]
-    D.imshow(scores, aspect="auto", interpolation="none")
-    D.set_xticks([])
-    D.set_yticks([])
+    D_im = D.imshow(scores, aspect="auto", interpolation="none")
+    n_nonrigid = len(metricses[exp]["non_scaf_units"])
+    n_rigid = len(metricses[exp]["scaf_units"])
+    ticks = np.array([1, n_nonrigid, r.N])
+    D.set_xticks(ticks - 1, ticks)
+    D.set_yticks([0, 19], [1, 20])
     D.set_xlabel(r"Non-Rigid \hspace{2.4cm} Backbone")
     D.set_ylabel("State")
+    D.yaxis.set_label_coords(-0.08, 0.5)
+    D_cbar = plt.colorbar(D_im, ax=D, aspect=15, ticks=[0, 1])
 
     # Subfigure E: PCA of consistency scores for a single organoid, showing
     # that it's sufficient to separate packet/non-packet units.
     E = f.subplots(
-        1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot, left=0.35, right=0.6)
+        # Clear out some space from the top for the legend.
+        1, 1, gridspec_kw=dict(top=DEFtop - 0.05, bottom=DEFbot, left=0.35,
+                               right=0.59)
     )
     scores = consistency_real[exp][10]
     is_packet = ~(np.arange(scores.shape[1]) < len(metricses[exp]["non_scaf_units"]))
     pca = PCA(n_components=2).fit_transform(scores.T)
     E.set_aspect("equal")
-    E.scatter(pca[:, 1], pca[:, 0], c=is_packet)
-    E.set_ylabel("PC1")
-    E.set_xlabel("PC2")
+    scb = E.scatter(pca[is_packet, 0], pca[is_packet, 1], label="Backbone")
+    scn = E.scatter(pca[~is_packet, 0], pca[~is_packet, 1], label="Non-Rigid")
+    E.legend(bbox_to_anchor=(0.45, 1.23), ncol=2, loc="center")
+    E.set_xlabel("PC1")
+    E.set_ylabel("PC2")
+    E.set_yticks([-1, 0, 1])
+    E.yaxis.set_label_coords(-0.12, 0.5)
 
     # Subfigure F: per-organoid separability metric.
     F = f.subplots(
-        1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot, left=0.67, right=0.98)
+        1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot, left=0.7, right=0.98)
     )
     F.violinplot(
         sep_on_states.values(),
