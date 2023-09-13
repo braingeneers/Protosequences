@@ -54,34 +54,38 @@ for path in cv_score_files:
     # Load the scores from the file itself.
     with open(path, "rb") as f:
         scores = pickle.load(f)
+        if "surrogate" not in scores:
+            print(f"Skipping {path} because it doesn't have surrogate scores.")
+            continue
 
     # Extract some metadata from the filename.
-    basename = os.path.basename(path).removesuffix(".pickle")
-    _, _, _, organoid, _, _, _, _, bin_size, states, surr = basename.split("_")
+    name_parts = os.path.basename(path).split("_")
+    organoid = name_parts[3]
+    bin_size = name_parts[-3]
+    states = name_parts[-2]
 
-    # Combine those into dataframe rows, one per score rather than one per file like a
-    # db normalization because plotting will expect that later anyway.
+    # Combine those into dataframe rows, one per score rather than one per file
+    # like a db normalization because plotting will expect that later anyway.
     df.extend(
         dict(
             organoid=organoid,
             bin_size=int(bin_size.removesuffix("ms")),
             states=int(states.removeprefix("K")),
-            set=key,
-            surr=surr,
             score=value,
         )
-        for key, values in scores.items()
-        for value in values
+        for value in scores["validation"] - scores["surrogate"]
     )
 df = pd.DataFrame(df)
 
 with figure("Cross-Validation Scores") as f:
     ax = f.gca()
     sns.violinplot(
-        data=df[df.set == "validation"],
+        data=df,
         x="organoid",
         y="score",
-        hue="surr",
-        split=True,
         ax=ax,
+        inner=None,
+        scale="count",
     )
+    ax.set_ylabel("$\Delta$ Log Likelihood")
+    ax.set_xlabel("Organoid")

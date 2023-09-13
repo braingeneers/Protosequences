@@ -2,7 +2,6 @@ import functools
 import glob
 import os
 import pickle
-import re
 import sys
 from contextlib import contextmanager
 from io import BytesIO
