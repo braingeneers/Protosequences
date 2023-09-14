@@ -5,6 +5,7 @@ help:
     @just --list
 
 build:
+    @git diff-index --quiet HEAD -- || (echo "Won't build with uncommited changes."; exit 1)
     docker build -t $container .
 
 debug: pull
