@@ -1,15 +1,17 @@
 # Do Cross Validation
 #
 # A script which takes a data source plus lists of experiment IDs, bin
-# sizes, and numbers of hidden states, and adds them all to the job queue for
-# cross-validation.
+# sizes, and numbers of hidden states, checks which ones are already on
+# S3, and adds the rest to the job queue for cross-validation.
 import os
 import sys
-import itertools
-import numpy as np
-from hmmsupport import _HMM_METHODS, all_experiments
 import argparse
+from tqdm import tqdm
+import numpy as np
+import awswrangler as wr
+from hmmsupport import _HMM_METHODS, all_experiments
 from braingeneers.iot.messaging import MessageBroker
+from cv_worker import s3_filename
 
 
 def ensure_list(str_str):
@@ -74,9 +76,27 @@ if __name__ == "__main__":
     print("Will use T in", args.bin_sizes)
 
     # Check which parameters actually need re-run.
-    needs_run = list(
-        itertools.product(args.exp, args.bin_sizes, args.n_stateses)
-    )
+    print("Must fit...")
+    with tqdm(total=len(args.exp) * len(args.bin_sizes) * len(args.n_stateses)) as pbar:
+
+        def missing(exp, bin_size_ms, n_states):
+            path = s3_filename(args.source, exp, bin_size_ms, n_states)
+            if ret := not wr.s3.does_object_exist(path):
+                tqdm.write(f" {args.source}/{exp}: T={bin_size_ms}ms, K={n_states}.")
+            pbar.update()
+            return ret
+
+        needs_run = [
+            (exp, bin_size_ms, n_states)
+            for exp in args.exp
+            for bin_size_ms in args.bin_sizes
+            for n_states in args.n_stateses
+            if missing(exp, bin_size_ms, n_states)
+        ]
+
+    if not needs_run:
+        print("Nothing. All CV jobs are already done.")
+        sys.exit()
 
     print(f"Queueing {len(needs_run)} CV jobs...")
 

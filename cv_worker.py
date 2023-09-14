@@ -10,6 +10,10 @@ CV_N_FOLDS = 5
 BASEPATH = f"s3://braingeneers/personal/{os.environ['S3_USER']}/cache/cv_scores"
 
 
+def s3_filename(source, exp, bin_size_ms, n_states):
+    return f"{BASEPATH}/{source}_{exp}_{bin_size_ms}ms_K{n_states}_real.pickle"
+
+
 def cross_validate(job):
     """
     Run cross-validation for a given parameter set, and store the results to a
@@ -82,9 +86,9 @@ def cross_validate(job):
         ret["validation"][r] = (full_ll - train_ll) / (n_total - n_train)
         ret["surrogate"][r] = surr_ll / (n_total - n_train)
 
-    tag = f"{source}_{exp}_{bin_size_ms}ms_K{n_states}_real"
-    with open(f"{BASEPATH}/{tag}.pickle", "wb") as f:
+    with open(s3_filename(source, exp, bin_size_ms, n_states), "wb") as f:
         pickle.dump(ret, f)
 
 
-become_worker("cv", cross_validate)
+if __name__ == "__main__":
+    become_worker("cv", cross_validate)
