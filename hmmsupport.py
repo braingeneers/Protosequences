@@ -180,11 +180,10 @@ _HMM_METHODS = {}
 
 
 class HMMMethod:
-    def __init__(self, library, fit, states, cross_validate):
+    def __init__(self, library, fit, states):
         self.library = library
         self.fit = fit
         self.states = states
-        self.cross_validate = cross_validate
         _HMM_METHODS[library] = self
 
 
@@ -213,65 +212,7 @@ def _ssm_states(hmm, raster):
     return hmm.most_likely_states(raster)
 
 
-def _ssm_cv(hmm, raster, n_folds, atol=FIT_ATOL, n_iter=FIT_N_ITER, verbose=False):
-    """
-    Return the log likelihood of `n_folds` different cross-validation folds of data for
-    the given raster. Train on the true data, but compute the log likelihood on both
-    real and surrogtae data for comparison in the supplemental figure.
-
-    Adapted from `ssm.model_selection.cross_val_scores()`.
-    """
-    # Allocate space for train and test log-likelihoods, as well as LL on the surrogate
-    # data of the same shape as the validation set.
-    train_scores = np.empty(n_folds)
-    test_scores = np.empty(n_folds)
-    surr_scores = np.empty(n_folds)
-
-    data = raster._raster
-    fake_data = raster.randomized()._raster
-
-    for r in range(n_folds):
-        # Create mask for training data.
-        train_mask = np.ones_like(data, dtype=bool)
-
-        # Determine number of heldout points.
-        n_total = np.sum(train_mask)
-        obs_inds = np.argwhere(train_mask)
-        heldout_num = int(n_total * 0.1)
-
-        # Randomly hold out speckled data pattern.
-        heldout_flat_inds = np.random.choice(n_total, heldout_num, replace=False)
-
-        # Create training mask.
-        i, j = obs_inds[heldout_flat_inds].T
-        train_mask[i, j] = False
-
-        # Fit model with training mask.
-        hmm.fit(
-            data,
-            masks=train_mask,
-            tolerance=atol,
-            num_iters=n_iter,
-            verbose=2 if verbose else 0,
-        )
-
-        # Compute log-likelihood on full, training, and surrogate training data.
-        full_ll = hmm.log_likelihood(data)
-        train_ll = hmm.log_likelihood(data, masks=train_mask)
-        surr_ll = hmm.log_likelihood(fake_data, masks=~train_mask)
-
-        # Total number of training and observed datapoints.
-        n_train = train_mask.sum()
-
-        # Save normalized log-likelihood scores.
-        train_scores[r] = train_ll / n_train
-        test_scores[r] = (full_ll - train_ll) / (n_total - n_train)
-        surr_scores[r] = surr_ll / (n_total - n_train)
-
-    return train_scores, test_scores, surr_scores
-
-
-SSMFit = HMMMethod("ssm", _ssm_hmm, _ssm_states, _ssm_cv)
+SSMFit = HMMMethod("ssm", _ssm_hmm, _ssm_states)
 
 
 default_method = os.environ.get("HMM_METHOD", "ssm")
@@ -359,11 +300,6 @@ class Model:
 
     def states(self, raster):
         return _HMM_METHODS[self.library].states(self._hmm, raster._raster)
-
-    def cross_validate(self, raster, n_folds, verbose=False):
-        return _HMM_METHODS[self.library].cross_validate(
-            self._hmm, raster, n_folds, verbose=verbose
-        )
 
     def dump(self, path):
         """
