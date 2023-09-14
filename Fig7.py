@@ -7,7 +7,6 @@ import seaborn as sns
 from matplotlib.ticker import PercentFormatter
 from scipy import stats
 from sklearn.decomposition import PCA
-from sklearn.metrics import roc_curve, roc_auc_score
 from tqdm import tqdm
 
 import hmmsupport
@@ -16,7 +15,7 @@ from hmmsupport import get_raster, figure, Model, all_experiments, load_metrics
 
 source = "org_and_slice"
 experiments = all_experiments(source)
-groups = {"L": "Organoid", "M": "Mouse", "Pr": "Primary"}
+groups = {"L": "Organoid", "M": "Slice", "Pr": "Primary"}
 groups_with_all = {**groups, "": "Overall"}
 exp_to_model = {e: next(k for k in groups if e.startswith(k)) for e in experiments}
 
@@ -50,19 +49,6 @@ for k, (r_real, _) in rasters_real.items():
     print(
         f"{k} has {nunits} units firing at {meanfr:0.2f} " f"Hz with {nbursts} bursts"
     )
-
-
-# %%
-
-# The figure plots results for one example HMM first before comparing
-# multiple, so pick a number of states and an experiment of interest.
-exp = "L1_t_spk_mat_sorted"
-n_states = 15
-n_states_index = np.nonzero(n_stateses == n_states)[0][0]
-r_real, models_real = rasters_real[exp]
-model_real = rasters_real[exp][1][n_states_index]
-r_rsm, models_rsm = rasters_rsm[exp]
-model_rsm = rasters_rsm[exp][1][n_states_index]
 
 
 # Vectors of the first ten explained variance ratios for all of the
@@ -230,109 +216,34 @@ df = pd.DataFrame(df)
 # %%
 
 
-# Create a color map which is identical to gist_rainbow but with all the
-# colors rescaled by 0.3 to make them match the ones above that are
-# affected by alpha.
-alpha_rainbow = plt.matplotlib.colors.LinearSegmentedColormap.from_list(
-    "alpha_rainbow", 0.5 + 0.5 * plt.get_cmap("gist_rainbow")(np.linspace(0, 1, 256))
-)
+with figure("Fig7", figsize=(8.5, 3.0)) as f:
+    G, H = f.subplots(1, 2, gridspec_kw=dict(width_ratios=[2, 3]))
 
-
-with figure("Fig7", figsize=(8.5, 5.5)) as f:
-    A, B, C = f.subplots(
-        1,
-        3,
-        gridspec_kw=dict(
-            top=0.99, bottom=0.62, left=0.06, right=0.97, width_ratios=[3, 5, 5]
-        ),
-    )
-    D, E, F = f.subplots(
-        1,
-        3,
-        gridspec_kw=dict(
-            top=0.5, bottom=0.07, left=0.06, right=0.97, width_ratios=[4, 3, 4]
-        ),
-    )
-
-    # Subfigure A: PCA of real vs. surrogate data.
-    A.set_aspect("equal")
-    data = model_real.pca.transform(r_real._raster)[:, 1::-1]
-    A.scatter(data[:, 0], data[:, 1], s=2, c=model_real.states(r_real), cmap=alpha_rainbow)
-    A.set_ylim([-3, 13])
-    A.set_xlim([-3, 8])
-    A.set_xlabel("PC2")
-    A.set_xticks([0, 5])
-    A.set_ylabel("PC1")
-    A.set_yticks([0, 5, 10])
-
-    # Subfigure B: explained variance ratio with inset.
-    states_upto = 10
-    B.plot(
-        np.arange(states_upto) + 1,
-        model_real.pca.explained_variance_ratio_[:states_upto],
-        label="Real",
-    )
-    B.plot(
-        np.arange(states_upto) + 1,
-        model_rsm.pca.explained_variance_ratio_[:states_upto],
-        label="Random",
-    )
-    B.set_xticks([1, states_upto])
-    B.set_xlabel("Principal Component")
-    B.set_ylabel("Explained Variance Ratio")
-    B.set_yticks([0, 1])
-    B.legend(ncol=2, loc="upper right")
-    bp = B.inset_axes([0.3, 0.2, 0.6, 0.6])
-    for ps, x in zip([pve_real[exp][:, 0], pve_rsm[exp][:, 0]], [0.8, 1.2]):
-        bp.violinplot(
-            ps, showmedians=True, showextrema=False, positions=[x], widths=0.2
-        )
-    bp.set_ylim([0.38, 1.02])
-    bp.set_xlim([0.6, 1.4])
-    bp.set_xticks([])
-    bp.set_yticks([])
-    B.indicate_inset_zoom(bp, edgecolor="black")
-
-    # Subfigure C: dimensionality as a function of PC inclusion threshold.
+    # Subfigure G: dimensionality as a function of PC inclusion threshold.
     for i, prefix in enumerate(groups):
         expsub = [e for e in experiments if e.startswith(prefix)]
-        plot_pev(C, f"C{i}", expsub, groups[prefix])
-    plot_pev(C, "red", experiments, "Surrogate", rsm=True)
-    C.legend(loc="upper left")
-    C.set_xlabel("Explained Variance Threshold")
-    C.set_ylabel("Dimensions Required")
-    C.set_ylim(1, 6)
-    C.set_xlim(0.7, 1)
-    C.xaxis.set_major_formatter(PercentFormatter(1, 0))
+        plot_pev(G, f"C{i}", expsub, groups[prefix])
+    plot_pev(G, "red", experiments, "Surrogate", rsm=True)
+    G.legend(loc="upper left")
+    G.set_xlabel("Explained Variance Threshold")
+    G.set_ylabel("Dimensions Required")
+    G.set_ylim(1, 6)
+    G.set_xlim(0.7, 1)
+    G.xaxis.set_major_formatter(PercentFormatter(1, 0))
 
-    # Subfigure D: split violins of consistency by backbone/non-rigid.
+    # Subfigure H: split violins of consistency by backbone/non-rigid.
     sns.violinplot(
         bw=0.1,
         data=df,
-        ax=D,
+        ax=H,
         split=True,
         x="model",
         y="consistency",
         hue="backbone",
         inner=None,
         cut=0,
-        scale="count",
+        scale="area",
     )
-    D.set_ylabel("Fraction of States with Non-Poisson Firing")
-    D.set_xlabel(None)
-    D.legend(loc="lower right")
-
-    # Subfigure E: show what a Poisson vs. non-Poisson state looks like.
-    E.plot()
-
-    # Subfigure F: ROC curves for backbone/non-rigid classification.
-    for prefix, group in groups_with_all.items():
-        subdata = df.loc[df.experiment.map(lambda e: e.startswith(prefix))]
-        auc = roc_auc_score(subdata.label, 1 - subdata.consistency)
-        fpr, tpr, thresh = roc_curve(subdata.label, 1 - subdata.consistency)
-        F.plot(fpr, tpr, label=f"{group} (AUC = {auc:.2f})")
-    F.set_xlabel("False Positive Rate")
-    F.set_ylabel("True Positive Rate")
-    F.legend()
-    F.xaxis.set_major_formatter(PercentFormatter(1, 0))
-    F.yaxis.set_major_formatter(PercentFormatter(1, 0))
+    H.set_ylabel("Fraction of States with Non-Poisson Firing")
+    H.set_xlabel(None)
+    H.legend(loc="upper right")
