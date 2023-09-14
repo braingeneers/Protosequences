@@ -142,10 +142,10 @@ def all_the_scores(exp, only_burst=False):
 
 def mean_consistency(scores_nobs, include_nan=True, weight=True):
     """
-    Combine consistency scores across all states of all models, reducing an array
-    of size (M,N) to (N,) so that there is just one score per unit. Returns a
-    vector of shape (n_units,) giving the fraction of all states across all models
-    where the Poisson null hypothesis failed to be rejected for that unit.
+    Combine p-values for the Poisson null hypothesis all states of all models,
+    reducing an array of size (M,N) to (N,) so that there is just one score per
+    unit. Returns a vector of shape (n_units,) giving the fraction of all states
+    across all models where the unit is too consistent to be Poisson.
 
     If `include_nan` is True, then (state, unit) combinations with zero events
     are included in the calculation and considered indistinguishable from
@@ -157,9 +157,7 @@ def mean_consistency(scores_nobs, include_nan=True, weight=True):
     # Compare in the correct sense so that NaNs are treated as "not
     # consistent", i.e. potentially Poisson, then invert.
     weights = nobs if weight else None
-    ret = 1 - np.ma.average(scores < 0.01, axis=0, weights=weights)
-    # We shouldn't see any NaNs here, but better safe than sorry. ;)
-    return np.where(np.isnan(ret), 0.5, ret)
+    return np.ma.average(scores < 0.01, axis=0, weights=weights)
 
 
 def unit_consistency(model, raster, only_burst=False):
