@@ -10,8 +10,7 @@ from sklearn.decomposition import PCA
 from tqdm import tqdm
 
 import hmmsupport
-from hmmsupport import get_raster, figure, Model, all_experiments, load_metrics
-
+from hmmsupport import Model, all_experiments, figure, get_raster, load_metrics
 
 source = "org_and_slice"
 experiments = all_experiments(source)
@@ -111,16 +110,14 @@ def poisson_test(data, mean=None):
     return stats.chi2(data.shape[0] - 1).cdf(statistic)
 
 
-def all_the_scores(exp, only_burst=False):
+def all_the_scores(exp, only_burst=False, rsm=False):
     """
     Gather all the consistency scores and observation counts across all states of
     all models. Don't differentiate between states or models, yielding a 2D array
     with some large number of rows and one column per unit.
     """
-    scores_nobs = [
-        unit_consistency(model, rasters_real[exp][0], only_burst)
-        for model in rasters_real[exp][1]
-    ]
+    r, models = (rasters_rsm if rsm else rasters_real)[exp]
+    scores_nobs = [unit_consistency(model, r, only_burst) for model in models]
     scores = np.vstack([s for s, _ in scores_nobs])
     nobs = np.hstack([n for _, n in scores_nobs])
     return scores, nobs
@@ -193,8 +190,9 @@ def auc_pval(auc, labels):
 consistencies = {}
 for exp in tqdm(experiments):
     consistencies[exp] = mean_consistency(
-        all_the_scores(exp, True),
-        include_nan=True,
+        all_the_scores(exp, True, rsm=False),
+    ) - mean_consistency(
+        all_the_scores(exp, True, rsm=True),
     )
 
 df = []
@@ -242,8 +240,11 @@ with figure("Fig7", figsize=(8.5, 3.0)) as f:
         hue="backbone",
         inner=None,
         cut=0,
-        scale="area",
+        width=1,
     )
-    H.set_ylabel("Fraction of States with Non-Poisson Firing")
+    H.set_ylabel(
+        "Fraction of Non-Poisson States per Unit:\n"
+        "Difference Between Real and Surrogate"
+    )
     H.set_xlabel(None)
     H.legend(loc="upper right")
