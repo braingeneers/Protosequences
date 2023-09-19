@@ -1,15 +1,16 @@
 # Fig5.py
 # Generate figure 5 of the final manuscript.
-import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.colors as cor
+import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.linear_model import SGDClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from tqdm import tqdm
+
 import hmmsupport
 from hmmsupport import get_raster, figure, load_metrics, Model, all_experiments
-from sklearn.decomposition import PCA
-from tqdm import tqdm
-from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import SGDClassifier
+
 
 source = "org_and_slice"
 experiments = [exp for exp in all_experiments(source) if exp.startswith("L")]
@@ -43,9 +44,7 @@ for k, (r, _) in rasters_real.items():
     nunits = r._raster.shape[1]
     meanfr = r._raster.mean() / r.bin_size_ms * 1000
     nbursts = len(r.find_bursts())
-    print(
-        f"{k} has {nunits} units firing at {meanfr:0.2f} " f"Hz with {nbursts} bursts"
-    )
+    print(f"{k} has {nunits} units firing at {meanfr:0.2f} Hz with {nbursts} bursts")
 
 
 consistency_real, consistency_rsm = [
@@ -277,12 +276,18 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
         1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot, left=0.04, right=0.3)
     )
     scores = consistency_real[exp][10]
-    D_im = D.imshow(scores, aspect="auto", interpolation="none")
+    D_im = D.imshow(
+        scores,
+        aspect="auto",
+        interpolation="none",
+        vmin=0,
+        vmax=1,
+        extent=[1, r.N, 20.5, 0.5],
+    )
     n_nonrigid = len(metricses[exp]["non_scaf_units"])
     n_rigid = len(metricses[exp]["scaf_units"])
-    ticks = np.array([1, n_nonrigid, r.N])
-    D.set_xticks(ticks - 1, ticks)
-    D.set_yticks([0, 19], [1, 20])
+    D.set_xticks(np.array([1, n_nonrigid, r.N]))
+    D.set_yticks([1, 20])
     D.set_xlabel(r"Non-Rigid \hspace{2.4cm} Backbone")
     D.set_ylabel("State")
     D.yaxis.set_label_coords(-0.08, 0.5)
@@ -292,8 +297,9 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
     # that it's sufficient to separate packet/non-packet units.
     E = f.subplots(
         # Clear out some space from the top for the legend.
-        1, 1, gridspec_kw=dict(top=DEFtop - 0.05, bottom=DEFbot, left=0.35,
-                               right=0.59)
+        1,
+        1,
+        gridspec_kw=dict(top=DEFtop - 0.05, bottom=DEFbot, left=0.35, right=0.59),
     )
     scores = consistency_real[exp][10]
     is_packet = ~(np.arange(scores.shape[1]) < len(metricses[exp]["non_scaf_units"]))
