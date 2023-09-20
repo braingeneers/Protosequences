@@ -132,7 +132,7 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
     A = f.subplots(
         1,
         3,
-        gridspec_kw=dict(wspace=0.1, top=0.995, bottom=0.8, left=0.04, right=0.95),
+        gridspec_kw=dict(wspace=0.1, top=0.995, bottom=0.8, left=0.06, right=0.95),
     )
     for ax, peak_float in zip(A, peaks):
         peak = int(round(peak_float))
@@ -169,13 +169,15 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
 
     ax2.set_ylabel("Population Rate (kHz)")
     ax2.set_yticks([0, 3])
+    ticks = np.array([1, n_packet_units, r.N])
+    A[0].set_yticks(r.N - ticks + 1, ticks)
     A[0].set_ylabel(
         r"Non-Rigid \hspace{1.5em} Backbone", y=1.0, horizontalalignment="right"
     )
 
     # Subfigure B: state examples.
     BCtop, BCbot = 0.70, 0.41
-    Bleft, Bwidth = 0.0, 0.65
+    Bleft, Bwidth = 0.03, 0.63
     (Ba, RA), (Bb, RB), (Bc, RC) = [
         f.subplots(
             1,
@@ -220,6 +222,8 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
         ax.set_yticks([])
         ax.set_ylim(0.5, rsub.shape[1] + 0.5)
         ax.axhline(len(unit_order) - n_packet_units + 0.5, color="k", lw=0.5)
+    ticks = np.array([1, n_packet_units, r.N])
+    Ba.set_yticks(r.N - ticks + 1, ticks)
     Ba.set_ylabel(
         r"Non-Rigid \hspace{2.2cm} Backbone", y=0.99, horizontalalignment="right"
     )
@@ -277,18 +281,18 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
     )
     scores = consistency_real[exp][10]
     D_im = D.imshow(
-        scores,
+        scores[:, ::-1],
         aspect="auto",
         interpolation="none",
         vmin=0,
         vmax=1,
         extent=[1, r.N, 20.5, 0.5],
     )
-    n_nonrigid = len(metricses[exp]["non_scaf_units"])
     n_rigid = len(metricses[exp]["scaf_units"])
-    D.set_xticks(np.array([1, n_nonrigid, r.N]))
+    D.set_xticks(np.array([1, n_rigid, r.N]))
     D.set_yticks([1, 20])
-    D.set_xlabel(r"Non-Rigid \hspace{2.4cm} Backbone")
+    D.set_xlabel(r"Backbone \hspace{1.6cm} Non-Rigid")
+    D.xaxis.set_label_coords(0.54, -0.125)
     D.set_ylabel("State")
     D.yaxis.set_label_coords(-0.08, 0.5)
     D_cbar = plt.colorbar(D_im, ax=D, aspect=15, ticks=[0, 1])
