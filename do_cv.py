@@ -9,6 +9,7 @@ import sys
 
 import numpy as np
 from braingeneers.iot.messaging import MessageBroker
+from joblib import Parallel, delayed
 from tqdm import tqdm
 
 from hmmsupport import all_experiments, cv_scores
@@ -71,29 +72,25 @@ if __name__ == "__main__":
 
     # Check which parameters actually need re-run.
     print("Must fit...")
-    with tqdm(total=len(args.exp) * len(args.bin_sizes) * len(args.n_stateses)) as pbar:
+    all_params = [
+        (exp, bin_size_ms, n_states)
+        for exp in args.exp
+        for bin_size_ms in args.bin_sizes
+        for n_states in args.n_stateses
+    ]
 
-        def missing(exp, bin_size_ms, n_states):
-            return cv_scores.check_call_in_cache(
-                args.source,
-                exp,
-                bin_size_ms,
-                n_states,
-            )
+    needs_run = Parallel(n_jobs=-1, backend="threading")(
+        delayed(cv_scores.check_call_in_cache)(args.source, *p)
+        for p in tqdm(all_params)
+    )
 
-        needs_run = [
-            (exp, bin_size_ms, n_states)
-            for exp in args.exp
-            for bin_size_ms in args.bin_sizes
-            for n_states in args.n_stateses
-            if missing(exp, bin_size_ms, n_states)
-        ]
+    job_params = [p for p, cached in zip(all_params, needs_run) if not cached]
 
-    if not needs_run:
+    if not job_params:
         print("Nothing. All CV jobs are already done.")
         sys.exit()
 
-    print(f"Queueing {len(needs_run)} CV jobs...")
+    print(f"Queueing {len(job_params)} CV jobs...")
 
     # If this is a dry run, don't actually bother queueing anything.
     if args.dryrun:
@@ -107,7 +104,7 @@ if __name__ == "__main__":
     q = mb.get_queue(queue_name)
 
     # Add all the jobs to the queue.
-    for exp, bin_size_ms, n_states in needs_run:
+    for exp, bin_size_ms, n_states in job_params:
         q.put(
             dict(
                 retries_allowed=3,
