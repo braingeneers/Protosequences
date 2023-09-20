@@ -61,30 +61,29 @@ pve_real, pve_rsm = [
 ]
 
 
-def components_required(exp, thresh, rsm=False):
-    enough = np.cumsum((pve_rsm if rsm else pve_real)[exp], axis=1) > thresh
+def components_required(exp, thresh, rsm=False, which_models=None):
+    scores = (pve_rsm if rsm else pve_real)[exp]
+    if which_models is not None:
+        K_min, K_max = which_models
+        scores = scores[(n_stateses >= K_min) & (n_stateses <= K_max), :]
+    enough = np.cumsum(scores, axis=1) > thresh
     return [
         np.argmax(enough[i, :]) + 1 if np.any(enough[i, :]) else enough.shape[1] + 1
         for i in range(enough.shape[0])
     ]
 
 
-def pev_vs_thresholds(experiments, xs, rsm=False):
-    return np.array(
-        [
-            np.hstack(
-                [components_required(exp, thresh=x, rsm=rsm) for exp in experiments]
-            )
-            for x in xs
-        ]
-    )
-
-
-def plot_pev(ax, color, experiments, label, rsm=False):
+def plot_pev(ax, color, experiments, label, rsm=False, which_models=None):
     xs = np.linspace(0.705, 1)
-    pev = pev_vs_thresholds(experiments, xs, rsm=rsm)
-    ys = pev.mean(axis=1)
-    ystd = pev.std(axis=1)
+    pev = [
+        np.hstack(
+            components_required(exp, x, rsm=rsm, which_models=which_models)
+            for exp in experiments
+        )
+        for x in xs
+    ]
+    ys = np.mean(pev, axis=1)
+    ystd = np.std(pev, axis=1)
     ax.fill_between(xs, ys - ystd, ys + ystd, alpha=0.2, color=color, label=label)
     ax.plot(xs, ys, color=color)
 
@@ -218,10 +217,11 @@ with figure("Fig7", figsize=(8.5, 3.0)) as f:
     G, H = f.subplots(1, 2, gridspec_kw=dict(width_ratios=[2, 3]))
 
     # Subfigure G: dimensionality as a function of PC inclusion threshold.
+    which_models = 10, 25
     for i, prefix in enumerate(groups):
         expsub = [e for e in experiments if e.startswith(prefix)]
-        plot_pev(G, f"C{i}", expsub, groups[prefix])
-    plot_pev(G, "red", experiments, "Surrogate", rsm=True)
+        plot_pev(G, f"C{i}", expsub, groups[prefix], which_models=which_models)
+    plot_pev(G, "red", experiments, "Surrogate", rsm=True, which_models=which_models)
     G.legend(loc="upper left")
     G.set_xlabel("Explained Variance Threshold")
     G.set_ylabel("Dimensions Required")
@@ -248,3 +248,21 @@ with figure("Fig7", figsize=(8.5, 3.0)) as f:
     )
     H.set_xlabel(None)
     H.legend(loc="upper right")
+
+
+# %%
+
+with figure("Supplement to Fig7") as f:
+    ax = f.gca()
+    which_models = 25, 50
+    for i, prefix in enumerate(groups):
+        expsub = [e for e in experiments if e.startswith(prefix)]
+        plot_pev(ax, f"C{i}", expsub, groups[prefix], which_models=which_models)
+    plot_pev(ax, "red", experiments, "Surrogate", rsm=True, which_models=which_models)
+    ax.legend(loc="upper left")
+    ax.set_xlabel("Explained Variance Threshold")
+    ax.set_ylabel("Dimensions Required")
+    ax.set_ylim(1, 6)
+    ax.set_xlim(0.7, 1)
+    ax.xaxis.set_major_formatter(PercentFormatter(1, 0))
+
