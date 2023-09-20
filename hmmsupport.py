@@ -10,9 +10,10 @@ import awswrangler
 import mat73
 import numpy as np
 import scipy.io
-from braingeneers.analysis import load_spike_data, SpikeData
+from braingeneers.analysis import SpikeData, load_spike_data
+from braingeneers.utils.memoize_s3 import memoize
 from braingeneers.utils.smart_open_braingeneers import open
-from scipy import signal, ndimage
+from scipy import ndimage, signal
 
 
 def s3_isdir(path):
@@ -244,6 +245,75 @@ def get_fitted_hmm(
         return method.fit(*params, verbose=verbose)
     else:
         return method.fit.get_cached(*params)
+
+
+@memoize
+def cv_scores(source, exp, bin_size_ms, n_states, n_folds=5):
+    """
+    Run cross-validation for a given parameter set and return a dict `scores`
+    with keys `training`, `validation`, and `surrogate`, each an array with
+    `n_states` entries representing the performance of a single trained
+    model on the training and validation sets, as well as on the validation
+    portion of the randomized surrogate version of the training set.
+
+    Adapted from `ssm.model_selection.cross_val_scores()`.
+    """
+    from ssm import HMM
+
+    # Load the relevant data and create an untrained model with the same parameters as
+    # is used for training models in the main script.
+    raster = get_raster(source, exp, bin_size_ms)
+    data = raster._raster
+    fake_data = raster.randomized()._raster
+    hmm = HMM(K=n_states, D=raster._raster.shape[1], observations="poisson")
+
+    # Allocate space for train and test log-likelihoods, as well as LL on the surrogate
+    # data of the same shape as the validation set.
+    scores = dict(
+        training=np.empty(n_folds),
+        validation=np.empty(n_folds),
+        surrogate=np.empty(n_folds),
+    )
+
+    for r in range(n_folds):
+        # Create mask for training data.
+        train_mask = np.ones_like(data, dtype=bool)
+
+        # Determine number of heldout points.
+        n_total = np.sum(train_mask)
+        obs_inds = np.argwhere(train_mask)
+        heldout_num = int(n_total * 0.1)
+
+        # Randomly hold out speckled data pattern.
+        heldout_flat_inds = np.random.choice(n_total, heldout_num, replace=False)
+
+        # Create training mask.
+        i, j = obs_inds[heldout_flat_inds].T
+        train_mask[i, j] = False
+
+        # Fit model with training mask.
+        hmm.fit(
+            data,
+            masks=train_mask,
+            tolerance=FIT_ATOL,
+            num_iters=FIT_N_ITER,
+            verbose=2,
+        )
+
+        # Compute log-likelihood on full, training, and surrogate training data.
+        full_ll = hmm.log_likelihood(data)
+        train_ll = hmm.log_likelihood(data, masks=train_mask)
+        surr_ll = hmm.log_likelihood(fake_data, masks=~train_mask)
+
+        # Total number of training and observed datapoints.
+        n_train = train_mask.sum()
+
+        # Calculate normalized log-likelihood scores.
+        scores["training"][r] = train_ll / n_train
+        scores["validation"][r] = (full_ll - train_ll) / (n_total - n_train)
+        scores["surrogate"][r] = surr_ll / (n_total - n_train)
+
+    return scores
 
 
 class Model:

@@ -3,15 +3,15 @@
 # A script which takes a data source plus lists of experiment IDs, bin
 # sizes, and numbers of hidden states, checks which ones are already on
 # S3, and adds the rest to the job queue for cross-validation.
+import argparse
 import os
 import sys
-import argparse
-from tqdm import tqdm
+
 import numpy as np
-import awswrangler as wr
-from hmmsupport import _HMM_METHODS, all_experiments
 from braingeneers.iot.messaging import MessageBroker
-from cv_worker import s3_filename
+from tqdm import tqdm
+
+from hmmsupport import all_experiments, cv_scores
 
 
 def ensure_list(str_str):
@@ -33,12 +33,6 @@ def parse_range_str(range_str):
         return np.arange(int(start), int(end) + 1)
     else:
         return np.array([int(range_str)])
-
-
-def hmm_method_type(name):
-    if name not in _HMM_METHODS:
-        raise ValueError
-    return name
 
 
 if __name__ == "__main__":
@@ -80,11 +74,12 @@ if __name__ == "__main__":
     with tqdm(total=len(args.exp) * len(args.bin_sizes) * len(args.n_stateses)) as pbar:
 
         def missing(exp, bin_size_ms, n_states):
-            path = s3_filename(args.source, exp, bin_size_ms, n_states)
-            if ret := not wr.s3.does_object_exist(path):
-                tqdm.write(f" {args.source}/{exp}: T={bin_size_ms}ms, K={n_states}.")
-            pbar.update()
-            return ret
+            return cv_scores.check_call_in_cache(
+                args.source,
+                exp,
+                bin_size_ms,
+                n_states,
+            )
 
         needs_run = [
             (exp, bin_size_ms, n_states)
