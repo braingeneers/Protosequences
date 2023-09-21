@@ -3,7 +3,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from matplotlib.ticker import PercentFormatter
 from scipy import stats
 from sklearn.decomposition import PCA
@@ -186,31 +185,48 @@ def auc_pval(auc, labels):
     return stats.norm(μ, σ).cdf((1 - auc) * ep * en)
 
 
-consistencies = {}
+consistencies_real, consistencies_rsm = {}, {}
 for exp in tqdm(experiments):
-    consistencies[exp] = mean_consistency(
-        all_the_scores(exp, True, rsm=False),
-    ) - mean_consistency(
-        all_the_scores(exp, True, rsm=True),
-    )
+    consistencies_real[exp] = mean_consistency(all_the_scores(exp, True, rsm=False))
+    consistencies_rsm[exp] = mean_consistency(all_the_scores(exp, True, rsm=True))
 
-df = []
-for exp in experiments:
-    for unitgroup in [backbone, nonrigid]:
-        label = 1 if unitgroup is backbone else 0
-        df.extend(
-            dict(
-                experiment=exp,
-                model=groups[exp_to_model[exp]],
-                consistency=c,
-                label=label,
-                backbone="Backbone" if label else "Non-Rigid",
-            )
-            for c in consistencies[exp][unitgroup[exp]]
+df = pd.DataFrame(
+    [
+        dict(
+            experiment=exp,
+            model=groups[exp_to_model[exp]],
+            consistency=c_real - c_rsm,
+            consistency_real=c_real,
+            consistency_rsm=c_rsm,
+            label=label,
+            backbone="Backbone" if label else "Non-Rigid",
         )
-df = pd.DataFrame(df)
+        for exp in experiments
+        for label, unitgroup in enumerate([nonrigid, backbone])
+        for c_real, c_rsm in zip(
+            consistencies_real[exp][unitgroup[exp]],
+            consistencies_rsm[exp][unitgroup[exp]],
+        )
+    ]
+)
 
 # %%
+
+
+def fraction_above_xs(xs, data, backbone=None, model=None):
+    """
+    Compute the fraction of data points above each threshold in `xs`.
+    """
+    if backbone is not None:
+        data = data[data.label == int(backbone)]
+    if model is not None:
+        data = data[data.model == model]
+    return np.array(
+        [
+            [(dsub.consistency_real >= x).mean() for x in xs]
+            for _, dsub in data.groupby("experiment")
+        ]
+    )
 
 
 with figure("Fig7", figsize=(8.5, 3.0)) as f:
@@ -230,24 +246,24 @@ with figure("Fig7", figsize=(8.5, 3.0)) as f:
     G.xaxis.set_major_formatter(PercentFormatter(1, 0))
 
     # Subfigure H: split violins of consistency by backbone/non-rigid.
-    sns.violinplot(
-        bw=0.1,
-        data=df,
-        ax=H,
-        split=True,
-        x="model",
-        y="consistency",
-        hue="backbone",
-        inner=None,
-        cut=0,
-        width=1,
-    )
-    H.set_ylabel(
-        "Fraction of Non-Poisson States per Unit:\n"
-        "Difference Between Real and Surrogate"
-    )
-    H.set_xlabel(None)
-    H.legend(loc="upper right")
+    xs = np.linspace(0.5, 1, 100)
+    for model in ["Organoid", "Slice", "Primary"]:
+        y_bb = fraction_above_xs(xs, df, True, model)
+        y_nr = fraction_above_xs(xs, df, False, model)
+        ys = y_bb - y_nr
+        H.plot(xs, ys.mean(0), label=model)
+        H.fill_between(
+            xs,
+            ys.mean(0) - ys.std(0),
+            ys.mean(0) + ys.std(0),
+            alpha=0.5,
+            color=H.get_lines()[-1].get_color(),
+        )
+    H.set_ylim(0, 0.8)
+    H.set_xlim(0.5, 1)
+    H.legend()
+    H.set_xlabel("Non-Poisson Threshold")
+    H.set_ylabel("Fraction of Non-Poisson Units")
 
 
 # %%
@@ -265,4 +281,3 @@ with figure("Supplement to Fig7") as f:
     ax.set_ylim(1, 6)
     ax.set_xlim(0.7, 1)
     ax.xaxis.set_major_formatter(PercentFormatter(1, 0))
-
