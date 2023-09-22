@@ -336,3 +336,11 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
     F.set_yticks(ticks, [f"{100*t:.0f}\\%" for t in ticks])
     F.set_ylabel("Backbone Classification Accuracy")
     F.legend(loc="lower right")
+
+
+# Also print the accuracy stats for part F.
+all_sep_fr = np.array(list(sep_on_fr.values()))
+all_sep_states = np.hstack(list(sep_on_states.values()))
+print(f"Separability by FR: {all_sep_fr.mean():.2%} +/- {all_sep_fr.std():.2%}")
+print(f"Separability by structure: {all_sep_states.mean():.2%} "
+      f"+/- {all_sep_states.std():.2%}")
