@@ -79,22 +79,31 @@ if __name__ == "__main__":
         for n_states in args.n_stateses
     ]
 
-    needs_run = Parallel(n_jobs=-1, backend="threading")(
-        delayed(cv_scores.check_call_in_cache)(args.source, *p)
-        for p in tqdm(all_params)
-    )
+    with tqdm(total=len(all_params)) as pbar:
 
-    job_params = [p for p, cached in zip(all_params, needs_run) if not cached]
+        def is_missing(p):
+            missing = not cv_scores.check_call_in_cache(args.source, *p)
+            pbar.update()
+            if missing:
+                tqdm.write(f"  {args.source}/{p[0]} with T={p[1]}ms, K={p[2]}.")
+            return missing
+
+        needs_run = Parallel(n_jobs=-1, backend="threading")(
+            delayed(is_missing)(p) for p in all_params
+        )
+
+    job_params = [p for p, missing in zip(all_params, needs_run) if missing]
 
     if not job_params:
         print("Nothing. All CV jobs are already done.")
         sys.exit()
 
-    print(f"Queueing {len(job_params)} CV jobs...")
-
     # If this is a dry run, don't actually bother queueing anything.
     if args.dryrun:
+        print(f"Would have fit {len(job_params)} CV jobs.")
         sys.exit()
+
+    print(f"Queueing {len(job_params)} CV jobs...")
 
     # Get the MQTT queue, clearing it if requested.
     queue_name = f"{os.environ.get('S3_USER')}/cv-job-queue"
