@@ -9,11 +9,12 @@ from sklearn.pipeline import make_pipeline
 from tqdm import tqdm
 
 import hmmsupport
-from hmmsupport import get_raster, figure, load_metrics, Model, all_experiments
-
+from hmmsupport import Model, all_experiments, figure, get_raster, load_metrics
 
 source = "org_and_slice"
 experiments = [exp for exp in all_experiments(source) if exp.startswith("L")]
+# Put the first experiment last because it's actually L10.
+experiments = experiments[1:] + experiments[:1]
 
 plt.ion()
 hmmsupport.figdir("paper")
@@ -295,7 +296,7 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
     D.xaxis.set_label_coords(0.54, -0.125)
     D.set_ylabel("State")
     D.yaxis.set_label_coords(-0.08, 0.5)
-    D_cbar = plt.colorbar(D_im, ax=D, aspect=15, ticks=[0, 1])
+    plt.colorbar(D_im, ax=D, aspect=15, ticks=[0, 1])
 
     # Subfigure E: PCA of consistency scores for a single organoid, showing
     # that it's sufficient to separate packet/non-packet units.
@@ -342,5 +343,32 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
 all_sep_fr = np.array(list(sep_on_fr.values()))
 all_sep_states = np.hstack(list(sep_on_states.values()))
 print(f"Separability by FR: {all_sep_fr.mean():.2%} +/- {all_sep_fr.std():.2%}")
-print(f"Separability by structure: {all_sep_states.mean():.2%} "
-      f"+/- {all_sep_states.std():.2%}")
+print(
+    f"Separability by structure: {all_sep_states.mean():.2%} "
+    f"+/- {all_sep_states.std():.2%}"
+)
+
+
+# %%
+
+with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
+    axes = f.subplots(4, 2)
+    for ax, exp in zip(axes.flat, experiments):
+        r = rasters_real[exp][0]
+        scores = consistency_real[exp][10]
+        ax.imshow(
+            scores[:, ::-1],
+            aspect="auto",
+            interpolation="none",
+            vmin=0,
+            vmax=1,
+            extent=[1, r.N, 20.5, 0.5],
+        )
+        n_rigid = len(metricses[exp]["scaf_units"])
+        ax.set_xticks(np.array([1, n_rigid, r.N]))
+        ax.set_yticks([1, 20])
+        ax.set_xlabel(r"Backbone \hspace{1.6cm} Non-Rigid")
+        # ax.xaxis.set_label_coords(0.54, -0.125)
+        ax.set_ylabel("State")
+        ax.yaxis.set_label_coords(-0.08, 0.5)
+        ax.set_title(f"Organoid {exp.split('_', 1)[0]}")
