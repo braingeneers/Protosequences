@@ -72,19 +72,24 @@ def components_required(exp, thresh, rsm=False, which_models=None):
     ]
 
 
-def plot_pev(ax, color, experiments, label, rsm=False, which_models=None):
+def plot_dimensions_required(
+    ax, color, experiments, label, rsm=False, which_models=None
+):
     xs = np.linspace(0.705, 1)
-    pev = [
+    dimensions_required = [
         np.hstack(
-            components_required(exp, x, rsm=rsm, which_models=which_models)
-            for exp in experiments
+            [
+                components_required(exp, x, rsm=rsm, which_models=which_models)
+                for exp in experiments
+            ]
         )
         for x in xs
     ]
-    ys = np.mean(pev, axis=1)
-    ystd = np.std(pev, axis=1)
+    ys = np.mean(dimensions_required, axis=1)
+    ystd = np.std(dimensions_required, axis=1)
     ax.fill_between(xs, ys - ystd, ys + ystd, alpha=0.2, color=color, label=label)
     ax.plot(xs, ys, color=color)
+    return dimensions_required
 
 
 def poisson_test(data, mean=None):
@@ -185,28 +190,22 @@ def auc_pval(auc, labels):
     return stats.norm(μ, σ).cdf((1 - auc) * ep * en)
 
 
-consistencies_real, consistencies_rsm = {}, {}
-for exp in tqdm(experiments):
-    consistencies_real[exp] = mean_consistency(all_the_scores(exp, True, rsm=False))
-    consistencies_rsm[exp] = mean_consistency(all_the_scores(exp, True, rsm=True))
+consistencies = {
+    e: mean_consistency(all_the_scores(e, True, rsm=False)) for e in tqdm(experiments)
+}
 
 df = pd.DataFrame(
     [
         dict(
             experiment=exp,
             model=groups[exp_to_model[exp]],
-            consistency=c_real - c_rsm,
-            consistency_real=c_real,
-            consistency_rsm=c_rsm,
+            consistency=c,
             label=label,
             backbone="Backbone" if label else "Non-Rigid",
         )
         for exp in experiments
         for label, unitgroup in enumerate([nonrigid, backbone])
-        for c_real, c_rsm in zip(
-            consistencies_real[exp][unitgroup[exp]],
-            consistencies_rsm[exp][unitgroup[exp]],
-        )
+        for c in consistencies[exp][unitgroup[exp]]
     ]
 )
 
@@ -223,7 +222,7 @@ def fraction_above_xs(xs, data, backbone=None, model=None):
         data = data[data.model == model]
     return np.array(
         [
-            [(dsub.consistency_real >= x).mean() for x in xs]
+            [(dsub.consistency >= x).mean() for x in xs]
             for _, dsub in data.groupby("experiment")
         ]
     )
@@ -233,11 +232,16 @@ with figure("Fig7", figsize=(8.5, 3.0)) as f:
     G, H = f.subplots(1, 2, gridspec_kw=dict(width_ratios=[2, 3]))
 
     # Subfigure G: dimensionality as a function of PC inclusion threshold.
-    which_models = 10, 25
+    which_models = 10, 30
+    dimensions = {}
     for i, prefix in enumerate(groups):
         expsub = [e for e in experiments if e.startswith(prefix)]
-        plot_pev(G, f"C{i}", expsub, groups[prefix], which_models=which_models)
-    plot_pev(G, "red", experiments, "Surrogate", rsm=True, which_models=which_models)
+        dimensions[prefix] = plot_dimensions_required(
+            G, f"C{i}", expsub, groups[prefix], which_models=which_models
+        )
+    dimensions["*"] = plot_dimensions_required(
+        G, "red", experiments, "Surrogate", rsm=True, which_models=which_models
+    )
     G.legend(loc="upper left")
     G.set_xlabel("Explained Variance Threshold")
     G.set_ylabel("Dimensions Required")
@@ -251,7 +255,7 @@ with figure("Fig7", figsize=(8.5, 3.0)) as f:
         y_bb = fraction_above_xs(xs, df, True, model)
         y_nr = fraction_above_xs(xs, df, False, model)
         ys = y_bb - y_nr
-        H.plot(xs, ys.mean(0), label=model)
+        H.semilogy(xs, ys.mean(0), label=model)
         H.fill_between(
             xs,
             ys.mean(0) - ys.std(0),
@@ -259,22 +263,31 @@ with figure("Fig7", figsize=(8.5, 3.0)) as f:
             alpha=0.5,
             color=H.get_lines()[-1].get_color(),
         )
-    H.set_ylim(0, 0.8)
+    H.set_ylim(1e-3, 1)
     H.set_xlim(0.5, 1)
     H.legend()
     H.set_xlabel("Non-Poisson Threshold")
     H.set_ylabel("Fraction of Non-Poisson Units")
 
 
+for a, b in [("L", "M"), ("M", "Pr"), ("L", "Pr")]:
+    scores = [stats.mannwhitneyu(A, B).pvalue for A, B in zip(dimensions[a], dimensions[b])]
+    print(f"{a} vs {b}: {np.average(scores):.3%}")
+
+
 # %%
 
 with figure("Supplement to Fig7") as f:
     ax = f.gca()
-    which_models = 25, 50
+    which_models = 30, 50
     for i, prefix in enumerate(groups):
         expsub = [e for e in experiments if e.startswith(prefix)]
-        plot_pev(ax, f"C{i}", expsub, groups[prefix], which_models=which_models)
-    plot_pev(ax, "red", experiments, "Surrogate", rsm=True, which_models=which_models)
+        plot_dimensions_required(
+            ax, f"C{i}", expsub, groups[prefix], which_models=which_models
+        )
+    plot_dimensions_required(
+        ax, "red", experiments, "Surrogate", rsm=True, which_models=which_models
+    )
     ax.legend(loc="upper left")
     ax.set_xlabel("Explained Variance Threshold")
     ax.set_ylabel("Dimensions Required")
