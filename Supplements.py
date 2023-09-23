@@ -1,18 +1,15 @@
 # Supplements.py
 # Generate various miscellaneous supplemental figures.
-import glob
-import os
-import pickle
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from tqdm import tqdm
 
 import hmmsupport
-from hmmsupport import Model, all_experiments, figure, get_raster
+from hmmsupport import Model, all_experiments, cv_scores, figure, get_raster
 
-hmmsupport.figdir("supplements")
+hmmsupport.figdir("paper")
 plt.ion()
 
 
@@ -68,21 +65,28 @@ with figure("Population Rate by State", figsize=(8.5, 11)) as f:
 # for the shuffled data.
 
 source = "org_and_slice"
-cv_score_files = glob.glob(f".cache/cv_scores/{source}_*")
-df = []
-for path in cv_score_files:
-    # Load the scores from the file itself.
-    with open(path, "rb") as f:
-        scores = pickle.load(f)
-        if "surrogate" not in scores:
-            print(f"Skipping {path} because it doesn't have surrogate scores.")
-            continue
+experiments = [e for e in all_experiments(source) if e.startswith("L")]
+# Note that these *have* to be np.int64 because joblib uses argument hashes that
+# are different for different integer types!
+n_stateses = np.arange(10, 31)
+bin_sizes_ms = np.array([10, 20, 30, 50, 70, 100])
+cv_scoreses = {}
+for p in tqdm(
+    [
+        (exp, bin_size_ms, n_states)
+        for exp in experiments
+        for bin_size_ms in bin_sizes_ms
+        for n_states in n_stateses
+    ]
+):
+    if cv_scores.check_call_in_cache(source, *p):
+        cv_scoreses[p] = cv_scores(source, *p)
+    else:
+        tqdm.write(f"Missing {p}")
 
-    # Extract some metadata from the filename.
-    name_parts = os.path.basename(path).split("_")
-    organoid = name_parts[3]
-    bin_size_ms = int(name_parts[-3].removesuffix("ms"))
-    num_states = int(name_parts[-2].removeprefix("K"))
+df = []
+for (exp, bin_size_ms, num_states), scores in cv_scoreses.items():
+    organoid = exp.split("_", 1)[0]
 
     # Combine those into dataframe rows, one per score rather than one per file
     # like a db normalization because plotting will expect that later anyway.
@@ -99,13 +103,11 @@ df = pd.DataFrame(sorted(df, key=lambda row: int(row["organoid"][1:])))
 
 with figure("Cross-Validation Scores") as f:
     ax = f.gca()
-    sns.violinplot(
+    sns.boxplot(
         data=df,
-        x="bin_size",
+        x="organoid",
         y="score",
         ax=ax,
-        inner=None,
-        scale="count",
     )
-    ax.set_ylabel("$\Delta$ Log Likelihood")
+    ax.set_ylabel("$\Delta$ Log Likelihood Real vs. Surrogate")
     ax.set_xlabel("Organoid")
