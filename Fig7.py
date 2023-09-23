@@ -72,24 +72,29 @@ def components_required(exp, thresh, rsm=False, which_models=None):
     ]
 
 
+def dimensions_required(experiments, xs, rsm=False, which_models=None):
+    return np.array(
+        [
+            np.hstack(
+                [
+                    components_required(exp, x, rsm=rsm, which_models=which_models)
+                    for exp in experiments
+                ]
+            )
+            for x in xs
+        ]
+    )
+
+
 def plot_dimensions_required(
     ax, color, experiments, label, rsm=False, which_models=None
 ):
     xs = np.linspace(0.705, 1)
-    dimensions_required = [
-        np.hstack(
-            [
-                components_required(exp, x, rsm=rsm, which_models=which_models)
-                for exp in experiments
-            ]
-        )
-        for x in xs
-    ]
-    ys = np.mean(dimensions_required, axis=1)
-    ystd = np.std(dimensions_required, axis=1)
+    dreq = dimensions_required(experiments, xs, rsm, which_models)
+    ys = np.mean(dreq, axis=1)
+    ystd = np.std(dreq, axis=1)
     ax.fill_between(xs, ys - ystd, ys + ystd, alpha=0.2, color=color, label=label)
     ax.plot(xs, ys, color=color)
-    return dimensions_required
 
 
 def poisson_test(data, mean=None):
@@ -233,13 +238,12 @@ with figure("Fig7", figsize=(8.5, 3.0)) as f:
 
     # Subfigure G: dimensionality as a function of PC inclusion threshold.
     which_models = 10, 30
-    dimensions = {}
     for i, prefix in enumerate(groups):
         expsub = [e for e in experiments if e.startswith(prefix)]
-        dimensions[prefix] = plot_dimensions_required(
+        plot_dimensions_required(
             G, f"C{i}", expsub, groups[prefix], which_models=which_models
         )
-    dimensions["*"] = plot_dimensions_required(
+    plot_dimensions_required(
         G, "red", experiments, "Surrogate", rsm=True, which_models=which_models
     )
     G.legend(loc="upper left")
@@ -270,16 +274,28 @@ with figure("Fig7", figsize=(8.5, 3.0)) as f:
     H.set_ylabel("Fraction of Non-Poisson Units")
 
 
-for a, b in [("L", "M"), ("M", "Pr"), ("L", "Pr")]:
-    scores = [stats.mannwhitneyu(A, B).pvalue for A, B in zip(dimensions[a], dimensions[b])]
-    print(f"{a} vs {b}: {np.average(scores):.3%}")
+# %%
+
+which_models = 10, 50
+dimensions = {}
+xs = np.linspace(0, 1, num=100)[1:]
+for i, prefix in enumerate(groups):
+    expsub = [e for e in experiments if e.startswith(prefix)]
+    dimensions[prefix] = dimensions_required(expsub, xs, which_models=which_models)
+dimensions["*"] = dimensions_required(
+    experiments, xs, which_models=which_models, rsm=True
+)
+
+for a, b in [("L", "M"), ("M", "Pr"), ("L", "Pr"), ("M", "*"), ("L", "*"), ("Pr", "*")]:
+    scores = stats.mannwhitneyu(dimensions[a], dimensions[b], axis=1).pvalue
+    print(a, b, stats.gmean(scores[~np.isnan(scores)]))
 
 
 # %%
 
 with figure("Supplement to Fig7") as f:
     ax = f.gca()
-    which_models = 30, 50
+    which_models = 10, 50
     for i, prefix in enumerate(groups):
         expsub = [e for e in experiments if e.startswith(prefix)]
         plot_dimensions_required(
