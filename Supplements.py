@@ -68,42 +68,7 @@ with figure("Population Rate by State", figsize=(8.5, 11)) as f:
 # Cross-validation proving that the model performance is better for the real data than
 # for the shuffled data.
 
-source = "org_and_slice"
-experiments = [e for e in all_experiments(source) if e.startswith("L")]
-# Note that these *have* to be np.int64 because joblib uses argument hashes that
-# are different for different integer types!
-n_stateses = np.arange(10, 31)
-bin_sizes_ms = np.array([10, 20, 30, 50, 70, 100])
-cv_scoreses = {}
-for p in tqdm(
-    [
-        (exp, bin_size_ms, n_states)
-        for exp in experiments
-        for bin_size_ms in bin_sizes_ms
-        for n_states in n_stateses
-    ]
-):
-    if cv_scores.check_call_in_cache(source, *p):
-        cv_scoreses[p] = cv_scores(source, *p)
-    else:
-        tqdm.write(f"Missing {p}")
-
-df = []
-for (exp, bin_size_ms, num_states), scores in cv_scoreses.items():
-    organoid = exp.split("_", 1)[0]
-
-    # Combine those into dataframe rows, one per score rather than one per file
-    # like a db normalization because plotting will expect that later anyway.
-    df.extend(
-        dict(
-            organoid=organoid,
-            bin_size=bin_size_ms,
-            states=num_states,
-            score=value,
-        )
-        for value in scores["validation"] - scores["surrogate"]
-    )
-df = pd.DataFrame(sorted(df, key=lambda row: int(row["organoid"][1:])))
+from cv_scores_df import df
 
 with figure("Cross-Validation Scores") as f:
     ax = f.gca()
