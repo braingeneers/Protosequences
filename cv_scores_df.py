@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 
 from hmmsupport import all_experiments, cv_scores, memoize
 
@@ -10,22 +9,22 @@ def cv_scores_df():
     source = "org_and_slice"
     # Note that these *have* to be np.int64 because joblib uses argument hashes that
     # are different for different integer types!
-    n_stateses = np.arange(10, 31)
-    bin_sizes_ms = np.array([10, 20, 30, 50, 70, 100])
-    cv_scoreses = {}
-    for p in tqdm(
-        [
-            (exp, bin_size_ms, n_states)
+    params = [
+            (exp, np.int64(bin_size_ms), np.int64(n_states))
             for exp in all_experiments(source)
             if exp.startswith("L")
-            for bin_size_ms in bin_sizes_ms
-            for n_states in n_stateses
+            for bin_size_ms in [10, 20, 30, 50, 70, 100]
+            for n_states in range(10, 51)
         ]
-    ):
+    cv_scoreses = {}
+    total = len(params)
+    for i,p in enumerate(params):
         if cv_scores.check_call_in_cache(source, *p):
             cv_scoreses[p] = cv_scores(source, *p)
+            status = "OK"
         else:
-            tqdm.write(f"Missing {p}")
+            status = "NOT IN CACHE!"
+        print(f"{i}/{total} {p} {status}")
 
     df = []
     for (exp, bin_size_ms, num_states), scores in cv_scoreses.items():

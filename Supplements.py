@@ -11,7 +11,7 @@ from scipy import stats
 from tqdm import tqdm
 
 import hmmsupport
-from hmmsupport import Model, all_experiments, cv_scores, figure, get_raster
+from hmmsupport import Model, all_experiments, figure, get_raster
 
 hmmsupport.figdir("paper")
 plt.ion()
