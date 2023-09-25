@@ -412,7 +412,7 @@ def figure(name, save_args={}, save=True, save_exts=["png"], **kwargs):
             f.savefig(path, **save_args)
 
 
-def load_raw(source, filename, only_include=None, in_memory=True):
+def load_raw(source, filename, only_include=None, in_memory=None):
     """
     Load raw data from a .mat file under a data directory. If the file cannot be
     found, return None if error=False, otherwise raise an exception.
@@ -425,8 +425,11 @@ def load_raw(source, filename, only_include=None, in_memory=True):
     if not filename.endswith(".mat"):
         filename = filename + ".mat"
 
-    # Load into memory because these methods use a ton of random
-    # access and it gets really slow with smart_open.
+    # By default, load the data into memory only if we're not going to do
+    # terribly much random access.
+    if in_memory is None:
+        in_memory = only_include is None or len(only_include) > 5
+
     with open(data_dir(source) + "/" + filename, "rb") as f:
         if in_memory:
             f = BytesIO(f.read())
@@ -436,7 +439,7 @@ def load_raw(source, filename, only_include=None, in_memory=True):
             return mat73.loadmat(f, only_include=only_include, verbose=False)
 
 
-def load_metrics(exp, only_include=None, in_memory=True):
+def load_metrics(exp, only_include=None, in_memory=None):
     "Use load_raw to get the metrics for an experiment."
     filename = exp.split("_", 1)[0] + "_single_recording_metrics.mat"
     return load_raw("metrics", filename, only_include, in_memory)

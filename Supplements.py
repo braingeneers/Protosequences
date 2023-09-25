@@ -1,14 +1,11 @@
 # Supplements.py
 # Generate various miscellaneous supplemental figures.
 import itertools
-import math
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import seaborn as sns
 from scipy import stats
-from tqdm import tqdm
 
 import hmmsupport
 from hmmsupport import Model, all_experiments, figure, get_raster
@@ -68,12 +65,12 @@ with figure("Population Rate by State", figsize=(8.5, 11)) as f:
 # Cross-validation proving that the model performance is better for the real data than
 # for the shuffled data.
 
-from cv_scores_df import df
+from cv_scores_df import df as cv_scores
 
 with figure("Cross-Validation Scores") as f:
     ax = f.gca()
     sns.boxplot(
-        data=df,
+        data=cv_scores,
         x="organoid",
         y="score",
         ax=ax,
@@ -85,75 +82,7 @@ with figure("Cross-Validation Scores") as f:
 # %%
 # State traversal statistics.
 
-source = "org_and_slice"
-exps = hmmsupport.all_experiments(source)
-n_stateses = range(10, 51)
-subsets = {
-    "Mouse": [e for e in exps if e[0] == "M"],
-    "Organoid": [e for e in exps if e[0] == "L"],
-    "Primary": [e for e in exps if e[0] == "P"],
-}
-
-metrics = {
-    exp: hmmsupport.load_metrics(
-        exp,
-        only_include=["scaf_window", "tburst"],
-        in_memory=False,
-    )
-    for exp in tqdm(exps, desc="Loading metrics")
-}
-
-models = {
-    exp: [hmmsupport.Model(source, exp, 30, K) for K in n_stateses]
-    for exp in tqdm(exps, desc="Loading models")
-}
-
-rasters = {
-    exp: hmmsupport.get_raster(source, exp, 30)
-    for exp in tqdm(exps, desc="Loading rasters")
-}
-
-
-def states_traversed(exp):
-    """
-    For each model for the given experiment, return the average number of
-    distinct states traversed per second in the scaffold window.
-    """
-    start, stop = metrics[exp]["scaf_window"].ravel()
-
-    for model in models[exp]:
-        T = model.bin_size_ms
-        h = model.states(rasters[exp])
-        length = math.ceil((stop - start) / T)
-        yield [
-            h[(bin0 := int((peak + start) / T)) : bin0 + length]
-            for peak in metrics[exp]["tburst"].ravel()
-        ]
-
-
-def distinct_states_traversed(exp):
-    """
-    Calculate the average number of distinct states traversed per second
-    in the scaffold window for each model for the provided experiment.
-    """
-    return [
-        1e3 * np.mean([len(set(states)) / len(states) for states in model_states])
-        for model_states in states_traversed(exp)
-    ]
-
-
-traversed = pd.DataFrame(
-    dict(
-        traversed=count,
-        model=model,
-        exp=exp.split("_", 1)[0],
-        n_states=n_states,
-    )
-    for model, exps in subsets.items()
-    for exp in tqdm(exps, desc=model)
-    for n_states, count in zip(n_stateses, distinct_states_traversed(exp))
-)
-
+from state_traversal import df as traversed
 
 with figure("States Traversed by Model") as f:
     groups = {k: vs.traversed for k, vs in traversed.groupby("model")}
@@ -185,8 +114,9 @@ with figure("States Traversed by Experiment") as f:
     ax.legend(loc="lower right")
 
 
-for a, b in itertools.combinations(subsets.keys(), 2):
-    ks = stats.ks_2samp(traversed[a], traversed[b])
+subframes = {model: subframe for model, subframe in traversed.groupby("model")}
+for a, b in itertools.combinations(subframes.keys(), 2):
+    ks = stats.ks_2samp(subframes[a].traversed, subframes[b].traversed)
     if (p := ks.pvalue) < 1e-3:
         stat = ks.statistic
         print(f"{a} vs. {b} is significant at ks = {stat:.2}, p = {100*p:.1e}% < 0.1%")
