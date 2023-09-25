@@ -412,12 +412,12 @@ def figure(name, save_args={}, save=True, save_exts=["png"], **kwargs):
             f.savefig(path, **save_args)
 
 
-def load_raw(source, filename, only_include=None, error=True):
+def load_raw(source, filename, only_include=None, in_memory=True):
     """
     Load raw data from a .mat file under a data directory. If the file cannot be
     found, return None if error=False, otherwise raise an exception.
-    Optionally only include a subset of variables, but for now this still loads
-    the entire file into memory.
+    Optionally only include a subset `only_include` of variables, also try
+    loading directly from S3 without downloading if `in_memory` is False.
     """
 
     # We have to do this manually since we're using open() instead of
@@ -427,21 +427,19 @@ def load_raw(source, filename, only_include=None, error=True):
 
     # Load into memory because these methods use a ton of random
     # access and it gets really slow with smart_open.
-    try:
-        with open(data_dir(source) + "/" + filename, "rb") as f:
-            contents = BytesIO(f.read())
-        return scipy.io.loadmat(contents, variable_names=only_include)
-    except NotImplementedError:
-        return mat73.loadmat(contents, only_include=only_include, verbose=False)
-    except (OSError, FileNotFoundError):
-        if error:
-            raise
+    with open(data_dir(source) + "/" + filename, "rb") as f:
+        if in_memory:
+            f = BytesIO(f.read())
+        try:
+            return scipy.io.loadmat(f, variable_names=only_include)
+        except NotImplementedError:
+            return mat73.loadmat(f, only_include=only_include, verbose=False)
 
 
-def load_metrics(exp, only_include=None, error=True):
+def load_metrics(exp, only_include=None, in_memory=True):
     "Use load_raw to get the metrics for an experiment."
     filename = exp.split("_", 1)[0] + "_single_recording_metrics.mat"
-    return load_raw("metrics", filename, only_include, error)
+    return load_raw("metrics", filename, only_include, in_memory)
 
 
 @functools.lru_cache

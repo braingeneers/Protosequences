@@ -130,7 +130,11 @@ subsets = {
 }
 
 metrics = {
-    exp: hmmsupport.load_metrics(exp, error=False)
+    exp: hmmsupport.load_metrics(
+        exp,
+        only_include=["scaf_window", "tburst"],
+        in_memory=False,
+    )
     for exp in tqdm(exps, desc="Loading metrics")
 }
 
@@ -188,14 +192,29 @@ traversed = pd.DataFrame(
 
 with figure("States Traversed by Model") as f:
     groups = {k: vs.traversed for k, vs in traversed.groupby("model")}
-    ax = sns.violinplot(traversed, x="model", y="traversed", ax=f.gca(),
-                        cut=0, inner=None, scale="count")
+    ax = sns.violinplot(
+        traversed,
+        x="model",
+        y="traversed",
+        ax=f.gca(),
+        cut=0,
+        inner=None,
+        scale="count",
+    )
     ax.set_ylabel("Average States Traversed in Per Second in Scaffold Window")
     ax.set_xlabel("")
 
 with figure("States Traversed by Experiment") as f:
-    ax = sns.violinplot(traversed, x="exp", y="traversed", ax=f.gca(), cut=0,
-                        inner=None, scale="count", hue="model")
+    ax = sns.violinplot(
+        traversed,
+        x="exp",
+        y="traversed",
+        ax=f.gca(),
+        cut=0,
+        inner=None,
+        scale="count",
+        hue="model",
+    )
     ax.set_ylabel("Average States Traversed in Per Second in Scaffold Window")
     ax.set_xlabel("")
     ax.legend(loc="lower right")
