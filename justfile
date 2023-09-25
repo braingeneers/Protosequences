@@ -24,19 +24,24 @@ queue-hmm src exp bin_size ks surrogate="real" method="default":
 queue-cv src exp bin_size ks:
     python do_cv.py "{{src}}" "{{exp}}" "{{bin_size}}" "{{ks}}"
 
-add-worker for="hmm" n="1" memory_gi="4":
+launch script memory_gi="4" n="1":
     #! /usr/bin/bash
     if [ -z "$S3_USER" ]; then
         echo \$S3_USER must be defined. >&2
         exit 1
     fi
-    export WORKER_TYPE={{for}}
+    export SCRIPT_NAME=$(basename "{{script}}" .py)
+    export CLEAN_NAME=$(echo $SCRIPT_NAME | tr _ -)
+    if [ ! -f "$SCRIPT_NAME.py" ]; then
+        echo "Script {{script}} not found in CURRENT directory." >&2
+        exit 1
+    fi
     export CONTAINER_IMAGE={{container}}
     export NRP_MEMORY_GI={{memory_gi}}
     export NRP_MEMORY_LIMIT_GI=$(( {{memory_gi}} * 14 / 10 ))
-    echo "Running with {{memory_gi}}GiB RAM"
+    echo "Launching {{n}} jobs with {{memory_gi}}GiB RAM"
     for i in $(seq "{{n}}"); do
         stamp=$(printf '%(%m%d%H%M%S)T\n' -1)
-        export JOB_NAME=$S3_USER-{{for}}-worker--$stamp$i
-        envsubst < worker.yml | kubectl apply -f -
+        export JOB_NAME=$S3_USER--$CLEAN_NAME--$stamp$i
+        envsubst < job.yml | kubectl apply -f -
     done
