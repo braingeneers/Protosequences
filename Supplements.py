@@ -62,18 +62,35 @@ with figure("Population Rate by State", figsize=(8.5, 11)) as f:
 
 
 # %%
+# Demonstrating the plateau that occurs above 10 states.
+
+from cv_plateau_df import df as cv_plateau
+
+with figure("Cross-Validation Plateau") as f:
+    ax = sns.lineplot(
+        data=cv_plateau,
+        x="states",
+        y="ll",
+        hue="organoid",
+        errorbar="sd",
+    )
+    ax.set_ylabel("Posterior Log Likelihood of True Data")
+    ax.set_xlabel("Number of Hidden States in Model")
+    ax.legend(title="Organoid")
+
+
+# %%
 # Cross-validation proving that the model performance is better for the real data than
 # for the shuffled data.
 
 from cv_scores_df import df as cv_scores
 
 with figure("Overall Model Validation") as f:
-    ax = f.gca()
-    sns.boxplot(
+    ax = sns.boxplot(
         data=cv_scores,
         x="organoid",
         y="delta_ll",
-        ax=ax,
+        ax=f.gca(),
     )
     ax.set_ylabel("$\Delta$ Log Likelihood Real vs. Surrogate")
     ax.set_xlabel("Organoid")
@@ -86,7 +103,7 @@ with figure("Cross-Validation by Bin Size") as f:
         y="ll",
         ax=ax,
     )
-    ax.set_ylabel("Log Likelihood of Model")
+    ax.set_ylabel("Log Likelihood of True Data")
     ax.set_xlabel("Bin Size (ms)")
 
 # %%
