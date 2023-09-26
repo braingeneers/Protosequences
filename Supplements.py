@@ -109,6 +109,25 @@ with figure("States Traversed by Model") as f:
     ax.set_ylabel("Average States Traversed in Per Second in Scaffold Window")
     ax.set_xlabel("")
 
+with figure("States Traversed by K") as f:
+    ax = sns.lineplot(
+        traversed,
+        x="n_states",
+        y="traversed",
+        ax=f.gca(),
+        hue="model",
+        errorbar="sd",
+    )
+    ax.set_ylabel("Average States Traversed in Per Second in Scaffold Window")
+    ax.set_xlabel("Number of Hidden States")
+    ax.set_xlim(ax.get_xlim())
+    reg = stats.linregress(traversed.n_states, traversed.traversed)
+    x = np.array([9, 51])
+    ax.plot(x, reg.intercept + reg.slope * x, color="k", linestyle="--",
+            label=f"Trendline ($r^2 = {reg.rvalue**2:.2}$)")
+    ax.legend(loc="lower right")
+
+
 for a, b in itertools.combinations(groups.keys(), 2):
     ks = stats.ks_2samp(groups[a], groups[b])
     if (p := ks.pvalue) < 1e-3:
