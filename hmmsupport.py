@@ -7,9 +7,11 @@ from contextlib import contextmanager
 from io import BytesIO
 
 import awswrangler
+import botocore
 import mat73
 import numpy as np
 import scipy.io
+import tenacity
 from braingeneers.analysis import SpikeData, load_spike_data
 from braingeneers.utils.memoize_s3 import memoize
 from braingeneers.utils.smart_open_braingeneers import open
@@ -412,6 +414,11 @@ def figure(name, save_args={}, save=True, save_exts=["png"], **kwargs):
             f.savefig(path, **save_args)
 
 
+@tenacity.retry(
+    wait=tenacity.wait_random_exponential(multiplier=1, max=60),
+    retry=tenacity.retry_if_exception_type(botocore.exceptions.ClientError),
+    stop=tenacity.stop_after_attempt(10),
+)
 def load_raw(source, filename, only_include=None, in_memory=None):
     """
     Load raw data from a .mat file under a data directory. If the file cannot be
