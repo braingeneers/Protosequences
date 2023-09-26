@@ -1,3 +1,4 @@
+import joblib
 import numpy as np
 import pandas as pd
 
@@ -10,21 +11,24 @@ def cv_scores_df():
     # Note that these *have* to be np.int64 because joblib uses argument hashes that
     # are different for different integer types!
     params = [
-            (exp, np.int64(bin_size_ms), np.int64(n_states))
-            for exp in all_experiments(source)
-            if exp.startswith("L")
-            for bin_size_ms in [10, 20, 30, 50, 70, 100]
-            for n_states in range(10, 51)
-        ]
-    cv_scoreses = {}
-    total = len(params)
-    for i,p in enumerate(params):
+        (exp, np.int64(bin_size_ms), np.int64(n_states))
+        for exp in all_experiments(source)
+        if exp.startswith("L")
+        for bin_size_ms in [10, 20, 30, 50, 70, 100]
+        for n_states in range(10, 51)
+    ]
+
+    def cache_params(i, p):
         if cv_scores.check_call_in_cache(source, *p):
-            cv_scoreses[p] = cv_scores(source, *p)
-            status = "OK"
+            return cv_scores(source, *p)
         else:
-            status = "NOT IN CACHE!"
-        print(f"{i}/{total} {p} {status}")
+            print(f"{i}/{len(params)} {p} MISSING")
+
+    scores = joblib.Parallel(backend="threading", n_jobs=10, verbose=10)(
+        joblib.delayed(cache_params)(i, p) for i, p in enumerate(params)
+    )
+
+    cv_scoreses = dict(zip(params, scores))
 
     df = []
     for (exp, bin_size_ms, num_states), scores in cv_scoreses.items():
@@ -37,9 +41,11 @@ def cv_scores_df():
                 organoid=organoid,
                 bin_size=bin_size_ms,
                 states=num_states,
-                score=value,
+                ll=ll,
+                surr_ll=surr_ll,
+                delta_ll=ll - surr_ll,
             )
-            for value in scores["validation"] - scores["surrogate"]
+            for ll, surr_ll in zip(scores["validation"], scores["surrogate"])
         )
     return pd.DataFrame(sorted(df, key=lambda row: int(row["organoid"][1:])))
 

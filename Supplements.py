@@ -67,27 +67,38 @@ with figure("Population Rate by State", figsize=(8.5, 11)) as f:
 
 from cv_scores_df import df as cv_scores
 
-with figure("Cross-Validation Scores") as f:
+with figure("Overall Model Validation") as f:
     ax = f.gca()
     sns.boxplot(
         data=cv_scores,
         x="organoid",
-        y="score",
+        y="delta_ll",
         ax=ax,
     )
     ax.set_ylabel("$\Delta$ Log Likelihood Real vs. Surrogate")
     ax.set_xlabel("Organoid")
 
+with figure("Cross-Validation by Bin Size") as f:
+    ax = f.gca()
+    sns.boxplot(
+        data=cv_scores,
+        x="bin_size",
+        y="ll",
+        ax=ax,
+    )
+    ax.set_ylabel("Log Likelihood of Model")
+    ax.set_xlabel("Bin Size (ms)")
 
 # %%
 # State traversal statistics.
 
-from state_traversal import df as traversed
+from state_traversal_df import df as traversed
 
 with figure("States Traversed by Model") as f:
     groups = {k: vs.traversed for k, vs in traversed.groupby("model")}
     ax = sns.violinplot(
         traversed,
+        bw=0.1,
         x="model",
         y="traversed",
         ax=f.gca(),
@@ -98,27 +109,10 @@ with figure("States Traversed by Model") as f:
     ax.set_ylabel("Average States Traversed in Per Second in Scaffold Window")
     ax.set_xlabel("")
 
-with figure("States Traversed by Experiment") as f:
-    ax = sns.violinplot(
-        traversed,
-        x="exp",
-        y="traversed",
-        ax=f.gca(),
-        cut=0,
-        inner=None,
-        scale="count",
-        hue="model",
-    )
-    ax.set_ylabel("Average States Traversed in Per Second in Scaffold Window")
-    ax.set_xlabel("")
-    ax.legend(loc="lower right")
-
-
-subframes = {model: subframe for model, subframe in traversed.groupby("model")}
-for a, b in itertools.combinations(subframes.keys(), 2):
-    ks = stats.ks_2samp(subframes[a].traversed, subframes[b].traversed)
+for a, b in itertools.combinations(groups.keys(), 2):
+    ks = stats.ks_2samp(groups[a], groups[b])
     if (p := ks.pvalue) < 1e-3:
         stat = ks.statistic
         print(f"{a} vs. {b} is significant at ks = {stat:.2}, p = {100*p:.1e}% < 0.1%")
     else:
-        print(f"{a} vs. {b} is insignificant ({p = :.1%})")
+        print(f"{a} vs. {b} is insignificant ({p = :.2%})")
