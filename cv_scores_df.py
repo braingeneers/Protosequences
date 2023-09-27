@@ -43,9 +43,12 @@ def cv_scores_df():
                 states=num_states,
                 ll=ll,
                 surr_ll=surr_ll,
+                train_ll=train_ll,
                 delta_ll=ll - surr_ll,
             )
-            for ll, surr_ll in zip(scores["validation"], scores["surrogate"])
+            for ll, surr_ll, train_ll in zip(
+                scores["validation"], scores["surrogate"], scores["training"]
+            )
         )
     return pd.DataFrame(sorted(df, key=lambda row: int(row["organoid"][1:])))
 

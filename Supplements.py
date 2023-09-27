@@ -97,10 +97,10 @@ with figure("Overall Model Validation") as f:
 
 with figure("Cross-Validation by Bin Size") as f:
     ax = f.gca()
-    sns.boxplot(
+    sns.violinplot(
         data=cv_scores,
         x="bin_size",
-        y="ll",
+        y="train_ll",
         ax=ax,
     )
     ax.set_ylabel("Log Likelihood of True Data")
