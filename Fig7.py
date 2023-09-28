@@ -23,14 +23,19 @@ hmmsupport.figdir("paper")
 bin_size_ms = 30
 n_stateses = np.arange(10, 51)
 
+
+backbone, nonrigid = {}, {}
+for exp in tqdm(experiments):
+    metrics = load_metrics(exp, only_include=["scaf_units", "non_scaf_units"])
+    backbone[exp] = np.int32(metrics["scaf_units"].ravel()) - 1
+    nonrigid[exp] = np.int32(metrics["non_scaf_units"].ravel()) - 1
+
+
 print("Loading real and surrogate rasters and doing PCA on HMMs.")
 with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:
-    rasters_real, rasters_rsm, backbone, nonrigid = {}, {}, {}, {}
+    rasters_real, rasters_rsm = {}, {}
     _rs = dict(real=rasters_real, rsm=rasters_rsm)
     for exp in experiments:
-        metrics = load_metrics(exp, only_include=["scaf_units", "non_scaf_units"])
-        backbone[exp] = np.int32(metrics["scaf_units"].ravel()) - 1
-        nonrigid[exp] = np.int32(metrics["non_scaf_units"].ravel()) - 1
         for surr in ["real", "rsm"]:
             _rs[surr][exp] = get_raster(source, exp, bin_size_ms, surr), []
             pbar.update()
@@ -247,7 +252,7 @@ with figure("Fig7", figsize=(8.5, 3.0)) as f:
         G, "red", experiments, "Surrogate", rsm=True, which_models=which_models
     )
     G.legend(loc="upper left")
-    G.set_xlabel("Explained Variance Threshold")
+    G.set_xlabel(r"Threshold $\theta$ (Percent Explained Variance)")
     G.set_ylabel("Dimensions Required")
     G.set_ylim(1, 6)
     G.set_xlim(0.7, 1)
