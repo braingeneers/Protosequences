@@ -35,18 +35,19 @@ def state_traversal_df():
         window for each model for the provided experiment.
         """
         start, stop = metrics[exp]["scaf_window"].ravel()
+        length_ms = stop - start
 
         for model in models[exp]:
             T = model.bin_size_ms
             h = model.states(rasters[exp])
-            length = math.ceil((stop - start) / T)
+            length_bins = math.ceil(length_ms / T)
             state_seqs = [
-                h[(bin0 := int((peak + start) / T)) : bin0 + length]
+                h[(bin0 := int((peak + start) / T)) : bin0 + length_bins]
                 for peak in metrics[exp]["tburst"].ravel()
             ]
             distinct_states = [len(set(states)) for states in state_seqs]
             count = np.mean(distinct_states)
-            rate = 1e3 * count / length
+            rate = 1e3 * count / length_ms
             yield count, rate
 
     return pd.DataFrame(

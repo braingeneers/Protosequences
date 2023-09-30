@@ -112,12 +112,11 @@ with figure("Cross-Validation by Bin Size") as f:
 from state_traversal_df import df as traversed
 
 with figure("States Traversed by Model") as f:
-    groups = {k: vs.traversed for k, vs in traversed.groupby("model")}
     ax = sns.violinplot(
         traversed,
         bw=0.1,
         x="model",
-        y="traversed",
+        y="rate",
         ax=f.gca(),
         cut=0,
         inner=None,
@@ -125,12 +124,13 @@ with figure("States Traversed by Model") as f:
     )
     ax.set_ylabel("Average States Traversed in Per Second in Scaffold Window")
     ax.set_xlabel("")
+    ax.set_ylim(0, 40)
 
 with figure("States Traversed by K") as f:
     ax = sns.lineplot(
         traversed,
         x="n_states",
-        y="traversed",
+        y="rate",
         ax=f.gca(),
         hue="model",
         errorbar="sd",
@@ -138,13 +138,20 @@ with figure("States Traversed by K") as f:
     ax.set_ylabel("Average States Traversed in Per Second in Scaffold Window")
     ax.set_xlabel("Number of Hidden States")
     ax.set_xlim(ax.get_xlim())
-    reg = stats.linregress(traversed.n_states, traversed.traversed)
+    ax.set_ylim(0, 40)
+    reg = stats.linregress(traversed.n_states, traversed.rate)
     x = np.array([9, 51])
-    ax.plot(x, reg.intercept + reg.slope * x, color="k", linestyle="--",
-            label=f"Trendline ($r^2 = {reg.rvalue**2:.2}$)")
+    ax.plot(
+        x,
+        reg.intercept + reg.slope * x,
+        color="k",
+        linestyle="--",
+        label=f"Trendline ($r^2 = {reg.rvalue**2:.2}$)",
+    )
     ax.legend(loc="lower right")
 
 
+groups = {k: vs.rate for k, vs in traversed.groupby("model")}
 for a, b in itertools.combinations(groups.keys(), 2):
     ks = stats.ks_2samp(groups[a], groups[b])
     if (p := ks.pvalue) < 1e-3:
