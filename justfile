@@ -24,7 +24,7 @@ queue-hmm src exp bin_size ks surrogate="real" method="default":
 queue-cv src exp bin_size ks:
     python do_cv.py "{{src}}" "{{exp}}" "{{bin_size}}" "{{ks}}"
 
-launch script memory_gi="4" n="1":
+launch script memory_gi="4" n="1": push
     #! /usr/bin/bash
     if [ -z "$S3_USER" ]; then
         echo \$S3_USER must be defined. >&2

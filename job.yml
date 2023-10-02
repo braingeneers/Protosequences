@@ -17,7 +17,7 @@ spec:
           - name: S3_USER
             value: $S3_USER
           - name: ENDPOINT
-            value: http://rook-ceph-rgw-nautiluss3.rook
+            value: https://s3.braingeneers.gi.ucsc.edu
         imagePullPolicy: Always
         volumeMounts:
           - mountPath: /root/.aws
