@@ -448,7 +448,8 @@ def load_raw(source, filename, only_include=None, in_memory=None):
 
 def load_metrics(exp, only_include=None, in_memory=None):
     "Use load_raw to get the metrics for an experiment."
-    filename = exp.split("_", 1)[0] + "_single_recording_metrics.mat"
+    exp_name = exp.removesuffix("_t_spk_mat_sorted")
+    filename = exp_name + "_single_recording_metrics.mat"
     return load_raw("metrics", filename, only_include, in_memory)
 
 
