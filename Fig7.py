@@ -281,6 +281,31 @@ with figure("Fig7", figsize=(8.5, 3.0)) as f:
 
 
 # %%
+# S16: showing that surrogate data has a linear manifold and real doesn't
+
+# Re-sort to get L10 to the end where it belongs.
+organoids = sorted(
+    (x for x in experiments if x.startswith("L")),
+    key=lambda x: int(x.split("_")[0][1:]),
+)
+
+with figure("Surrogate vs Real PCA", figsize=(7.5, 9)) as f:
+    subfs = f.subfigures(4, 2)
+    for exp, subf in zip(organoids, subfs.ravel()):
+        subf.suptitle(f"Organoid {exp.split('_')[0]}")
+        axes = subf.subplots(1, 2, sharex=True, sharey=True,
+                             gridspec_kw=dict(wspace=0, left=0.1, right=0.9,
+                                              top=0.9, bottom=0.1))
+        for ax, rasters in zip(axes, [rasters_real, rasters_rsm]):
+            raster = rasters[exp][0]
+            model = rasters[exp][1][0]
+            h = model.states(raster)
+            points = model.pca.transform(raster._raster)[:, :2]
+            ax.set_aspect("equal")
+            ax.scatter(points[:, 1], points[:, 0], s=1, alpha=0.5, c=h, cmap="rainbow")
+
+
+# %%
 # S17: dimensionality as a function of PC inclusion threshold
 
 which_models = 10, 50
