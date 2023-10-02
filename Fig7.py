@@ -3,6 +3,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 from matplotlib.ticker import PercentFormatter
 from scipy import stats
 from sklearn.decomposition import PCA
@@ -258,7 +259,7 @@ with figure("Fig7", figsize=(8.5, 3.0)) as f:
     G.set_xlim(0.7, 1)
     G.xaxis.set_major_formatter(PercentFormatter(1, 0))
 
-    # Subfigure H: split violins of consistency by backbone/non-rigid.
+    # Subfigure H:
     xs = np.linspace(0.5, 1, 100)
     for model in ["Organoid", "Slice", "Primary"]:
         y_bb = fraction_above_xs(xs, df, True, model)
@@ -276,10 +277,11 @@ with figure("Fig7", figsize=(8.5, 3.0)) as f:
     H.set_xlim(0.5, 1)
     H.legend()
     H.set_xlabel("Non-Poisson Threshold")
-    H.set_ylabel("Fraction of Non-Poisson Units")
+    H.set_ylabel("Fraction of Non-Poisson States by Unit")
 
 
 # %%
+# S17: dimensionality as a function of PC inclusion threshold
 
 which_models = 10, 50
 dimensions = {}
@@ -291,14 +293,12 @@ dimensions["*"] = dimensions_required(
     experiments, xs, which_models=which_models, rsm=True
 )
 
-for a, b in [("L", "M"), ("M", "Pr"), ("L", "Pr"), ("M", "*"), ("L", "*"), ("Pr", "*")]:
+for a, b in [("L", "M"), ("M", "Pr"), ("L", "Pr")]:
     scores = stats.mannwhitneyu(dimensions[a], dimensions[b], axis=1).pvalue
     print(a, b, stats.gmean(scores[~np.isnan(scores)]))
 
 
-# %%
-
-with figure("Supplement to Fig7") as f:
+with figure("Fig 7G Expanded") as f:
     ax = f.gca()
     which_models = 10, 50
     for i, prefix in enumerate(groups):
@@ -315,3 +315,33 @@ with figure("Supplement to Fig7") as f:
     ax.set_ylim(1, 6)
     ax.set_xlim(0.7, 1)
     ax.xaxis.set_major_formatter(PercentFormatter(1, 0))
+
+
+# %%
+# S22: backbone units are less likely to be Poisson than non-rigid units
+
+with figure("Backbone vs Non-Rigid Poisson Scores") as f:
+    ax = sns.boxplot(
+        df,
+        x="model",
+        y="consistency",
+        hue="backbone",
+        width=0.5,
+        ax=f.gca(),
+    )
+    ax.set_xlabel("")
+    labels = []
+    for label in ax.get_xticklabels():
+        model = label.get_text()
+        subdf = df[df.model == model]
+        labels.append(f"{model} ($n = {len(subdf)}$)")
+        print(label.get_text())
+        p = stats.ks_2samp(
+            subdf[subdf.backbone == "Backbone"].consistency,
+            subdf[subdf.backbone == "Non-Rigid"].consistency,
+            alternative="less",
+        ).pvalue
+        print(model, len(subdf), p)
+    ax.set_xticklabels(labels)
+    ax.set_ylabel("Fraction of Non-Poisson States by Unit")
+    ax.legend()

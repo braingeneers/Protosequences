@@ -15,7 +15,7 @@ plt.ion()
 
 
 # %%
-# Population Rate by State
+# S16 Population Rate by State
 # This supplement demonstrates that population rate isn't the only thing that
 # distinguishes between states, because when they're ordered by burst location,
 # they have a lot of overlap in population rate, but the overall sequence makes
@@ -62,7 +62,7 @@ with figure("Population Rate by State", figsize=(8.5, 11)) as f:
 
 
 # %%
-# Demonstrating the plateau that occurs above 10 states.
+# S20: The plateau that occurs above 10 states.
 
 from cv_plateau_df import df as cv_plateau
 
@@ -80,8 +80,8 @@ with figure("Cross-Validation Plateau") as f:
 
 
 # %%
-# Cross-validation proving that the model performance is better for the real data than
-# for the shuffled data.
+# S14: Cross-validation proving that the model performance is better for
+# the real data than for the shuffled data.
 
 from cv_scores_df import df as cv_scores
 
@@ -95,6 +95,8 @@ with figure("Overall Model Validation") as f:
     ax.set_ylabel("$\Delta$ Log Likelihood Real vs. Surrogate")
     ax.set_xlabel("Organoid")
 
+# S21: Cross-validation by bin size.
+
 with figure("Cross-Validation by Bin Size") as f:
     ax = f.gca()
     sns.violinplot(
@@ -107,7 +109,7 @@ with figure("Cross-Validation by Bin Size") as f:
     ax.set_xlabel("Bin Size (ms)")
 
 # %%
-# State traversal statistics.
+# S18: State traversal by model.
 
 from state_traversal_df import df as traversed
 
@@ -125,6 +127,8 @@ with figure("States Traversed by Model") as f:
     ax.set_ylabel("Average States Traversed in Per Second in Scaffold Window")
     ax.set_xlabel("")
     ax.set_ylim(0, 40)
+
+# S19: State traversal by number of states.
 
 with figure("States Traversed by K") as f:
     ax = sns.lineplot(

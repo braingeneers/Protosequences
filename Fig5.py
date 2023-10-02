@@ -350,6 +350,7 @@ print(
 
 
 # %%
+# S15: as 5D but for all organoids.
 
 with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
     axes = f.subplots(4, 2)
@@ -368,7 +369,6 @@ with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
         ax.set_xticks(np.array([1, n_rigid, r.N]))
         ax.set_yticks([1, 20])
         ax.set_xlabel(r"Backbone \hspace{1.6cm} Non-Rigid")
-        # ax.xaxis.set_label_coords(0.54, -0.125)
         ax.set_ylabel("State")
         ax.yaxis.set_label_coords(-0.08, 0.5)
         ax.set_title(f"Organoid {exp.split('_', 1)[0]}")
