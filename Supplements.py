@@ -7,7 +7,8 @@ import numpy as np
 import seaborn as sns
 from scipy import stats
 
-from hmmsupport import figdir, figure
+from hmmsupport import (cv_plateau_df, cv_scores_df, figdir, figure,
+                        state_traversal_df)
 
 figdir("paper")
 plt.ion()
@@ -16,7 +17,7 @@ plt.ion()
 # %%
 # S20: The plateau that occurs above 10 states.
 
-from cv_plateau_df import df as cv_plateau
+cv_plateau = cv_plateau_df()
 
 with figure("Cross-Validation Plateau") as f:
     ax = sns.lineplot(
@@ -35,7 +36,7 @@ with figure("Cross-Validation Plateau") as f:
 # S14: Cross-validation proving that the model performance is better for
 # the real data than for the shuffled data.
 
-from cv_scores_df import df as cv_scores
+cv_scores = cv_scores_df()
 
 with figure("Overall Model Validation") as f:
     ax = sns.boxplot(
@@ -51,7 +52,7 @@ with figure("Overall Model Validation") as f:
 
 with figure("Cross-Validation by Bin Size") as f:
     ax = f.gca()
-    sns.violinplot(
+    sns.boxplot(
         data=cv_scores,
         x="bin_size",
         y="train_ll",
@@ -63,7 +64,7 @@ with figure("Cross-Validation by Bin Size") as f:
 # %%
 # S18: State traversal by model.
 
-from state_traversal_df import df as traversed
+traversed = state_traversal_df()
 
 with figure("States Traversed by Model") as f:
     ax = sns.violinplot(
@@ -73,7 +74,7 @@ with figure("States Traversed by Model") as f:
         y="rate",
         ax=f.gca(),
         cut=0,
-        inner=None,
+        inner="boxplot",
         scale="count",
     )
     ax.set_ylabel("Average States Traversed in Per Second in Scaffold Window")

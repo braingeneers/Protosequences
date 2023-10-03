@@ -1,18 +1,23 @@
 import functools
 import glob
+import math
 import os
 import pickle
+import queue
 import sys
 from contextlib import contextmanager
 from io import BytesIO
 
 import awswrangler
 import botocore
+import joblib
 import mat73
 import numpy as np
+import pandas as pd
 import scipy.io
 import tenacity
 from braingeneers.analysis import SpikeData, load_spike_data
+from braingeneers.iot.messaging import MessageBroker
 from braingeneers.utils.memoize_s3 import memoize
 from braingeneers.utils.smart_open_braingeneers import open
 from scipy import ndimage, signal
@@ -694,3 +699,200 @@ class Raster(SpikeData):
         ret._init(self.source, self.experiment, self.bin_size_ms, sd.train, sd.length)
         ret._burst_default_rms = self._burst_default_rms
         return ret
+
+
+class Job:
+    def __init__(self, q, item):
+        self._q = q
+        self._item = item
+        self.params = item["params"]
+        self.retries_allowed = item.get("retries_allowed", 3)
+
+    def requeue(self):
+        if self.retries_allowed > 0:
+            self._item["retries_allowed"] = self.retries_allowed - 1
+            self.q.put(self._item)
+            return True
+        else:
+            return False
+
+
+def become_worker(what, how):
+    q = MessageBroker().get_queue(f"{os.environ['S3_USER']}/{what}-job-queue")
+
+    try:
+        while True:
+            # Keep popping queue items and fitting HMMs with those parameters.
+            job = Job(q, q.get())
+
+            try:
+                how(job)
+            finally:
+                # Always issue task_done, even if the worker failed. If the
+                # task counts are misaligned, log it but continue.
+                try:
+                    q.task_done()
+                except ValueError as e:
+                    print("Queue misaligned:", e)
+
+    # If there are no more jobs, let the worker quit.
+    except queue.Empty:
+        print("No more jobs in queue.")
+
+    # Any other exception is a problem with the worker, so put the job
+    # back in the queue unaltered and quit. Also issue task_done because we
+    # are not going to process the original job.
+    except BaseException as e:
+        print(f"Worker terminated with exception {e}.")
+        q.put(job._item)
+        print("Job requeued.")
+
+
+@memoize
+def cv_plateau_df():
+    source = "org_and_slice"
+    # Note that these *have* to be np.int64 because joblib uses argument hashes that
+    # are different for different integer types!
+    params = [
+        (exp, np.int64(30), np.int64(n_states))
+        for exp in all_experiments(source)
+        if exp.startswith("L")
+        for n_states in range(1, 50)
+    ]
+
+    def cache_params(i, p):
+        if cv_scores.check_call_in_cache(source, *p):
+            return cv_scores(source, *p)
+        else:
+            print(f"{i}/{len(params)} {p} MISSING")
+
+    scores = joblib.Parallel(backend="threading", n_jobs=10, verbose=10)(
+        joblib.delayed(cache_params)(i, p) for i, p in enumerate(params)
+    )
+
+    cv_scoreses = dict(zip(params, scores))
+
+    df = []
+    for (exp, bin_size_ms, num_states), scores in cv_scoreses.items():
+        organoid = exp.split("_", 1)[0]
+
+        # Combine those into dataframe rows, one per score rather than one per file
+        # like a db normalization because plotting will expect that later anyway.
+        df.extend(
+            dict(
+                organoid=organoid,
+                bin_size=bin_size_ms,
+                states=num_states,
+                ll=ll,
+                surr_ll=surr_ll,
+                delta_ll=ll - surr_ll,
+            )
+            for ll, surr_ll in zip(scores["validation"], scores["surrogate"])
+        )
+    return pd.DataFrame(sorted(df, key=lambda row: int(row["organoid"][1:])))
+
+
+@memoize
+def cv_scores_df():
+    source = "org_and_slice"
+    # Note that these *have* to be np.int64 because joblib uses argument hashes that
+    # are different for different integer types!
+    params = [
+        (exp, np.int64(bin_size_ms), np.int64(n_states))
+        for exp in all_experiments(source)
+        if exp.startswith("L")
+        for bin_size_ms in [10, 20, 30, 50, 70, 100]
+        for n_states in range(10, 51)
+    ]
+
+    def cache_params(i, p):
+        if cv_scores.check_call_in_cache(source, *p):
+            return cv_scores(source, *p)
+        else:
+            print(f"{i}/{len(params)} {p} MISSING")
+
+    scores = joblib.Parallel(backend="threading", n_jobs=10, verbose=10)(
+        joblib.delayed(cache_params)(i, p) for i, p in enumerate(params)
+    )
+
+    cv_scoreses = dict(zip(params, scores))
+
+    df = []
+    for (exp, bin_size_ms, num_states), scores in cv_scoreses.items():
+        organoid = exp.split("_", 1)[0]
+
+        # Combine those into dataframe rows, one per score rather than one per file
+        # like a db normalization because plotting will expect that later anyway.
+        df.extend(
+            dict(
+                organoid=organoid,
+                bin_size=bin_size_ms,
+                states=num_states,
+                ll=ll,
+                surr_ll=surr_ll,
+                train_ll=train_ll,
+                delta_ll=ll - surr_ll,
+            )
+            for ll, surr_ll, train_ll in zip(
+                scores["validation"], scores["surrogate"], scores["training"]
+            )
+        )
+    return pd.DataFrame(sorted(df, key=lambda row: int(row["organoid"][1:])))
+
+
+@memoize
+def state_traversal_df():
+    source = "org_and_slice"
+    exps = all_experiments(source)
+    n_stateses = range(10, 51)
+    subsets = {
+        "Mouse": [e for e in exps if e[0] == "M"],
+        "Organoid": [e for e in exps if e[0] == "L"],
+        "Primary": [e for e in exps if e[0] == "P"],
+    }
+
+    only_include = ["scaf_window", "tburst"]
+    metrics = {exp: load_metrics(exp, only_include) for exp in exps}
+    print("Loaded metrics")
+
+    models = {exp: [Model(source, exp, 30, K) for K in n_stateses] for exp in exps}
+    print("Loaded models")
+
+    rasters = {exp: get_raster(source, exp, 30) for exp in exps}
+    print("Loaded rasters")
+
+    def distinct_states_traversed(exp):
+        """
+        Calculate the average total number of distinct states as well
+        as the rate at which they are traversed per second in the scaffold
+        window for each model for the provided experiment.
+        """
+        start, stop = metrics[exp]["scaf_window"].ravel()
+        length_ms = stop - start
+
+        for model in models[exp]:
+            T = model.bin_size_ms
+            h = model.states(rasters[exp])
+            length_bins = math.ceil(length_ms / T)
+            state_seqs = [
+                h[(bin0 := int((peak + start) / T)) : bin0 + length_bins]
+                for peak in metrics[exp]["tburst"].ravel()
+            ]
+            distinct_states = [len(set(states)) for states in state_seqs]
+            count = np.mean(distinct_states)
+            rate = 1e3 * count / length_ms
+            yield count, rate
+
+    return pd.DataFrame(
+        print(model, exp, n_states)
+        or dict(
+            count=count,
+            rate=rate,
+            model=model,
+            exp=exp.split("_", 1)[0],
+            n_states=n_states,
+        )
+        for model, exps in subsets.items()
+        for exp in exps
+        for n_states, (count, rate) in zip(n_stateses, distinct_states_traversed(exp))
+    )

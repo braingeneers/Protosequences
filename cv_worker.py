@@ -1,5 +1,4 @@
-from hmmsupport import cv_scores
-from worker import become_worker
+from hmmsupport import cv_scores, become_worker
 
 if __name__ == "__main__":
 

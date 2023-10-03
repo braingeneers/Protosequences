@@ -1,5 +1,4 @@
-from worker import become_worker
-from hmmsupport import get_fitted_hmm
+from hmmsupport import get_fitted_hmm, become_worker
 
 def fit_hmm(job):
     "Fit an HMM with the job's parameters, retrying if it fails."
