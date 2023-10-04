@@ -2,6 +2,9 @@
 # Generate figure 5 of the final manuscript.
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn as sns
+from scipy import stats
 from sklearn.decomposition import PCA
 from sklearn.linear_model import SGDClassifier
 from sklearn.model_selection import train_test_split
@@ -372,3 +375,65 @@ with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
         ax.set_ylabel("State")
         ax.yaxis.set_label_coords(-0.08, 0.5)
         ax.set_title(f"Organoid {exp.split('_', 1)[0]}")
+
+
+# %%
+# S23: temporal spread of states within bursts.
+
+df = []
+burst_margins = -20, 40
+with tqdm(total=len(rasters_real) * len(n_stateses)) as pbar:
+    for exp, (r, models) in rasters_real.items():
+        for model in models:
+            h = model.states(r)
+            n_peaks = len(r.find_bursts(burst_margins))
+            state_order = r.state_order(h, burst_margins, n_states=model.n_states)
+            state_prob = r.observed_state_probs(
+                h, burst_margins=burst_margins, n_states=model.n_states
+            )
+            state_prob = state_prob[state_order, :]
+
+            t_ms = np.arange(burst_margins[0], burst_margins[-1] + 1) * r.bin_size_ms
+
+            def state_stats(xs):
+                if xs.sum() == 0:
+                    return {}
+                mean = np.average(t_ms, weights=xs)
+                std = np.sqrt(np.cov(t_ms, aweights=xs))
+                expected = stats.norm(mean, std).pdf(t_ms)
+                norm = lambda x: n_peaks * x / x.sum()
+                chi2 = stats.chisquare(norm(xs), norm(expected))
+                return dict(
+                    state_mean=mean,
+                    state_std=std,
+                    state_chi2=chi2.statistic,
+                    state_p=chi2.pvalue,
+                )
+
+            df.extend(
+                [
+                    dict(
+                        experiment=exp,
+                        n_states=model.n_states,
+                        bin_size_ms=r.bin_size_ms,
+                        state_index=i,
+                        state_prob=state_prob[i, :],
+                        **state_stats(state_prob[i, :]),
+                    )
+                    for i in range(state_prob.shape[0])
+                ]
+            )
+            pbar.update()
+df = pd.DataFrame(df)
+
+# %%
+
+df["band"] = 100 * (df.state_mean // 100)
+dfsub = df[df.state_p > 0.01]
+
+with figure("Temporal Spread of States") as f:
+    ax = sns.boxplot(dfsub, x="band", y="state_std", ax=f.gca())
+    ax.set_xlabel("Mean Burst-Relative Time (ms)")
+    ax.set_ylabel("Standard Deviation (ms)")
+    ticks = ax.get_xticks()[::2]
+    ax.set_xticks(ticks)
