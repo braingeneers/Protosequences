@@ -8,7 +8,7 @@ import seaborn as sns
 from scipy import stats
 
 from hmmsupport import (cv_plateau_df, cv_scores_df, figdir, figure,
-                        state_traversal_df)
+                        get_raster, state_traversal_df)
 
 figdir("paper")
 plt.ion()
@@ -45,8 +45,10 @@ with figure("Overall Model Validation") as f:
         y="delta_ll",
         ax=f.gca(),
     )
-    ax.set_ylabel("$\Delta$ Log Likelihood Real vs. Surrogate")
+    ax.set_ylabel("Mean $\Delta$ Log Likelihood Real vs. Surrogate")
     ax.set_xlabel("Organoid")
+    ax.set_yscale("log")
+
 
 # S21: Cross-validation by bin size.
 
@@ -55,11 +57,12 @@ with figure("Cross-Validation by Bin Size") as f:
     sns.boxplot(
         data=cv_scores,
         x="bin_size",
-        y="train_ll",
+        y="total_delta_ll",
         ax=ax,
     )
-    ax.set_ylabel("Log Likelihood of True Data")
+    ax.set_ylabel("Total $\Delta$ Log Likelihood Real vs. Surrogate")
     ax.set_xlabel("Bin Size (ms)")
+    ax.set_yscale("log")
 
 # %%
 # S18: State traversal by model.

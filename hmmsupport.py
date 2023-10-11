@@ -821,23 +821,33 @@ def cv_scores_df():
         if scores is None:
             continue
 
-        # Combine those into dataframe rows, one per score rather than one per file
-        # like a db normalization because plotting will expect that later anyway.
+        # This is cached, so it's less stupid than it looks to do this here.
+        length_bins = get_raster(source, exp, bin_size_ms)._raster.shape[0]
+
+        # Combine those into dataframe rows, per score rather than per file
+        # like a db normalization because plotting will expect that.
         df.extend(
             dict(
+                experiment=exp,
                 organoid=exp.split("_", 1)[0],
                 bin_size=bin_size_ms,
+                length_bins=length_bins,
                 states=num_states,
                 ll=ll,
                 surr_ll=surr_ll,
                 train_ll=train_ll,
-                delta_ll=ll - surr_ll,
             )
             for ll, surr_ll, train_ll in zip(
                 scores["validation"], scores["surrogate"], scores["training"]
             )
         )
-    return pd.DataFrame(sorted(df, key=lambda row: int(row["organoid"][1:])))
+
+    # Turn those into a dataframe, then add the computed columns.
+    df = pd.DataFrame(sorted(df, key=lambda row: int(row["organoid"][1:])))
+    df["delta_ll"] = df["ll"] - df["surr_ll"]
+    for col in ["ll", "surr_ll", "train_ll", "delta_ll"]:
+        df["total_" + col] = df[col] * df.length_bins
+    return df
 
 
 @memoize
