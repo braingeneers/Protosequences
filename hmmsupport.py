@@ -801,7 +801,7 @@ def cv_scores_df():
         (exp, np.int64(bin_size_ms), np.int64(n_states))
         for exp in all_experiments(source)
         if exp.startswith("L")
-        for bin_size_ms in [10, 20, 30, 50, 70, 100]
+        for bin_size_ms in [1, 3, 5, 10, 20, 30, 50, 70, 100]
         for n_states in range(10, 51)
     ]
 
@@ -815,17 +815,17 @@ def cv_scores_df():
         joblib.delayed(cache_params)(i, p) for i, p in enumerate(params)
     )
 
-    cv_scoreses = dict(zip(params, scores))
-
     df = []
-    for (exp, bin_size_ms, num_states), scores in cv_scoreses.items():
-        organoid = exp.split("_", 1)[0]
+    for (exp, bin_size_ms, num_states), scores in zip(params, scores):
+        # Filter out the results that were missing above.
+        if scores is None:
+            continue
 
         # Combine those into dataframe rows, one per score rather than one per file
         # like a db normalization because plotting will expect that later anyway.
         df.extend(
             dict(
-                organoid=organoid,
+                organoid=exp.split("_", 1)[0],
                 bin_size=bin_size_ms,
                 states=num_states,
                 ll=ll,
