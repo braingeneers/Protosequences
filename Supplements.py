@@ -8,7 +8,7 @@ import seaborn as sns
 from scipy import stats
 
 from hmmsupport import (cv_plateau_df, cv_scores_df, figdir, figure,
-                        get_raster, state_traversal_df)
+                        state_traversal_df)
 
 figdir("paper")
 plt.ion()
@@ -23,13 +23,14 @@ with figure("Cross-Validation Plateau") as f:
     ax = sns.lineplot(
         data=cv_plateau,
         x="states",
-        y="ll",
+        y="total_delta_ll",
         hue="organoid",
         errorbar="sd",
     )
-    ax.set_ylabel("Posterior Log Likelihood of True Data")
+    ax.set_ylabel("Total $\Delta$ Log Likelihood Real vs. Surrogate")
     ax.set_xlabel("Number of Hidden States in Model")
     ax.legend(title="Organoid")
+    ax.set_yscale("log")
 
 
 # %%
@@ -38,14 +39,16 @@ with figure("Cross-Validation Plateau") as f:
 
 cv_scores = cv_scores_df()
 
+# This figure looks the same without the limitation of bin sizes to 30ms, but this
+# version is easier to explain in the methods. :)
 with figure("Overall Model Validation") as f:
     ax = sns.boxplot(
-        data=cv_scores,
+        data=cv_scores[cv_scores.bin_size == 30],
         x="organoid",
-        y="delta_ll",
+        y="total_delta_ll",
         ax=f.gca(),
     )
-    ax.set_ylabel("Mean $\Delta$ Log Likelihood Real vs. Surrogate")
+    ax.set_ylabel("Total $\Delta$ Log Likelihood Real vs. Surrogate")
     ax.set_xlabel("Organoid")
     ax.set_yscale("log")
 

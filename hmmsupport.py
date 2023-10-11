@@ -750,59 +750,38 @@ def become_worker(what, how):
 
 @memoize
 def cv_plateau_df():
+    """
+    Generate a DataFrame of CV scores demonstrating the plateau that occurs
+    with the total number of hidden states.
+    """
     source = "org_and_slice"
-    # Note that these *have* to be np.int64 because joblib uses argument hashes that
-    # are different for different integer types!
-    params = [
-        (exp, np.int64(30), np.int64(n_states))
-        for exp in all_experiments(source)
-        if exp.startswith("L")
-        for n_states in range(1, 50)
-    ]
-
-    def cache_params(i, p):
-        if cv_scores.check_call_in_cache(source, *p):
-            return cv_scores(source, *p)
-        else:
-            print(f"{i}/{len(params)} {p} MISSING")
-
-    scores = joblib.Parallel(backend="threading", n_jobs=10, verbose=10)(
-        joblib.delayed(cache_params)(i, p) for i, p in enumerate(params)
-    )
-
-    cv_scoreses = dict(zip(params, scores))
-
-    df = []
-    for (exp, bin_size_ms, num_states), scores in cv_scoreses.items():
-        organoid = exp.split("_", 1)[0]
-
-        # Combine those into dataframe rows, one per score rather than one per file
-        # like a db normalization because plotting will expect that later anyway.
-        df.extend(
-            dict(
-                organoid=organoid,
-                bin_size=bin_size_ms,
-                states=num_states,
-                ll=ll,
-                surr_ll=surr_ll,
-                delta_ll=ll - surr_ll,
-            )
-            for ll, surr_ll in zip(scores["validation"], scores["surrogate"])
-        )
-    return pd.DataFrame(sorted(df, key=lambda row: int(row["organoid"][1:])))
+    exps = [exp for exp in all_experiments(source) if exp.startswith("L")]
+    return cv_df(source, exps, [30], range(1, 50))
 
 
 @memoize
 def cv_scores_df():
+    """
+    Generate a DataFrame of CV scores for overall cross-validation showing
+    that different bin sizes don't have much effect on the distribution of
+    CV scores.
+    """
     source = "org_and_slice"
-    # Note that these *have* to be np.int64 because joblib uses argument hashes that
-    # are different for different integer types!
+    exps = [exp for exp in all_experiments(source) if exp.startswith("L")]
+    bin_sizes_ms = [1, 3, 5, 10, 20, 30, 50, 70, 100]
+    n_stateses = range(10, 51)
+    return cv_df(source, exps, bin_sizes_ms, n_stateses)
+
+
+def cv_df(source, experiments, bin_sizes_ms, n_stateses):
+    "Load a DataFrame of CV scores for a provided combination of parameters."
+    # Note that these *have* to be np.int64 because joblib uses argument
+    # hashes that are different for different integer types!
     params = [
         (exp, np.int64(bin_size_ms), np.int64(n_states))
-        for exp in all_experiments(source)
-        if exp.startswith("L")
-        for bin_size_ms in [1, 3, 5, 10, 20, 30, 50, 70, 100]
-        for n_states in range(10, 51)
+        for exp in experiments
+        for bin_size_ms in bin_sizes_ms
+        for n_states in n_stateses
     ]
 
     def cache_params(i, p):
