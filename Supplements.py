@@ -73,19 +73,27 @@ with figure("Cross-Validation by Bin Size") as f:
 traversed = state_traversal_df()
 
 with figure("States Traversed by Model") as f:
-    ax = sns.violinplot(
-        traversed,
-        bw=0.1,
-        x="model",
-        y="rate",
-        ax=f.gca(),
-        cut=0,
-        inner="boxplot",
-        scale="count",
-    )
-    ax.set_ylabel("Average States Traversed in Per Second in Scaffold Window")
-    ax.set_xlabel("")
-    ax.set_ylim(0, 40)
+    bins = np.arange(1, 38, 3)
+    axes = f.subplots(3, 1)
+    for (i, ax), (model, dfsub) in zip(enumerate(axes), traversed.groupby("model")):
+        sns.histplot(
+            dfsub,
+            x="rate",
+            color=f"C{i}",
+            kde=True,
+            linewidth=0,
+            kde_kws=dict(cut=0),
+            ax=ax,
+            bins=bins,
+            label=model,
+        )
+        ax.set_xlim(0, 40)
+        if i == 2:
+            ax.set_xlabel("Average States Traversed in Per Second in Scaffold Window")
+        else:
+            ax.set_xlabel("")
+            ax.set_xticklabels([])
+    f.legend(loc=(0.775, 0.5))
 
 # S19: State traversal by number of states.
 

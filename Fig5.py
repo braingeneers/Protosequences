@@ -4,15 +4,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from matplotlib.ticker import PercentFormatter
 from scipy import stats
 from sklearn.decomposition import PCA
 from sklearn.linear_model import SGDClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from tqdm import tqdm
-
 import hmmsupport
 from hmmsupport import Model, all_experiments, figure, get_raster, load_metrics
+
 
 source = "org_and_slice"
 experiments = [exp for exp in all_experiments(source) if exp.startswith("L")]
@@ -322,24 +323,31 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
     E.yaxis.set_label_coords(-0.12, 0.5)
 
     # Subfigure F: per-organoid separability metric.
+    df = pd.DataFrame(
+        [
+            dict(experiment=exp, value=value)
+            for exp, values in sep_on_states.items()
+            for value in values
+        ]
+    )
     F = f.subplots(
         1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot, left=0.7, right=0.98)
     )
-    F.violinplot(
-        sep_on_states.values(),
-        positions=np.arange(len(experiments)),
-        showextrema=False,
-        showmeans=True,
+    sns.boxplot(
+        df,
+        y="value",
+        x="experiment",
+        color="C0",
+        ax=F,
     )
-    F.plot([], [], "C0_", ms=10, label="By State Structure")
-    F.plot(sep_on_fr.values(), "_", ms=10, label="By Firing Rate")
+    F.plot([], [], "C0s", ms=4.5, label="By State Structure")
+    F.plot(sep_on_fr.values(), "C1D", ms=5, label="By Firing Rate")
     F.set_xlabel("Organoid")
     F.set_xticks(range(len(experiments)), [f"{i+1}" for i in range(len(experiments))])
-    F.set_ylim([0.45, 1.05])
-    ticks = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-    F.set_yticks(ticks, [f"{100*t:.0f}\\%" for t in ticks])
+    F.set_ylim([0.35, 1.05])
     F.set_ylabel("Backbone Classification Accuracy")
     F.legend(loc="lower right")
+    F.yaxis.set_major_formatter(PercentFormatter(1, 0))
 
 
 # Also print the accuracy stats for part F.
