@@ -38,7 +38,7 @@ launch script memory_gi="4" n="1": push
     fi
     export CONTAINER_IMAGE={{container}}
     export NRP_MEMORY_GI={{memory_gi}}
-    export NRP_MEMORY_LIMIT_GI=$(( {{memory_gi}} * 14 / 10 ))
+    export NRP_MEMORY_LIMIT_GI=$(( {{memory_gi}} * 20 / 10 ))
     echo "Launching {{n}} jobs with {{memory_gi}}GiB RAM"
     for i in $(seq "{{n}}"); do
         stamp=$(printf '%(%m%d%H%M%S)T\n' -1)
