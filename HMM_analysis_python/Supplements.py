@@ -27,7 +27,7 @@ with figure("Cross-Validation Plateau") as f:
         hue="organoid",
         errorbar="sd",
     )
-    ax.set_ylabel("Total $\Delta$ Log Likelihood Real vs. Surrogate")
+    ax.set_ylabel("Total $\Delta$ Log Likelihood Real vs. Shuffled")
     ax.set_xlabel("Number of Hidden States in Model")
     ax.legend(title="Organoid")
     ax.set_yscale("log")
@@ -48,7 +48,7 @@ with figure("Overall Model Validation") as f:
         y="total_delta_ll",
         ax=f.gca(),
     )
-    ax.set_ylabel("Total $\Delta$ Log Likelihood Real vs. Surrogate")
+    ax.set_ylabel("Total $\Delta$ Log Likelihood Real vs. Shuffled")
     ax.set_xlabel("Organoid")
     ax.set_yscale("log")
 
@@ -63,7 +63,7 @@ with figure("Cross-Validation by Bin Size") as f:
         y="total_delta_ll",
         ax=ax,
     )
-    ax.set_ylabel("Total $\Delta$ Log Likelihood Real vs. Surrogate")
+    ax.set_ylabel("Total $\Delta$ Log Likelihood Real vs. Shuffled")
     ax.set_xlabel("Bin Size (ms)")
     ax.set_yscale("log")
 
@@ -89,7 +89,7 @@ with figure("States Traversed by Model") as f:
         )
         ax.set_xlim(0, 40)
         if i == 2:
-            ax.set_xlabel("Average States Traversed in Per Second in Scaffold Window")
+            ax.set_xlabel("Average States Traversed in Per Second in Backbone Window")
         else:
             ax.set_xlabel("")
             ax.set_xticklabels([])
@@ -106,7 +106,7 @@ with figure("States Traversed by K") as f:
         hue="model",
         errorbar="sd",
     )
-    ax.set_ylabel("Average States Traversed in Per Second in Scaffold Window")
+    ax.set_ylabel("Average States Traversed in Per Second in Backbone Window")
     ax.set_xlabel("Number of Hidden States")
     ax.set_xlim(ax.get_xlim())
     ax.set_ylim(0, 40)

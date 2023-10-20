@@ -250,7 +250,7 @@ with figure("Fig7", figsize=(8.5, 3.0)) as f:
             G, f"C{i}", expsub, groups[prefix], which_models=which_models
         )
     plot_dimensions_required(
-        G, "red", experiments, "Surrogate", rsm=True, which_models=which_models
+        G, "red", experiments, "Shuffled", rsm=True, which_models=which_models
     )
     G.legend(loc="upper left")
     G.set_xlabel(r"Threshold $\theta$ (Percent Explained Variance)")
@@ -289,7 +289,7 @@ organoids = sorted(
     key=lambda x: int(x.split("_")[0][1:]),
 )
 
-with figure("Surrogate vs Real PCA", figsize=(7.5, 9)) as f:
+with figure("Shuffled vs Real PCA", figsize=(7.5, 9)) as f:
     subfs = f.subfigures(4, 2)
     for exp, subf in zip(organoids, subfs.ravel()):
         subf.suptitle(f"Organoid {exp.split('_')[0]}")
@@ -332,7 +332,7 @@ with figure("Fig 7G Expanded") as f:
             ax, f"C{i}", expsub, groups[prefix], which_models=which_models
         )
     plot_dimensions_required(
-        ax, "red", experiments, "Surrogate", rsm=True, which_models=which_models
+        ax, "red", experiments, "Shuffled", rsm=True, which_models=which_models
     )
     ax.legend(loc="upper left")
     ax.set_xlabel("Explained Variance Threshold")
