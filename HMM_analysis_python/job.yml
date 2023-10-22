@@ -6,7 +6,6 @@ metadata:
     app: organoid-hmm
     user: $S3_USER
 spec:
-  ttlSecondsAfterFinished: 3600
   backoffLimit: 0
   template:
     spec:
@@ -31,7 +30,7 @@ spec:
             cpu: 1
             memory: "${NRP_MEMORY_LIMIT_GI}Gi"
             nvidia.com/gpu: 0
-        command: ["python", "${SCRIPT_NAME}.py"]
+        command: ["python", "-uB", "${SCRIPT_NAME}.py"]
       restartPolicy: Never
       volumes:
         - name: prp-s3-credentials
