@@ -132,7 +132,7 @@ alpha_rainbow = plt.matplotlib.colors.LinearSegmentedColormap.from_list(
 )
 
 
-with figure("Fig5", figsize=(8.5, 7.5)) as f:
+with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
     # Subfigure A: example burst rasters.
     A = f.subplots(
         1,
@@ -244,6 +244,7 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
             vmin=0,
             vmax=r._raster.max(),
             extent=[0, 1, r._raster.shape[1] + 0.5, 0.5],
+            cmap="Greys",
         )
 
         axH.plot(
@@ -269,6 +270,7 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
         extent=[t_sec[0], t_sec[-1], n_states + 0.5, 0.5],
         interpolation="none",
         aspect="auto",
+        cmap="Greys",
     )
     ax.set_yticks([1, n_states])
     ax.set_xticks(0.3 * np.arange(-1, 3))
@@ -292,6 +294,7 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
         vmin=0,
         vmax=1,
         extent=[1, r.N, 20.5, 0.5],
+        cmap="Greys",
     )
     n_rigid = len(metricses[exp]["scaf_units"])
     D.set_xticks(np.array([1, n_rigid, r.N]))
@@ -333,13 +336,18 @@ with figure("Fig5", figsize=(8.5, 7.5)) as f:
     F = f.subplots(
         1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot, left=0.7, right=0.98)
     )
+
+    # sns.violinplot(
+    #     cut=0,
+    #     density_norm="area",
     sns.boxplot(
-        df,
+        data=df,
         y="value",
         x="experiment",
         color="C0",
         ax=F,
     )
+
     F.plot([], [], "C0s", ms=4.5, label="By State Structure")
     F.plot(sep_on_fr.values(), "C1D", ms=5, label="By Firing Rate")
     F.set_xlabel("Organoid")
@@ -375,6 +383,7 @@ with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
             vmin=0,
             vmax=1,
             extent=[1, r.N, 20.5, 0.5],
+            cmap="Greys",
         )
         n_rigid = len(metricses[exp]["scaf_units"])
         ax.set_xticks(np.array([1, n_rigid, r.N]))

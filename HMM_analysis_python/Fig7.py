@@ -239,7 +239,7 @@ def fraction_above_xs(xs, data, backbone=None, model=None):
     )
 
 
-with figure("Fig7", figsize=(8.5, 3.0)) as f:
+with figure("Fig7", figsize=(8.5, 3.0), save_exts=["png", "svg"]) as f:
     G, H = f.subplots(1, 2, gridspec_kw=dict(width_ratios=[2, 3]))
 
     # Subfigure G: dimensionality as a function of PC inclusion threshold.
