@@ -11,9 +11,9 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from tqdm import tqdm
+
 import hmmsupport
 from hmmsupport import Model, all_experiments, figure, get_raster, load_metrics
-
 
 source = "org_and_slice"
 experiments = [exp for exp in all_experiments(source) if exp.startswith("L")]
@@ -104,10 +104,10 @@ sep_on_fr = {exp: separability_on_fr(r) for exp, (r, _) in rasters_real.items()}
 # The figure compares three states of interest, which need to depend on the
 # specific trained model we're looking at...
 exp = "L1_t_spk_mat_sorted"
-n_states = 15
+n_states = 20
 r, models = rasters_real[exp]
 model = models[np.nonzero(n_stateses == n_states)[0][0]]
-interesting_states = [8, 9, 10]
+interesting_states = [10, 11, 12]
 
 # Compute hidden states throughout the recording, and use them to identify
 # which states happen at which peak-relative times.
@@ -147,6 +147,7 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
         t_sec = (np.ogrid[when] - peak) * bin_size_ms / 1000
         ax.imshow(
             hsub.reshape((1, -1)),
+            interpolation="nearest",
             cmap=alpha_rainbow,
             alpha=0.8,
             aspect="auto",
@@ -239,8 +240,8 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
         axS.set_title(f"State {s+1}")
         axS.imshow(
             data_sub.T,
+            interpolation="nearest",
             aspect="auto",
-            interpolation="none",
             vmin=0,
             vmax=r._raster.max(),
             extent=[0, 1, r._raster.shape[1] + 0.5, 0.5],
@@ -265,10 +266,10 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
     ax = f.subplots(gridspec_kw=dict(top=BCtop, bottom=BCbot, left=0.71, right=0.96))
     im = ax.imshow(
         state_prob[state_order, :],
+        interpolation="nearest",
         vmin=0,
         vmax=1,
         extent=[t_sec[0], t_sec[-1], n_states + 0.5, 0.5],
-        interpolation="none",
         aspect="auto",
         cmap="Greys",
     )
@@ -289,8 +290,8 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
     scores = consistency_real[exp][10]
     D_im = D.imshow(
         scores[:, ::-1],
+        interpolation="nearest",
         aspect="auto",
-        interpolation="none",
         vmin=0,
         vmax=1,
         extent=[1, r.N, 20.5, 0.5],
@@ -313,15 +314,16 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
         1,
         gridspec_kw=dict(top=DEFtop - 0.05, bottom=DEFbot, left=0.35, right=0.59),
     )
-    scores = consistency_real[exp][10]
-    is_packet = ~(np.arange(scores.shape[1]) < len(metricses[exp]["non_scaf_units"]))
-    pca = PCA(n_components=2).fit_transform(scores.T)
+    is_packet = ~(np.arange(r.N) < len(metricses[exp]["non_scaf_units"]))
+    pca = PCA(n_components=2)
+    scores = pca.fit_transform(consistency_real[exp][10].T).T
     E.set_aspect("equal")
-    scb = E.scatter(pca[is_packet, 0], pca[is_packet, 1], label="Backbone")
-    scn = E.scatter(pca[~is_packet, 0], pca[~is_packet, 1], label="Non-Rigid")
+    scb = E.scatter(*scores[:, is_packet], label="Backbone")
+    scn = E.scatter(*scores[:, ~is_packet], label="Non-Rigid")
     E.legend(bbox_to_anchor=(0.45, 1.23), ncol=2, loc="center")
-    E.set_xlabel("PC1")
-    E.set_ylabel("PC2")
+    pev1, pev2 = pca.explained_variance_ratio_
+    E.set_xlabel(f"PC1 (Explains {pev1:.0%} of Variance)".replace("%", "\\%"))
+    E.set_ylabel(f"PC2 ({pev2:.0%})".replace("%", "\\%"))
     E.set_yticks([-1, 0, 1])
     E.yaxis.set_label_coords(-0.12, 0.5)
 
@@ -379,7 +381,7 @@ with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
         ax.imshow(
             scores[:, ::-1],
             aspect="auto",
-            interpolation="none",
+            interpolation="nearest",
             vmin=0,
             vmax=1,
             extent=[1, r.N, 20.5, 0.5],
