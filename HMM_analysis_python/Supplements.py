@@ -15,7 +15,7 @@ plt.ion()
 
 
 # %%
-# S20: The plateau that occurs above 10 states.
+# S15: The plateau that occurs above 10 states.
 
 cv_plateau = cv_plateau_df()
 
@@ -34,7 +34,7 @@ with figure("Cross-Validation Plateau") as f:
 
 
 # %%
-# S14: Cross-validation proving that the model performance is better for
+# S16: Cross-validation proving that the model performance is better for
 # the real data than for the shuffled data.
 
 cv_scores = cv_scores_df()
@@ -53,7 +53,7 @@ with figure("Overall Model Validation") as f:
     ax.set_yscale("log")
 
 
-# S21: Cross-validation by bin size.
+# S17: Cross-validation by bin size.
 
 with figure("Cross-Validation by Bin Size") as f:
     ax = f.gca()
@@ -67,8 +67,9 @@ with figure("Cross-Validation by Bin Size") as f:
     ax.set_xlabel("Bin Size (ms)")
     ax.set_yscale("log")
 
+
 # %%
-# S18: State traversal by model.
+# S26: State traversal by model.
 
 traversed = state_traversal_df()
 
@@ -94,6 +95,7 @@ with figure("States Traversed by Model") as f:
             ax.set_xlabel("")
             ax.set_xticklabels([])
     f.legend(loc=(0.775, 0.5))
+
 
 # S19: State traversal by number of states.
 

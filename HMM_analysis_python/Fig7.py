@@ -281,7 +281,7 @@ with figure("Fig7", figsize=(8.5, 3.0), save_exts=["png", "svg"]) as f:
 
 
 # %%
-# S16: showing that surrogate data has a linear manifold and real doesn't
+# S21: showing that surrogate data has a linear manifold and real doesn't
 
 # Re-sort to get L10 to the end where it belongs.
 organoids = sorted(
@@ -306,7 +306,7 @@ with figure("Shuffled vs Real PCA", figsize=(7.5, 9)) as f:
 
 
 # %%
-# S17: dimensionality as a function of PC inclusion threshold
+# S25: dimensionality as a function of PC inclusion threshold
 
 which_models = 10, 50
 dimensions = {}
@@ -343,7 +343,7 @@ with figure("Fig 7G Expanded") as f:
 
 
 # %%
-# S22: backbone units are less likely to be Poisson than non-rigid units
+# S27: backbone units are less likely to be Poisson than non-rigid units
 
 with figure("Backbone vs Non-Rigid Poisson Scores") as f:
     ax = sns.boxplot(

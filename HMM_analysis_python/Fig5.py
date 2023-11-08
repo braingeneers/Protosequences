@@ -371,7 +371,7 @@ print(
 
 
 # %%
-# S15: as 5D but for all organoids.
+# S20: as 5D but for all organoids.
 
 with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
     axes = f.subplots(4, 2)
@@ -397,7 +397,7 @@ with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
 
 
 # %%
-# S23: temporal spread of states within bursts.
+# S18: temporal spread of states within bursts.
 
 df = []
 burst_margins = -20, 40
@@ -444,9 +444,6 @@ with tqdm(total=len(rasters_real) * len(n_stateses)) as pbar:
             )
             pbar.update()
 df = pd.DataFrame(df)
-
-# %%
-
 df["band"] = 100 * (df.state_mean // 100)
 dfsub = df[df.state_p > 0.01]
 
