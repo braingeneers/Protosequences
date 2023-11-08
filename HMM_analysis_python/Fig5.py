@@ -183,7 +183,7 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
 
     # Subfigure B: state examples.
     BCtop, BCbot = 0.70, 0.41
-    Bleft, Bwidth = 0.03, 0.63
+    Bleft, Bwidth = 0.0, 0.66
     (Ba, RA), (Bb, RB), (Bc, RC) = [
         f.subplots(
             1,
@@ -228,8 +228,7 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
         ax.set_yticks([])
         ax.set_ylim(0.5, rsub.shape[1] + 0.5)
         ax.axhline(len(unit_order) - n_packet_units + 0.5, color="k", lw=0.5)
-    ticks = np.array([1, n_packet_units, r.N])
-    Ba.set_yticks(r.N - ticks + 1, ticks)
+    Ba.set_yticks([])
     Ba.set_ylabel(
         r"Non-Rigid \hspace{2.2cm} Backbone", y=0.99, horizontalalignment="right"
     )
@@ -263,8 +262,8 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
         )
 
     # Subfigure C: state heatmap.
-    ax = f.subplots(gridspec_kw=dict(top=BCtop, bottom=BCbot, left=0.71, right=0.96))
-    im = ax.imshow(
+    C = f.subplots(gridspec_kw=dict(top=BCtop, bottom=BCbot, left=0.73, right=0.98))
+    im = C.imshow(
         state_prob[state_order, :],
         interpolation="nearest",
         vmin=0,
@@ -273,14 +272,13 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
         aspect="auto",
         cmap="Greys",
     )
-    ax.set_yticks([1, n_states])
-    ax.set_xticks(0.3 * np.arange(-1, 3))
-    ax.set_xlim(-0.3, 0.6)
-    ax.set_xlabel("Time From Burst Peak (s)")
-    ax.set_ylabel("Hidden State Number")
-    plt.colorbar(
-        im, ax=ax, label="Probability of Observing State", aspect=10, ticks=[0, 1]
-    )
+    C.set_yticks([1, n_states])
+    C.set_xticks(0.3 * np.arange(-1, 3))
+    C.set_xlim(-0.3, 0.6)
+    C.set_xlabel("Time From Burst Peak (s)")
+    C.set_ylabel("Hidden State Number")
+    C.yaxis.set_label_coords(-0.08, 0.5)
+    plt.colorbar(im, ax=C, aspect=15, ticks=[0, 1])
 
     # Subfigure D: somehow show what's happening on the right.
     DEFtop, DEFbot = 0.33, 0.06
@@ -298,13 +296,13 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
         cmap="Greys",
     )
     n_rigid = len(metricses[exp]["scaf_units"])
-    D.set_xticks(np.array([1, n_rigid, r.N]))
+    D.axvline(n_rigid + 0.5, color="k", lw=0.5)
+    D.set_xticks([])
     D.set_yticks([1, 20])
     D.set_xlabel(r"Backbone \hspace{1.6cm} Non-Rigid")
-    D.xaxis.set_label_coords(0.54, -0.125)
-    D.set_ylabel("State")
+    D.set_ylabel("Hidden State Number")
     D.yaxis.set_label_coords(-0.08, 0.5)
-    plt.colorbar(D_im, ax=D, aspect=15, ticks=[0, 1])
+    Dcb = plt.colorbar(D_im, ax=D, aspect=15, ticks=[0, 1])
 
     # Subfigure E: PCA of consistency scores for a single organoid, showing
     # that it's sufficient to separate packet/non-packet units.
@@ -314,6 +312,8 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
         1,
         gridspec_kw=dict(top=DEFtop - 0.05, bottom=DEFbot, left=0.35, right=0.59),
     )
+    E.spines["top"].set_visible(False)
+    E.spines["right"].set_visible(False)
     is_packet = ~(np.arange(r.N) < len(metricses[exp]["non_scaf_units"]))
     pca = PCA(n_components=2)
     scores = pca.fit_transform(consistency_real[exp][10].T).T
@@ -322,10 +322,10 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
     scn = E.scatter(*scores[:, ~is_packet], label="Non-Rigid")
     E.legend(bbox_to_anchor=(0.45, 1.23), ncol=2, loc="center")
     pev1, pev2 = pca.explained_variance_ratio_
-    E.set_xlabel(f"PC1 (Explains {pev1:.0%} of Variance)".replace("%", "\\%"))
-    E.set_ylabel(f"PC2 ({pev2:.0%})".replace("%", "\\%"))
-    E.set_yticks([-1, 0, 1])
-    E.yaxis.set_label_coords(-0.12, 0.5)
+    E.set_xlabel(f"PC1 ({pev1:.0%} variance)".replace("%", "\\%"))
+    E.set_ylabel(f"PC2 ({pev2:.0%} variance)".replace("%", "\\%"))
+    E.set_yticks([])
+    E.set_xticks([])
 
     # Subfigure F: per-organoid separability metric.
     df = pd.DataFrame(
@@ -339,10 +339,9 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
         1, 1, gridspec_kw=dict(top=DEFtop, bottom=DEFbot, left=0.7, right=0.98)
     )
 
-    # sns.violinplot(
-    #     cut=0,
-    #     density_norm="area",
-    sns.boxplot(
+    sns.violinplot(
+        cut=0,
+        scale="width",
         data=df,
         y="value",
         x="experiment",
@@ -354,10 +353,11 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
     F.plot(sep_on_fr.values(), "C1D", ms=5, label="By Firing Rate")
     F.set_xlabel("Organoid")
     F.set_xticks(range(len(experiments)), [f"{i+1}" for i in range(len(experiments))])
-    F.set_ylim([0.35, 1.05])
     F.set_ylabel("Backbone Classification Accuracy")
     F.legend(loc="lower right")
     F.yaxis.set_major_formatter(PercentFormatter(1, 0))
+    F.spines["top"].set_visible(False)
+    F.spines["right"].set_visible(False)
 
 
 # Also print the accuracy stats for part F.
