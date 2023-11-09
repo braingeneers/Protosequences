@@ -373,6 +373,8 @@ print(
 # %%
 # S20: as 5D but for all organoids.
 
+Ls = "L1 L2 L3 L5 L7 L8 L9 L10".split()
+
 with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
     axes = f.subplots(4, 2)
     for ax, exp in zip(axes.flat, experiments):
@@ -393,7 +395,7 @@ with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
         ax.set_xlabel(r"Backbone \hspace{1.6cm} Non-Rigid")
         ax.set_ylabel("State")
         ax.yaxis.set_label_coords(-0.08, 0.5)
-        ax.set_title(f"Organoid {exp.split('_', 1)[0]}")
+        ax.set_title(f"Organoid {1+Ls.index(exp.split('_', 1)[0])}")
 
 
 # %%

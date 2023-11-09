@@ -13,23 +13,29 @@ from hmmsupport import (cv_plateau_df, cv_scores_df, figdir, figure,
 figdir("paper")
 plt.ion()
 
+Ls = "L1 L2 L3 L5 L7 L8 L9 L10".split()
+
 
 # %%
 # S15: The plateau that occurs above 10 states.
 
 cv_plateau = cv_plateau_df()
+cv_plateau["org_label"] = cv_plateau.organoid.map(
+    lambda L: "Organoid " + str(Ls.index(L) + 1)
+)
+
 
 with figure("Cross-Validation Plateau") as f:
     ax = sns.lineplot(
         data=cv_plateau,
         x="states",
         y="total_delta_ll",
-        hue="organoid",
+        hue="org_label",
         errorbar="sd",
     )
     ax.set_ylabel("Total $\Delta$ Log Likelihood Real vs. Shuffled")
     ax.set_xlabel("Number of Hidden States in Model")
-    ax.legend(title="Organoid")
+    ax.legend(title=None, ncol=2)
     ax.set_yscale("log")
 
 
@@ -38,19 +44,22 @@ with figure("Cross-Validation Plateau") as f:
 # the real data than for the shuffled data.
 
 cv_scores = cv_scores_df()
+cv_plateau["org_label"] = cv_plateau.organoid.map(
+    lambda L: "Or" + str(Ls.index(L) + 1)
+)
 
 # This figure looks the same without the limitation of bin sizes to 30ms, but this
 # version is easier to explain in the methods. :)
 with figure("Overall Model Validation") as f:
     ax = sns.boxplot(
         data=cv_scores[cv_scores.bin_size == 30],
-        x="organoid",
+        x="org_label",
         y="total_delta_ll",
         ax=f.gca(),
     )
     ax.set_ylabel("Total $\Delta$ Log Likelihood Real vs. Shuffled")
-    ax.set_xlabel("Organoid")
     ax.set_yscale("log")
+    ax.set_xlabel("")
 
 
 # S17: Cross-validation by bin size.

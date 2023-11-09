@@ -289,10 +289,11 @@ organoids = sorted(
     key=lambda x: int(x.split("_")[0][1:]),
 )
 
+Ls = "L1 L2 L3 L5 L7 L8 L9 L10".split()
 with figure("Shuffled vs Real PCA", figsize=(7.5, 9)) as f:
     subfs = f.subfigures(4, 2)
     for exp, subf in zip(organoids, subfs.ravel()):
-        subf.suptitle(f"Organoid {exp.split('_')[0]}")
+        subf.suptitle(f"Organoid {1+Ls.index(exp.split('_')[0])}")
         axes = subf.subplots(1, 2, sharex=True, sharey=True,
                              gridspec_kw=dict(wspace=0, left=0.1, right=0.9,
                                               top=0.9, bottom=0.1))
