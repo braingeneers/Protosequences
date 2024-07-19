@@ -44,7 +44,7 @@ with figure("Cross-Validation Plateau") as f:
 # the real data than for the shuffled data.
 
 cv_scores = cv_scores_df()
-cv_plateau["org_label"] = cv_plateau.organoid.map(
+cv_scores["org_label"] = cv_scores.organoid.map(
     lambda L: "Or" + str(Ls.index(L) + 1)
 )
 
