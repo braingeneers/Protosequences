@@ -4,14 +4,17 @@
 # sizes, and numbers of hidden states, checks which of those models are not
 # cached, and either adds them to the HMM job queue or just runs them
 # locally, depending whether the option --local is provided.
+import argparse
+import fnmatch
+import itertools
 import os
 import sys
-import itertools
+
 import numpy as np
-import hmmsupport
-import argparse
-from tqdm import tqdm
 from braingeneers.iot.messaging import MessageBroker
+from tqdm import tqdm
+
+import hmmsupport
 
 
 def ensure_list(str_str):
@@ -46,7 +49,7 @@ if __name__ == "__main__":
         prog="fit_hmms", description="Fit HMMs locally or on NRP."
     )
     parser.add_argument("source")
-    parser.add_argument("exp", type=lambda x: x if x == "*" else ensure_list(x))
+    parser.add_argument("exp", type=lambda x: x if "*" in x else ensure_list(x))
     parser.add_argument("bin_sizes", type=parse_range_str)
     parser.add_argument("n_stateses", type=parse_range_str)
     parser.add_argument("surrs", default=["real"], nargs="?", type=ensure_list)
@@ -72,9 +75,9 @@ if __name__ == "__main__":
         print("$S3_USER must be defined.", file=sys.stderr)
         sys.exit(1)
 
-    # Can't be part of the type because it depends on source.
-    if args.exp == "*":
-        args.exp = hmmsupport.all_experiments(args.source)
+    # Support *. Can't be part of the type because it depends on source.
+    if "*" in args.exp:
+        args.exp = fnmatch.filter(hmmsupport.all_experiments(args.source), args.exp)
 
     # Verbosely print the full parameter set.
     print(f"Fitting HMMs using {args.library} for experiments:")
