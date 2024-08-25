@@ -10,13 +10,41 @@ from sklearn.decomposition import PCA
 from tqdm import tqdm
 
 import hmmsupport
-from hmmsupport import Model, all_experiments, figure, get_raster, load_metrics
+from hmmsupport import Model, figure, get_raster, load_metrics
 
 source = "org_and_slice"
-experiments = all_experiments(source)
-groups = {"L": "Organoid", "M": "Slice", "Pr": "Primary"}
-groups_with_all = {**groups, "": "Overall"}
-exp_to_model = {e: next(k for k in groups if e.startswith(k)) for e in experiments}
+group_name = {"L": "Organoid", "M": "Slice", "Pr": "Primary"}
+groups = {
+    "L": [
+        "L1_t_spk_mat_sorted",
+        "L2_7M_t_spk_mat_sorted",
+        "L3_7M_t_spk_mat_sorted",
+        "L5_t_spk_mat_sorted",
+        "well1_t_spk_mat_sorted",
+        "well4_t_spk_mat_sorted",
+        "well5_t_spk_mat_sorted",
+        "well6_t_spk_mat_sorted",
+    ],
+    "M": [
+        "M1S1_t_spk_mat_sorted",
+        "M1S2_t_spk_mat_sorted",
+        "M2S1_t_spk_mat_sorted",
+        "M2S2_t_spk_mat_sorted",
+        "M3S1_t_spk_mat_sorted",
+        "M3S2_t_spk_mat_sorted",
+    ],
+    "Pr": [
+        "Pr1_t_spk_mat_sorted",
+        "Pr2_t_spk_mat_sorted",
+        "Pr3_t_spk_mat_sorted",
+        "Pr4_t_spk_mat_sorted",
+    ],
+}
+experiments = sum(groups.values(), [])
+exp_to_group = {}
+for group, exps in groups.items():
+    for exp in exps:
+        exp_to_group[exp] = group_name[group]
 
 plt.ion()
 hmmsupport.figdir("paper")
@@ -26,6 +54,7 @@ n_stateses = np.arange(10, 51)
 
 
 backbone, nonrigid = {}, {}
+print("Loading metrics files.")
 for exp in tqdm(experiments):
     metrics = load_metrics(exp, only_include=["scaf_units", "non_scaf_units"])
     backbone[exp] = np.int32(metrics["scaf_units"].ravel()) - 1
@@ -209,7 +238,7 @@ df = pd.DataFrame(
     [
         dict(
             experiment=exp,
-            model=groups[exp_to_model[exp]],
+            model=exp_to_group[exp],
             consistency=c,
             label=label,
             backbone="Backbone" if label else "Non-Rigid",
@@ -244,10 +273,9 @@ with figure("Fig7", figsize=(8.5, 3.0), save_exts=["png", "svg"]) as f:
 
     # Subfigure G: dimensionality as a function of PC inclusion threshold.
     which_models = 10, 30
-    for i, prefix in enumerate(groups):
-        expsub = [e for e in experiments if e.startswith(prefix)]
+    for i, (group, exps) in enumerate(groups.items()):
         plot_dimensions_required(
-            G, f"C{i}", expsub, groups[prefix], which_models=which_models
+            G, f"C{i}", exps, group_name[group], which_models=which_models
         )
     plot_dimensions_required(
         G, "red", experiments, "Shuffled", rsm=True, which_models=which_models
@@ -294,9 +322,13 @@ with figure("Shuffled vs Real PCA", figsize=(7.5, 9)) as f:
     subfs = f.subfigures(4, 2)
     for exp, subf in zip(organoids, subfs.ravel()):
         subf.suptitle(f"Organoid {1+Ls.index(exp.split('_')[0])}")
-        axes = subf.subplots(1, 2, sharex=True, sharey=True,
-                             gridspec_kw=dict(wspace=0, left=0.1, right=0.9,
-                                              top=0.9, bottom=0.1))
+        axes = subf.subplots(
+            1,
+            2,
+            sharex=True,
+            sharey=True,
+            gridspec_kw=dict(wspace=0, left=0.1, right=0.9, top=0.9, bottom=0.1),
+        )
         for ax, rasters in zip(axes, [rasters_real, rasters_rsm]):
             raster = rasters[exp][0]
             model = rasters[exp][1][0]
@@ -312,9 +344,8 @@ with figure("Shuffled vs Real PCA", figsize=(7.5, 9)) as f:
 which_models = 10, 50
 dimensions = {}
 xs = np.linspace(0, 1, num=100)[1:]
-for i, prefix in enumerate(groups):
-    expsub = [e for e in experiments if e.startswith(prefix)]
-    dimensions[prefix] = dimensions_required(expsub, xs, which_models=which_models)
+for i, (group, exps) in enumerate(groups.items()):
+    dimensions[group] = dimensions_required(exps, xs, which_models=which_models)
 dimensions["*"] = dimensions_required(
     experiments, xs, which_models=which_models, rsm=True
 )
@@ -327,10 +358,10 @@ for a, b in [("L", "M"), ("M", "Pr"), ("L", "Pr")]:
 with figure("Fig 7G Expanded") as f:
     ax = f.gca()
     which_models = 10, 50
-    for i, prefix in enumerate(groups):
+    for i, prefix in enumerate(group_name):
         expsub = [e for e in experiments if e.startswith(prefix)]
         plot_dimensions_required(
-            ax, f"C{i}", expsub, groups[prefix], which_models=which_models
+            ax, f"C{i}", expsub, group_name[prefix], which_models=which_models
         )
     plot_dimensions_required(
         ax, "red", experiments, "Shuffled", rsm=True, which_models=which_models

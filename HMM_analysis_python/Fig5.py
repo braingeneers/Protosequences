@@ -13,12 +13,19 @@ from sklearn.pipeline import make_pipeline
 from tqdm import tqdm
 
 import hmmsupport
-from hmmsupport import Model, all_experiments, figure, get_raster, load_metrics
+from hmmsupport import Model, figure, get_raster, load_metrics
 
 source = "org_and_slice"
-experiments = [exp for exp in all_experiments(source) if exp.startswith("L")]
-# Put the first experiment last because it's actually L10.
-experiments = experiments[1:] + experiments[:1]
+experiments = [
+    "L1_t_spk_mat_sorted",
+    "L2_7M_t_spk_mat_sorted",
+    "L3_7M_t_spk_mat_sorted",
+    "L5_t_spk_mat_sorted",
+    "well1_t_spk_mat_sorted",
+    "well4_t_spk_mat_sorted",
+    "well5_t_spk_mat_sorted",
+    "well6_t_spk_mat_sorted",
+]
 
 plt.ion()
 hmmsupport.figdir("paper")
@@ -373,11 +380,9 @@ print(
 # %%
 # S20: as 5D but for all organoids.
 
-Ls = "L1 L2 L3 L5 L7 L8 L9 L10".split()
-
 with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
     axes = f.subplots(4, 2)
-    for ax, exp in zip(axes.flat, experiments):
+    for i, (ax, exp) in enumerate(zip(axes.flat, experiments)):
         r = rasters_real[exp][0]
         scores = consistency_real[exp][10]
         ax.imshow(
@@ -395,7 +400,7 @@ with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
         ax.set_xlabel(r"Backbone \hspace{1.6cm} Non-Rigid")
         ax.set_ylabel("State")
         ax.yaxis.set_label_coords(-0.08, 0.5)
-        ax.set_title(f"Organoid {1+Ls.index(exp.split('_', 1)[0])}")
+        ax.set_title(f"Organoid {i+1}")
 
 
 # %%
