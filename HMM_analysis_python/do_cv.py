@@ -4,6 +4,7 @@
 # sizes, and numbers of hidden states, checks which ones are already on
 # S3, and adds the rest to the job queue for cross-validation.
 import argparse
+import fnmatch
 import os
 import sys
 
@@ -41,7 +42,7 @@ if __name__ == "__main__":
         prog="fit_hmms", description="Queue cross-validation for HMMs."
     )
     parser.add_argument("source")
-    parser.add_argument("exp", type=lambda x: x if x == "*" else ensure_list(x))
+    parser.add_argument("exp", type=lambda x: x if "*" in x else ensure_list(x))
     parser.add_argument("bin_sizes", type=parse_range_str)
     parser.add_argument("n_stateses", type=parse_range_str)
     parser.add_argument(
@@ -59,9 +60,9 @@ if __name__ == "__main__":
         print("$S3_USER must be defined.", file=sys.stderr)
         sys.exit(1)
 
-    # Can't be part of the type because it depends on source.
-    if args.exp == "*":
-        args.exp = all_experiments(args.source)
+    # Support *. Can't be part of the type because it depends on source.
+    if '*' in args.exp:
+        args.exp = fnmatch.filter(all_experiments(args.source), args.exp)
 
     # Verbosely print the full parameter set.
     print("Cross-validating HMMs on the following experiments:")
