@@ -13,16 +13,22 @@ from hmmsupport import (cv_plateau_df, cv_scores_df, figdir, figure,
 figdir("paper")
 plt.ion()
 
-Ls = "L1 L2 L3 L5 L7 L8 L9 L10".split()
-
+experiments = [
+    "L1_t_spk_mat_sorted",
+    "L2_7M_t_spk_mat_sorted",
+    "L3_7M_t_spk_mat_sorted",
+    "L5_t_spk_mat_sorted",
+    "well1_t_spk_mat_sorted",
+    "well4_t_spk_mat_sorted",
+    "well5_t_spk_mat_sorted",
+    "well6_t_spk_mat_sorted",
+]
 
 # %%
 # S15: The plateau that occurs above 10 states.
 
-cv_plateau = cv_plateau_df()
-cv_plateau["org_label"] = cv_plateau.organoid.map(
-    lambda L: "Organoid " + str(Ls.index(L) + 1)
-)
+cv_plateau = cv_plateau_df(experiments)
+cv_plateau["org_label"] = cv_plateau.organoid.map(lambda i: "Organoid " + str(i + 1))
 
 
 with figure("Cross-Validation Plateau") as f:
@@ -43,10 +49,8 @@ with figure("Cross-Validation Plateau") as f:
 # S16: Cross-validation proving that the model performance is better for
 # the real data than for the shuffled data.
 
-cv_scores = cv_scores_df()
-cv_scores["org_label"] = cv_scores.organoid.map(
-    lambda L: "Or" + str(Ls.index(L) + 1)
-)
+cv_scores = cv_scores_df(experiments)
+cv_scores["org_label"] = cv_scores.organoid.map(lambda i: "Or" + str(i + 1))
 
 # This figure looks the same without the limitation of bin sizes to 30ms, but this
 # version is easier to explain in the methods. :)

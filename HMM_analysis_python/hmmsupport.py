@@ -749,28 +749,24 @@ def become_worker(what, how):
 
 
 @memoize
-def cv_plateau_df():
+def cv_plateau_df(exps):
     """
     Generate a DataFrame of CV scores demonstrating the plateau that occurs
     with the total number of hidden states.
     """
-    source = "org_and_slice"
-    exps = [exp for exp in all_experiments(source) if exp.startswith("L")]
-    return cv_df(source, exps, [30], range(1, 50))
+    return cv_df("org_and_slice", exps, [30], range(1, 51))
 
 
 @memoize
-def cv_scores_df():
+def cv_scores_df(exps):
     """
     Generate a DataFrame of CV scores for overall cross-validation showing
     that different bin sizes don't have much effect on the distribution of
     CV scores.
     """
-    source = "org_and_slice"
-    exps = [exp for exp in all_experiments(source) if exp.startswith("L")]
     bin_sizes_ms = [1, 3, 5, 10, 20, 30, 50, 70, 100]
     n_stateses = range(10, 51)
-    return cv_df(source, exps, bin_sizes_ms, n_stateses)
+    return cv_df("org_and_slice", exps, bin_sizes_ms, n_stateses)
 
 
 def cv_df(source, experiments, bin_sizes_ms, n_stateses):
@@ -808,7 +804,7 @@ def cv_df(source, experiments, bin_sizes_ms, n_stateses):
         df.extend(
             dict(
                 experiment=exp,
-                organoid=exp.split("_", 1)[0],
+                organoid=experiments.index(exp),
                 bin_size=bin_size_ms,
                 length_bins=length_bins,
                 states=num_states,
@@ -822,7 +818,7 @@ def cv_df(source, experiments, bin_sizes_ms, n_stateses):
         )
 
     # Turn those into a dataframe, then add the computed columns.
-    df = pd.DataFrame(sorted(df, key=lambda row: int(row["organoid"][1:])))
+    df = pd.DataFrame(sorted(df, key=lambda row: row["organoid"]))
     df["delta_ll"] = df["ll"] - df["surr_ll"]
     for col in ["ll", "surr_ll", "train_ll", "delta_ll"]:
         df["total_" + col] = df[col] * df.length_bins
@@ -836,7 +832,7 @@ def state_traversal_df():
     n_stateses = range(10, 51)
     subsets = {
         "Mouse": [e for e in exps if e[0] == "M"],
-        "Organoid": [e for e in exps if e[0] == "L"],
+        "Organoid": [e for e in exps if e[0] in "Lw"],
         "Primary": [e for e in exps if e[0] == "P"],
     }
 
@@ -873,14 +869,7 @@ def state_traversal_df():
             yield count, rate
 
     return pd.DataFrame(
-        print(model, exp, n_states)
-        or dict(
-            count=count,
-            rate=rate,
-            model=model,
-            exp=exp.split("_", 1)[0],
-            n_states=n_states,
-        )
+        dict(count=count, rate=rate, model=model, exp=exp, n_states=n_states)
         for model, exps in subsets.items()
         for exp in exps
         for n_states, (count, rate) in zip(n_stateses, distinct_states_traversed(exp))
