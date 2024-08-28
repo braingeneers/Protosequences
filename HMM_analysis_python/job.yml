@@ -24,10 +24,12 @@ spec:
         resources:
           requests:
             cpu: 1
+            ephemeral-storage: "2Mi"
             memory: "${NRP_MEMORY_GI}Gi"
             nvidia.com/gpu: 0
           limits:
             cpu: 1
+            ephemeral-storage: "4Mi"
             memory: "${NRP_MEMORY_LIMIT_GI}Gi"
             nvidia.com/gpu: 0
         command: ["python", "-uB", "${SCRIPT_NAME}.py"]
