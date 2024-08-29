@@ -478,7 +478,6 @@ class Raster(SpikeData):
                     if "SUA" in mat
                     else mat["spike_matrix"]
                 )
-                self._burst_default_rms = 6.0
                 idces, times = np.nonzero(sm)
                 units = [times[idces == i] for i in range(sm.shape[0])]
                 length = sm.shape[1] * 1.0
@@ -509,7 +508,6 @@ class Raster(SpikeData):
                         for unit in mat["units"][0]
                     ]
                 length = 1e3 * np.ceil(max(unit.max() for unit in units) / 1e3)
-                self._burst_default_rms = 3.0
 
         # If those .mat files don't exist, instead load from Sury's phy
         # zips. This can't work if the data is in a mat format, though.
@@ -519,7 +517,6 @@ class Raster(SpikeData):
                 sd = load_spike_data(None, full_path=full_path)
             except OSError:
                 raise FileNotFoundError(f"Experiment {source}/{experiment} not found")
-            self._burst_default_rms = None
             units, length = sd.train, sd.length
 
         # Delegate out to the part that's useful to extract for subclass
@@ -538,6 +535,7 @@ class Raster(SpikeData):
         super().__init__(units, length=length)
         self._poprate = self.binned(1)
         self._raster = self.raster(bin_size_ms).T
+        self.burst_rms = None
 
     def coarse_rate(self):
         return self.poprate(20, 100)
@@ -580,7 +578,7 @@ class Raster(SpikeData):
         # Find the peaks of the coarse rate.
         r_coarse = self.coarse_rate()
         if rms is None:
-            rms = self._default_burst_rms
+            rms = self.burst_rms
             if self.burst_rms is None:
                 raise ValueError("No default rms value set for this data.")
         height = rms * np.sqrt(np.mean(r_coarse**2))
@@ -678,12 +676,12 @@ class Raster(SpikeData):
 
         return np.argsort([np.median(times) for times in burst_relative_state_times])
 
-    def randomized(self, bin_size=1.0, seed=2953):
+    def randomized(self, bin_size_ms=1.0, seed=None):
         "As SpikeData.randomized(), but return a Raster."
-        sd = super().randomized(bin_size, seed)
+        sd = super().randomized(bin_size_ms, seed or 2953)
         ret = self.__class__.__new__(self.__class__)
         ret._init(self.source, self.experiment, self.bin_size_ms, sd.train, sd.length)
-        ret._burst_default_rms = self._burst_default_rms
+        ret.burst_rms = self.burst_rms
         return ret
 
 
@@ -697,7 +695,7 @@ class Job:
     def requeue(self):
         if self.retries_allowed > 0:
             self._item["retries_allowed"] = self.retries_allowed - 1
-            self.q.put(self._item)
+            self._q.put(self._item)
             return True
         else:
             return False
