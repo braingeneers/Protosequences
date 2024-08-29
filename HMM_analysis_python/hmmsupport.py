@@ -580,24 +580,29 @@ class Raster(SpikeData):
         # Find the peaks of the coarse rate.
         r_coarse = self.coarse_rate()
         if rms is None:
-            rms = self._burst_default_rms
-            if self._burst_default_rms is None:
+            rms = self._default_burst_rms
+            if self.burst_rms is None:
                 raise ValueError("No default rms value set for this data.")
         height = rms * np.sqrt(np.mean(r_coarse**2))
         peaks_ms = signal.find_peaks(r_coarse, height=height, distance=700)[0]
 
-        # Descend from those peaks in both directions to find the first
-        # points where the coarse rate is below 10% of the peak value.
+        # Descend from those peaks in both directions to find the first points
+        # where the coarse rate is 90% of the way back to the minimum value it
+        # takes on between two peaks.
         n = len(peaks_ms)
         edges = np.zeros((n, 2), int)
         for i, peak in enumerate(peaks_ms):
-            min_height = 0.1 * r_coarse[peak]
-            while peak + edges[i, 0] >= 0 and r_coarse[peak + edges[i, 0]] > min_height:
+            pre_start = peaks_ms[i - 1] if i > 0 else 0
+            pre_height = r_coarse[pre_start:peak].min()
+            pre_height = 0.9 * pre_height + 0.1 * r_coarse[peak]
+            post_end = peaks_ms[i + 1] if i < n - 1 else len(r_coarse)
+            post_height = r_coarse[peak:post_end].min()
+            post_height = 0.9 * post_height + 0.1 * r_coarse[peak]
+            min = -peak
+            max = len(r_coarse) - peak
+            while edges[i, 0] > min and r_coarse[peak + edges[i, 0]] > pre_height:
                 edges[i, 0] -= 1
-            while (
-                peak + edges[i, 1] < len(r_coarse)
-                and r_coarse[peak + edges[i, 1]] > min_height
-            ):
+            while edges[i, 1] < max and r_coarse[peak + edges[i, 1]] > post_height:
                 edges[i, 1] += 1
         return peaks_ms, edges
 
@@ -611,10 +616,8 @@ class Raster(SpikeData):
         peaks = (
             np.array(
                 [
-                    peaks[i]
-                    + edges[i, 0]
-                    + np.argmax(r_fine[peaks[i] + edges[i, 0] : peaks[i] + edges[i, 1]])
-                    for i in range(len(peaks))
+                    p + l + np.argmax(r_fine[p + l : p + r])
+                    for p, (l, r) in zip(peaks, edges)
                 ]
             )
             / self.bin_size_ms
