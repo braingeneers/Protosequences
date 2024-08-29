@@ -61,7 +61,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Support *. Can't be part of the type because it depends on source.
-    if '*' in args.exp:
+    if "*" in args.exp:
         args.exp = fnmatch.filter(all_experiments(args.source), args.exp)
 
     # Verbosely print the full parameter set.

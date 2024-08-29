@@ -7,8 +7,7 @@ import numpy as np
 import seaborn as sns
 from scipy import stats
 
-from hmmsupport import (cv_plateau_df, cv_scores_df, figdir, figure,
-                        state_traversal_df)
+from hmmsupport import cv_plateau_df, cv_scores_df, figdir, figure, state_traversal_df
 
 figdir("paper")
 plt.ion()
@@ -39,7 +38,7 @@ with figure("Cross-Validation Plateau") as f:
         hue="org_label",
         errorbar="sd",
     )
-    ax.set_ylabel("Total $\Delta$ Log Likelihood Real vs. Shuffled")
+    ax.set_ylabel("Total $\\Delta$ Log Likelihood Real vs. Shuffled")
     ax.set_xlabel("Number of Hidden States in Model")
     ax.legend(title=None, ncol=2)
     ax.set_yscale("log")
@@ -61,7 +60,7 @@ with figure("Overall Model Validation") as f:
         y="total_delta_ll",
         ax=f.gca(),
     )
-    ax.set_ylabel("Total $\Delta$ Log Likelihood Real vs. Shuffled")
+    ax.set_ylabel("Total $\\Delta$ Log Likelihood Real vs. Shuffled")
     ax.set_yscale("log")
     ax.set_xlabel("")
 
@@ -76,7 +75,7 @@ with figure("Cross-Validation by Bin Size") as f:
         y="total_delta_ll",
         ax=ax,
     )
-    ax.set_ylabel("Total $\Delta$ Log Likelihood Real vs. Shuffled")
+    ax.set_ylabel("Total $\\Delta$ Log Likelihood Real vs. Shuffled")
     ax.set_xlabel("Bin Size (ms)")
     ax.set_yscale("log")
 

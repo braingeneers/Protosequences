@@ -1,4 +1,5 @@
-from hmmsupport import get_fitted_hmm, become_worker
+from hmmsupport import become_worker, get_fitted_hmm
+
 
 def fit_hmm(job):
     "Fit an HMM with the job's parameters, retrying if it fails."
@@ -10,5 +11,6 @@ def fit_hmm(job):
             print("Optimization failed, retrying.")
         else:
             print("Optimization failed.")
+
 
 become_worker("hmm", fit_hmm)

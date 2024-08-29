@@ -105,6 +105,7 @@ def _store(obj, path):
 class Cache:
     def __init__(self, func):
         self.wrapped = func
+        self.__name__ = func.__name__
         functools.update_wrapper(self, func)
 
     def _cache_names(self, source, exp, bin_size_ms, n_states, surrogate):
@@ -165,20 +166,19 @@ class Cache:
 
         return ret
 
+_figdir_dir = "figures"
 
 def figdir(path=None):
+    global _figdir_dir
     if path is not None:
         path = os.path.expanduser(path.strip())
         if path.startswith("/"):
-            figdir.dir = path
+            _figdir_dir = path
         else:
-            figdir.dir = os.path.join("figures", path)
-        if not os.path.exists(figdir.dir):
-            os.makedirs(figdir.dir)
-    return os.path.abspath(figdir.dir)
-
-
-figdir("")
+            _figdir_dir = os.path.join("figures", path)
+        if not os.path.exists(_figdir_dir):
+            os.makedirs(_figdir_dir)
+    return os.path.abspath(_figdir_dir)
 
 
 FIT_ATOL = 1e-3
@@ -377,23 +377,6 @@ class Model:
 
     def states(self, raster):
         return _HMM_METHODS[self.library].states(self._hmm, raster._raster)
-
-    def dump(self, path):
-        """
-        Dump the parameters of this HMM to a .mat file.
-        """
-        mat = dict(
-            state_means=np.exp(self._hmm.observations.log_lambdas)[
-                self._hmm.state_order, :
-            ],
-            state_sequence=[
-                np.nonzero(self._hmm.state_order == s)[0][0] for s in self.states()
-            ],
-            n_states=self.hmm.K,
-            bin_size_ms=self.hmm.bin_size_ms,
-        )
-        with open(os.path.join(figdir(), path), "wb") as f:
-            scipy.io.savemat(f, mat)
 
 
 @contextmanager
