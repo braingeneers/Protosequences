@@ -13,7 +13,7 @@ import hmmsupport
 from hmmsupport import Model, figure, get_raster, load_metrics
 
 source = "org_and_slice"
-group_name = {"L": "Organoid", "M": "Slice", "Pr": "Primary"}
+group_name = {"L": "Organoid", "MO": "Mouse Organoid", "M": "Slice", "Pr": "Primary"}
 groups = {
     "L": [
         "L1_t_spk_mat_sorted",
@@ -24,6 +24,17 @@ groups = {
         "well4_t_spk_mat_sorted",
         "well5_t_spk_mat_sorted",
         "well6_t_spk_mat_sorted",
+    ],
+    "MO": [
+        "MO1_t_spk_mat_sorted",
+        "MO2_t_spk_mat_sorted",
+        "MO3_t_spk_mat_sorted",
+        "MO4_t_spk_mat_sorted",
+        "MO5_t_spk_mat_sorted",
+        "MO6_t_spk_mat_sorted",
+        "MO7_t_spk_mat_sorted",
+        "MO8_t_spk_mat_sorted",
+        "MO9_t_spk_mat_sorted",
     ],
     "M": [
         "M1S1_t_spk_mat_sorted",
@@ -40,6 +51,13 @@ groups = {
         "Pr4_t_spk_mat_sorted",
     ],
 }
+exp_rms = (
+    {exp: 5.0 for exp in groups["L"]}
+    | {exp: 3.0 for exp in groups["MO"]}
+    | {exp: 6.0 for exp in groups["M"]}
+    | {exp: 3.0 for exp in groups["Pr"]}
+    | {"MO1_t_spk_mat_sorted": 2.5, "MO2_t_spk_mat_sorted": 2.0}
+)
 experiments = sum(groups.values(), [])
 exp_to_group = {}
 for group, exps in groups.items():
@@ -75,12 +93,13 @@ with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:
                 _rs[surr][exp][1].append(m)
                 pbar.update()
 
-for k, (r_real, _) in rasters_real.items():
+for exp, (r_real, _) in rasters_real.items():
+    r_real.burst_rms = exp_rms[exp]
     nunits = r_real._raster.shape[1]
     meanfr = r_real._raster.mean() / r_real.bin_size_ms * 1000
     nbursts = len(r_real.find_bursts())
     print(
-        f"{k} has {nunits} units firing at {meanfr:0.2f} " f"Hz with {nbursts} bursts"
+        f"{exp} has {nunits} units firing at {meanfr:0.2f} " f"Hz with {nbursts} bursts"
     )
 
 

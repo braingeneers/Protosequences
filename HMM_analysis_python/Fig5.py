@@ -40,11 +40,9 @@ with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:
     rasterses = dict(real=rasters_real, rsm=rasters_rsm)
     for exp in experiments:
         metricses[exp] = load_metrics(exp)
-        window = metricses[exp]["burst_window"].ravel() / 1e3
-        window[0] = min(window[0], -0.3)
-        window[1] = max(window[1], 0.6)
         for surr, rs in rasterses.items():
-            rs[exp] = get_raster(source, exp, bin_size_ms), []
+            rs[exp] = get_raster(source, exp, bin_size_ms, surr), []
+            rs[exp][0].burst_rms = 5.0
             pbar.update()
             for n in n_stateses:
                 m = Model(source, exp, bin_size_ms, n)
@@ -60,7 +58,7 @@ for k, (r, _) in rasters_real.items():
 
 
 consistency_real, consistency_rsm = [
-    {exp: [m.consistency for m in ms] for exp, (r, ms) in rs.items()}
+    {exp: [m.consistency for m in ms] for exp, (_, ms) in rs.items()}
     for rs in rasterses.values()
 ]
 
