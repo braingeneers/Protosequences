@@ -7,6 +7,7 @@ import queue
 import sys
 from contextlib import contextmanager
 from io import BytesIO
+from typing import Any
 
 import awswrangler
 import botocore
@@ -21,6 +22,7 @@ from braingeneers.iot.messaging import MessageBroker
 from braingeneers.utils.memoize_s3 import memoize
 from braingeneers.utils.smart_open_braingeneers import open
 from scipy import ndimage, signal
+from ssm import HMM
 
 
 def s3_isdir(path):
@@ -166,7 +168,9 @@ class Cache:
 
         return ret
 
+
 _figdir_dir = "figures"
+
 
 def figdir(path=None):
     global _figdir_dir
@@ -184,16 +188,6 @@ def figdir(path=None):
 FIT_ATOL = 1e-3
 FIT_N_ITER = 5000
 
-_HMM_METHODS = {}
-
-
-class HMMMethod:
-    def __init__(self, library, fit, states):
-        self.library = library
-        self.fit = fit
-        self.states = states
-        _HMM_METHODS[library] = self
-
 
 @Cache
 def _ssm_hmm(
@@ -207,31 +201,15 @@ def _ssm_hmm(
     n_iter=FIT_N_ITER,
 ):
     "Fit an HMM to data with SSM and return the model."
-    from ssm import HMM as SSMHMM
-
     r = get_raster(source, exp, bin_size_ms, surrogate)
-    hmm = SSMHMM(K=n_states, D=r._raster.shape[1], observations="poisson")
+    hmm = HMM(K=n_states, D=r._raster.shape[1], observations="poisson")
     hmm.fit(r._raster, verbose=2 if verbose else 0, tolerance=atol, num_iters=n_iter)
     return hmm
 
 
-def _ssm_states(hmm, raster):
-    "Return the most likely state sequence for the given raster."
-    return hmm.most_likely_states(raster)
-
-
-SSMFit = HMMMethod("ssm", _ssm_hmm, _ssm_states)
-
-
-default_method = os.environ.get("HMM_METHOD", "ssm")
-_HMM_METHODS["default"] = _HMM_METHODS[default_method]
-
-
-def is_cached(source, exp, bin_size_ms, n_states, surrogate="real", library="default"):
+def is_cached(source, exp, bin_size_ms, n_states, surrogate="real"):
     "Return whether the given model is cached."
-    return _HMM_METHODS[library].fit.is_cached(
-        source, exp, bin_size_ms, n_states, surrogate
-    )
+    return _ssm_hmm.is_cached(source, exp, bin_size_ms, n_states, surrogate)
 
 
 def get_fitted_hmm(
@@ -241,17 +219,14 @@ def get_fitted_hmm(
     n_states,
     surrogate="real",
     recompute_ok=True,
-    library="default",
     verbose=False,
-):
+) -> HMM | None:
     if verbose:
         print(f"Running {source}/{exp}:{bin_size_ms}ms, K={n_states}")
-    params = source, exp, bin_size_ms, n_states, surrogate
-    method = _HMM_METHODS[library]
     if recompute_ok:
-        return method.fit(*params, verbose=verbose)
+        return _ssm_hmm(source, exp, bin_size_ms, n_states, surrogate, verbose=verbose)
     else:
-        return method.fit.get_cached(*params)
+        return _ssm_hmm.get_cached(source, exp, bin_size_ms, n_states, surrogate)
 
 
 @memoize
@@ -265,8 +240,6 @@ def cv_scores(source, exp, bin_size_ms, n_states, n_folds=5):
 
     Adapted from `ssm.model_selection.cross_val_scores()`.
     """
-    from ssm import HMM
-
     # Load the relevant data and create an untrained model with the same parameters as
     # is used for training models in the main script.
     raster = get_raster(source, exp, bin_size_ms)
@@ -331,7 +304,6 @@ class Model:
         bin_size_ms,
         n_states,
         surrogate="real",
-        library="default",
         verbose=False,
         recompute_ok=False,
     ):
@@ -342,10 +314,12 @@ class Model:
             bin_size_ms,
             n_states,
             surrogate,
-            library=library,
             verbose=verbose,
             recompute_ok=recompute_ok,
         )
+
+        if self._hmm is None:
+            raise ValueError("Failed to load or fit model.")
 
         # Save metadata.
         self.source = source
@@ -354,7 +328,6 @@ class Model:
         self.n_states = n_states
         self.surrogate = surrogate
         self.tag = f"{source}_{exp}_{bin_size_ms}ms_K{n_states}_{surrogate}"
-        self.library = library
 
     def compute_consistency(self, raster, metrics):
         """
@@ -376,7 +349,8 @@ class Model:
         self.consistency = scores[:, self.unit_order][self.state_order, :]
 
     def states(self, raster):
-        return _HMM_METHODS[self.library].states(self._hmm, raster._raster)
+        assert self._hmm is not None
+        return self._hmm.most_likely_states(raster._raster)
 
 
 @contextmanager
@@ -399,12 +373,12 @@ def figure(name, save_args={}, save=True, save_exts=["png"], **kwargs):
             if ext[0] != ".":
                 ext = "." + ext
             path = os.path.join(figdir(), fname + ext)
-            f.savefig(path, **save_args)
+            f.savefig(path, **save_args)  # type: ignore
 
 
 @tenacity.retry(
     wait=tenacity.wait_random_exponential(multiplier=1, max=60),
-    retry=tenacity.retry_if_exception_type(botocore.exceptions.ClientError),
+    retry=tenacity.retry_if_exception_type(botocore.exceptions.ClientError),  # type: ignore
     stop=tenacity.stop_after_attempt(10),
 )
 def load_raw(source, filename, only_include=None, in_memory=None):
@@ -543,7 +517,9 @@ class Raster(SpikeData):
     def fine_rate(self):
         return self.poprate(5, 5)
 
-    def poprate(self, square_width_ms=0, gaussian_width_ms=None):
+    def poprate(
+        self, square_width_ms=0, gaussian_width_ms=None
+    ) -> np.ndarray[float, Any]:
         """
         Calculate population rate with a two-stage filter.
 
@@ -728,7 +704,7 @@ def become_worker(what, how):
     # are not going to process the original job.
     except BaseException as e:
         print(f"Worker terminated with exception {e}.")
-        q.put(job._item)
+        q.put(job._item)  # type: ignore
         print("Job requeued.")
 
 
@@ -765,7 +741,7 @@ def cv_df(source, experiments, bin_sizes_ms, n_stateses):
     ]
 
     def cache_params(i, p):
-        if cv_scores.check_call_in_cache(source, *p):
+        if cv_scores.check_call_in_cache(source, *p):  # type: ignore
             return cv_scores(source, *p)
         else:
             print(f"{i}/{len(params)} {p} MISSING")
@@ -781,7 +757,7 @@ def cv_df(source, experiments, bin_sizes_ms, n_stateses):
             continue
 
         # This is cached, so it's less stupid than it looks to do this here.
-        length_bins = get_raster(source, exp, bin_size_ms)._raster.shape[0]
+        length_bins = get_raster(source, exp, bin_size_ms)._raster.shape[0]  # type: ignore
 
         # Combine those into dataframe rows, per score rather than per file
         # like a db normalization because plotting will expect that.

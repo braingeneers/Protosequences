@@ -38,12 +38,6 @@ def parse_range_str(range_str):
         return np.array([int(range_str)])
 
 
-def hmm_method_type(name):
-    if name not in hmmsupport._HMM_METHODS:
-        raise ValueError
-    return name
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="fit_hmms", description="Fit HMMs locally or on NRP."
@@ -53,7 +47,6 @@ if __name__ == "__main__":
     parser.add_argument("bin_sizes", type=parse_range_str)
     parser.add_argument("n_stateses", type=parse_range_str)
     parser.add_argument("surrs", default=["real"], nargs="?", type=ensure_list)
-    parser.add_argument("library", default="default", nargs="?", type=hmm_method_type)
     parser.add_argument(
         "-n", "--dryrun", action="store_true", help="just print what would be done"
     )
@@ -80,7 +73,7 @@ if __name__ == "__main__":
         args.exp = fnmatch.filter(hmmsupport.all_experiments(args.source), args.exp)
 
     # Verbosely print the full parameter set.
-    print(f"Fitting HMMs using {args.library} for experiments:")
+    print(f"Fitting HMMs for experiments:")
     for exp, surr in itertools.product(args.exp, args.surrs):
         print(f"  {args.source}/{exp}[{surr}]")
     print("Will use K in", args.n_stateses)
@@ -93,7 +86,7 @@ if __name__ == "__main__":
         itertools.product(args.exp, args.bin_sizes, args.n_stateses, args.surrs)
     )
     for p in tqdm(needs_check, total=len(needs_check), disable=not args.pbar):
-        if not hmmsupport.is_cached(args.source, *p, library=args.library):
+        if not hmmsupport.is_cached(args.source, *p):
             needs_run.append(p)
             tqdm.write(f"  {args.source}/{p[0]}[{p[3]}] with T={p[1]}ms, K={p[2]}.")
 
@@ -116,7 +109,6 @@ if __name__ == "__main__":
                 bin_size_ms,
                 n_states,
                 surrogate,
-                args.library,
                 verbose=True,
             )
         sys.exit()
@@ -139,7 +131,6 @@ if __name__ == "__main__":
                     bin_size_ms=bin_size_ms,
                     n_states=n_states,
                     surrogate=surrogate,
-                    library=args.library,
                 ),
             )
         )
