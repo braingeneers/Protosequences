@@ -297,7 +297,7 @@ with figure("Fig7", figsize=(8.5, 3.0), save_exts=["png", "svg"]) as f:
             G, f"C{i}", exps, group_name[group], which_models=which_models
         )
     plot_dimensions_required(
-        G, "red", experiments, "Shuffled", rsm=True, which_models=which_models
+        G, "C5", experiments, "Shuffled", rsm=True, which_models=which_models
     )
     G.legend(loc="upper left")
     G.set_xlabel(r"Threshold $\theta$ (Percent Explained Variance)")
@@ -308,7 +308,7 @@ with figure("Fig7", figsize=(8.5, 3.0), save_exts=["png", "svg"]) as f:
 
     # Subfigure H:
     xs = np.linspace(0.5, 1, 100)
-    for model in ["Organoid", "Slice", "Primary"]:
+    for model in group_name.values():
         y_bb = fraction_above_xs(xs, df, True, model)
         y_nr = fraction_above_xs(xs, df, False, model)
         ys = y_bb - y_nr
