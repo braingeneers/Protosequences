@@ -49,6 +49,10 @@ groups = {
         "Pr2_t_spk_mat_sorted",
         "Pr3_t_spk_mat_sorted",
         "Pr4_t_spk_mat_sorted",
+        "Pr5_t_spk_mat_sorted",
+        "Pr6_t_spk_mat_sorted",
+        "Pr7_t_spk_mat_sorted",
+        "Pr8_t_spk_mat_sorted",
     ],
 }
 exp_rms = (
