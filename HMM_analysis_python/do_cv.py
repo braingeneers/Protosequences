@@ -42,7 +42,7 @@ if __name__ == "__main__":
         prog="fit_hmms", description="Queue cross-validation for HMMs."
     )
     parser.add_argument("source")
-    parser.add_argument("exp", type=lambda x: x if "*" in x else ensure_list(x))
+    parser.add_argument("exp", type=ensure_list)
     parser.add_argument("bin_sizes", type=parse_range_str)
     parser.add_argument("n_stateses", type=parse_range_str)
     parser.add_argument(
@@ -53,20 +53,24 @@ if __name__ == "__main__":
         action="store_true",
         help="clear the queue before adding new jobs",
     )
-    parser.add_argument("--pbar", action="store_true", help="show a progress bar")
     args = parser.parse_args()
 
     if not os.environ.get("S3_USER"):
         print("$S3_USER must be defined.", file=sys.stderr)
         sys.exit(1)
 
-    # Support *. Can't be part of the type because it depends on source.
-    if "*" in args.exp:
-        args.exp = fnmatch.filter(all_experiments(args.source), args.exp)
+    # Turn a list whose entries may contain wildcards into a simple list.
+    all_exps = all_experiments(args.source)
+    exps = []
+    for exp in args.exp:
+        if "*" in exp:
+            exps.extend(fnmatch.filter(all_exps, exp))
+        else:
+            exps.append(exp)
 
     # Verbosely print the full parameter set.
     print("Cross-validating HMMs on the following experiments:")
-    for exp in args.exp:
+    for exp in exps:
         print(f"  {args.source}/{exp}")
     print("Will use K in", args.n_stateses)
     print("Will use T in", args.bin_sizes)
@@ -75,7 +79,7 @@ if __name__ == "__main__":
     print("Must fit...")
     all_params = [
         (exp, bin_size_ms, n_states)
-        for exp in args.exp
+        for exp in exps
         for bin_size_ms in args.bin_sizes
         for n_states in args.n_stateses
     ]

@@ -61,7 +61,6 @@ if __name__ == "__main__":
         action="store_true",
         help="clear the queue before adding new jobs",
     )
-    parser.add_argument("--pbar", action="store_true", help="show a progress bar")
     args = parser.parse_args()
 
     if not args.local and not os.environ.get("S3_USER"):
@@ -90,7 +89,7 @@ if __name__ == "__main__":
     needs_check = list(
         itertools.product(exps, args.bin_sizes, args.n_stateses, args.surrs)
     )
-    for p in tqdm(needs_check, total=len(needs_check), disable=not args.pbar):
+    for p in tqdm(needs_check):
         if not hmmsupport.is_cached(args.source, *p):
             needs_run.append(p)
             tqdm.write(f"  {args.source}/{p[0]}[{p[3]}] with T={p[1]}ms, K={p[2]}.")
