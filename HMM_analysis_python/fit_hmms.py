@@ -43,7 +43,7 @@ if __name__ == "__main__":
         prog="fit_hmms", description="Fit HMMs locally or on NRP."
     )
     parser.add_argument("source")
-    parser.add_argument("exp", type=lambda x: x if "*" in x else ensure_list(x))
+    parser.add_argument("exp", type=ensure_list)
     parser.add_argument("bin_sizes", type=parse_range_str)
     parser.add_argument("n_stateses", type=parse_range_str)
     parser.add_argument("surrs", default=["real"], nargs="?", type=ensure_list)
@@ -68,13 +68,18 @@ if __name__ == "__main__":
         print("$S3_USER must be defined.", file=sys.stderr)
         sys.exit(1)
 
-    # Support *. Can't be part of the type because it depends on source.
-    if "*" in args.exp:
-        args.exp = fnmatch.filter(hmmsupport.all_experiments(args.source), args.exp)
+    # Turn a list whose entries may contain wildcards into a simple list.
+    all_exps = hmmsupport.all_experiments(args.source)
+    exps = []
+    for exp in args.exp:
+        if "*" in exp:
+            exps.extend(fnmatch.filter(all_exps, exp))
+        else:
+            exps.append(exp)
 
     # Verbosely print the full parameter set.
     print(f"Fitting HMMs for experiments:")
-    for exp, surr in itertools.product(args.exp, args.surrs):
+    for exp, surr in itertools.product(exps, args.surrs):
         print(f"  {args.source}/{exp}[{surr}]")
     print("Will use K in", args.n_stateses)
     print("Will use T in", args.bin_sizes)
@@ -83,7 +88,7 @@ if __name__ == "__main__":
     print("Must fit...")
     needs_run = []
     needs_check = list(
-        itertools.product(args.exp, args.bin_sizes, args.n_stateses, args.surrs)
+        itertools.product(exps, args.bin_sizes, args.n_stateses, args.surrs)
     )
     for p in tqdm(needs_check, total=len(needs_check), disable=not args.pbar):
         if not hmmsupport.is_cached(args.source, *p):
