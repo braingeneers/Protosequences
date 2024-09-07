@@ -43,5 +43,5 @@ launch script n="1" memory_gi="4" memory_limit_gi="4": push
     for i in $(seq "{{n}}"); do
         stamp=$(printf '%(%m%d%H%M%S)T\n' -1)
         export JOB_NAME=$S3_USER--$CLEAN_NAME--$stamp$i
-        envsubst < job.yml | kubectl apply -f -
+        envsubst < job.yml | kubectl apply -f - || exit $#
     done
