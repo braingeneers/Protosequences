@@ -12,7 +12,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from tqdm import tqdm
 
-import hmmsupport
 from hmmsupport import Model, figure, get_raster, load_metrics
 
 source = "org_and_slice"
@@ -28,7 +27,6 @@ experiments = [
 ]
 
 plt.ion()
-hmmsupport.figdir("paper")
 
 bin_size_ms = 30
 n_stateses = np.arange(10, 51)

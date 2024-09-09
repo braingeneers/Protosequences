@@ -7,9 +7,8 @@ import numpy as np
 import seaborn as sns
 from scipy import stats
 
-from hmmsupport import cv_plateau_df, cv_scores_df, figdir, figure, state_traversal_df
+from hmmsupport import cv_plateau_df, cv_scores_df, figure, state_traversal_df
 
-figdir("paper")
 plt.ion()
 
 experiments = [

@@ -9,7 +9,6 @@ from scipy import stats
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 
-import hmmsupport
 from hmmsupport import Model, figure, get_raster, load_metrics
 
 source = "org_and_slice"
@@ -69,7 +68,6 @@ for group, exps in groups.items():
         exp_to_group[exp] = group_name[group]
 
 plt.ion()
-hmmsupport.figdir("paper")
 
 bin_size_ms = 30
 n_stateses = np.arange(10, 51)
