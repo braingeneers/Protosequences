@@ -329,14 +329,15 @@ class Model:
         self.surrogate = surrogate
         self.tag = f"{source}_{exp}_{bin_size_ms}ms_K{n_states}_{surrogate}"
 
+        abs_margin = int(1e3 / self.bin_size_ms)
+        self.burst_margins = -abs_margin, abs_margin
+
+
     def compute_consistency(self, raster, metrics):
         """
         Compute an n_states x n_units array indicating how likely a unit is
         to have nonzero firings in each time bin of a given state.
         """
-        abs_margin = int(1e3 / self.bin_size_ms)
-        self.burst_margins = -abs_margin, abs_margin
-
         self.h = self.states(raster)
         scores = np.array(
             [(raster._raster[self.h == i, :] > 0).mean(0) for i in range(self.n_states)]
@@ -509,7 +510,7 @@ class Raster(SpikeData):
         super().__init__(units, length=length)
         self._poprate = self.binned(1)
         self._raster = self.raster(bin_size_ms).T
-        self.burst_rms = None
+        self.burst_rms: float | None = None
 
     def coarse_rate(self):
         return self.poprate(20, 100)
