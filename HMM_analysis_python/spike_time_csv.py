@@ -37,13 +37,14 @@ if __name__ == "__main__":
     # Load the raster (bin size doesn't affect the output CSV) and generate the CSV
     # where each row is a single spike.
     r = get_raster("org_and_slice", args.exp, 30)
+    idces, times = r.idces_times()
     pd.DataFrame(
-        dict(unit=i, time=t) for i, ts in enumerate(r.train) for t in ts
+        dict(unit=idces + 1, time=times)
     ).to_csv(csvname, index=False)
 
     # Load the metrics and generate a CSV out of the metrics as well.
     metrics = load_metrics(args.exp, only_include=["scaf_units"])
     scaf = set(metrics["scaf_units"].ravel())
-    pd.DataFrame(dict(unit=i, backbone=i + 1 in scaf) for i in range(r.N)).to_csv(
+    pd.DataFrame(dict(unit=i + 1, backbone=i + 1 in scaf) for i in range(r.N)).to_csv(
         bbname, index=False
     )
