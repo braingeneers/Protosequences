@@ -41,7 +41,9 @@ with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:
         metricses[exp] = load_metrics(exp, which_metrics)
         for surr, rs in rasterses.items():
             r, ms = rs[exp] = get_raster(source, exp, bin_size_ms, surr), []
-            r.unit_order = metricses[exp]["mean_rate_ordering"].flatten().astype(int) - 1
+            r.unit_order = (
+                metricses[exp]["mean_rate_ordering"].flatten().astype(int) - 1
+            )
             r.burst_rms = 5.0
             pbar.update()
             for n in n_stateses:
@@ -85,22 +87,16 @@ def separability(exp, X, pca=None, n_tries=100, validation=0.2):
     return res
 
 
-def separability_on_fr(r):
-    """
-    Check how well you can separate packet and non-packet units based on
-    just their overall firing rates.
-    """
-    rates = r.rates("Hz").reshape((-1, 1))
-    return separability(r.experiment, rates)
-
-
 sep_on_states = {
     exp: [separability(exp, scores.T) for scores in scoreses]
     for exp, scoreses in consistency_real.items()
 }
 
-sep_on_fr = {exp: separability_on_fr(r) for exp, (r, _) in rasters_real.items()}
 
+sep_on_fr = {
+    exp: separability(exp, r.rates("Hz").reshape((-1, 1)))
+    for exp, (r, _) in rasters_real.items()
+}
 
 # %%
 

@@ -7,6 +7,9 @@ import seaborn as sns
 from matplotlib.ticker import PercentFormatter
 from scipy import stats
 from sklearn.decomposition import PCA
+from sklearn.linear_model import SGDClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
 from tqdm import tqdm
 
 from hmmsupport import Model, figure, get_raster, load_metrics
@@ -255,11 +258,33 @@ def auc_pval(auc, labels):
     return stats.norm(μ, σ).cdf((1 - auc) * ep * en)
 
 
+def separability(exp, X, pca=None, n_tries=100, validation=0.2):
+    """
+    Fit a linear classifier to the given features X and return its
+    performance separating packet and non-packet units.
+    """
+    clf = SGDClassifier(n_jobs=12)
+    if pca is not None and pca < X.shape[1]:
+        clf = make_pipeline(PCA(n_components=pca), clf)
+    y = ~(np.arange(X.shape[0]) < len(nonrigid[exp]))
+    if validation is None:
+        Xt = Xv = X
+        yt = yv = y
+    best, res = 0, 0
+    for _ in range(n_tries):
+        if validation is not None:
+            Xt, Xv, yt, yv = train_test_split(X, y, stratify=y, test_size=validation)
+        score = clf.fit(Xt, yt).score(Xv, yv)
+        if score > best:
+            best, res = score, clf.score(X, y)
+    return res
+
+
 consistencies = {
     e: mean_consistency(all_the_scores(e, True, rsm=False)) for e in tqdm(experiments)
 }
 
-df = pd.DataFrame(
+consistency_df = pd.DataFrame(
     [
         dict(
             experiment=exp,
@@ -271,6 +296,29 @@ df = pd.DataFrame(
         for exp in experiments
         for label, unitgroup in enumerate([nonrigid, backbone])
         for c in consistencies[exp][unitgroup[exp]]
+    ]
+)
+
+
+sep_on_states = {
+    exp: [separability(exp, m.consistency.T) for m in ms]
+    for exp, (_, ms) in rasters_real.items()
+}
+
+sep_on_fr = {
+    exp: separability(exp, r.rates("Hz").reshape((-1, 1)))
+    for exp, (r, _) in rasters_real.items()
+}
+
+separability_df = pd.DataFrame(
+    [
+        dict(group=exp_to_group[exp], value=value, by="State Structure")
+        for exp, values in sep_on_states.items()
+        for value in values
+    ]
+    + [
+        dict(group=exp_to_group[exp], value=value, by="Firing Rate")
+        for exp, value in sep_on_fr.items()
     ]
 )
 
@@ -315,8 +363,8 @@ with figure("Fig7", figsize=(8.5, 3.0), save_exts=["png", "svg"]) as f:
     # Subfigure H:
     xs = np.linspace(0.5, 1, 100)
     for model in group_name.values():
-        y_bb = fraction_above_xs(xs, df, True, model)
-        y_nr = fraction_above_xs(xs, df, False, model)
+        y_bb = fraction_above_xs(xs, consistency_df, True, model)
+        y_nr = fraction_above_xs(xs, consistency_df, False, model)
         ys = y_bb - y_nr
         H.semilogy(xs, ys.mean(0), label=model)
         H.fill_between(
@@ -332,6 +380,22 @@ with figure("Fig7", figsize=(8.5, 3.0), save_exts=["png", "svg"]) as f:
     H.set_xlabel("Non-Poisson Threshold")
     H.set_ylabel("Fraction of Non-Poisson States by Unit")
 
+
+# %%
+# Possible new figure showing classification of backbone across models.
+
+with figure("Backbone Classifiability Across Models") as f:
+    ax = f.gca()
+    sns.boxplot(
+        data=separability_df,
+        y="value",
+        x="group",
+        hue="by",
+        ax=ax,
+    )
+    ax.set_ylabel("Backbone Classification Accuracy")
+    ax.set_xlabel("")
+    ax.legend()
 
 # %%
 # S21: showing that surrogate data has a linear manifold and real doesn't
@@ -404,7 +468,7 @@ with figure("Fig 7G Expanded") as f:
 
 with figure("Backbone vs Non-Rigid Poisson Scores") as f:
     ax = sns.boxplot(
-        df,
+        consistency_df,
         x="model",
         y="consistency",
         hue="backbone",
@@ -415,7 +479,7 @@ with figure("Backbone vs Non-Rigid Poisson Scores") as f:
     labels = []
     for label in ax.get_xticklabels():
         model = label.get_text()
-        subdf = df[df.model == model]
+        subdf = consistency_df[consistency_df.model == model]
         labels.append(f"{model} ($n = {len(subdf)}$)")
         print(label.get_text())
         p = stats.ks_2samp(
