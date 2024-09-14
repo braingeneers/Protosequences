@@ -308,7 +308,7 @@ class Model:
         recompute_ok=False,
     ):
         # Retrieve the (hopefully cached) model.
-        self._hmm = get_fitted_hmm(
+        hmm = get_fitted_hmm(
             source,
             exp,
             bin_size_ms,
@@ -318,10 +318,11 @@ class Model:
             recompute_ok=recompute_ok,
         )
 
-        if self._hmm is None:
+        if hmm is None:
             raise ValueError("Failed to load or fit model.")
 
         # Save metadata.
+        self._hmm = hmm
         self.source = source
         self.exp = exp
         self.bin_size_ms = bin_size_ms
@@ -333,7 +334,7 @@ class Model:
         self.burst_margins = -abs_margin, abs_margin
 
 
-    def compute_consistency(self, raster, metrics):
+    def compute_consistency(self, raster):
         """
         Compute an n_states x n_units array indicating how likely a unit is
         to have nonzero firings in each time bin of a given state.
@@ -342,12 +343,11 @@ class Model:
         scores = np.array(
             [(raster._raster[self.h == i, :] > 0).mean(0) for i in range(self.n_states)]
         )
-        self.unit_order = np.int32(metrics["mean_rate_ordering"].flatten()) - 1
         self.state_order = raster.state_order(
             self.h, self.burst_margins, n_states=self.n_states
         )
         scores[np.isnan(scores)] = 0
-        self.consistency = scores[:, self.unit_order][self.state_order, :]
+        self.consistency = scores[:, raster.unit_order][self.state_order, :]
 
     def states(self, raster):
         assert self._hmm is not None
@@ -511,6 +511,7 @@ class Raster(SpikeData):
         self._poprate = self.binned(1)
         self._raster = self.raster(bin_size_ms).T
         self.burst_rms: float | None = None
+        self.unit_order = np.arange(self.N)
 
     def coarse_rate(self):
         return self.poprate(20, 100)

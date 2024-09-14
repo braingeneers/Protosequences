@@ -73,12 +73,14 @@ bin_size_ms = 30
 n_stateses = np.arange(10, 51)
 
 
-backbone, nonrigid = {}, {}
+backbone, nonrigid, unit_orders = {}, {}, {}
+which_metrics = ["scaf_units", "non_scaf_units", "mean_rate_ordering"]
 print("Loading metrics files.")
 for exp in tqdm(experiments):
-    metrics = load_metrics(exp, only_include=["scaf_units", "non_scaf_units"])
+    metrics = load_metrics(exp, only_include=which_metrics)
     backbone[exp] = np.int32(metrics["scaf_units"].ravel()) - 1
     nonrigid[exp] = np.int32(metrics["non_scaf_units"].ravel()) - 1
+    unit_orders[exp] = np.int32(metrics["mean_rate_ordering"].flatten()) - 1
 
 
 print("Loading real and surrogate rasters and doing PCA on HMMs.")
@@ -87,16 +89,18 @@ with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:
     _rs = dict(real=rasters_real, rsm=rasters_rsm)
     for exp in experiments:
         for surr in ["real", "rsm"]:
-            _rs[surr][exp] = get_raster(source, exp, bin_size_ms, surr), []
+            r, ms = _rs[surr][exp] = get_raster(source, exp, bin_size_ms, surr), []
+            r.burst_rms = exp_rms[exp]
+            r.unit_order = unit_orders[exp]
             pbar.update()
             for n in n_stateses:
                 m = Model(source, exp, bin_size_ms, n, surr)
+                m.compute_consistency(r)
                 m.pca = PCA().fit(np.exp(m._hmm.observations.log_lambdas))
-                _rs[surr][exp][1].append(m)
+                ms.append(m)
                 pbar.update()
 
 for exp, (r_real, _) in rasters_real.items():
-    r_real.burst_rms = exp_rms[exp]
     nunits = r_real._raster.shape[1]
     meanfr = r_real._raster.mean() / r_real.bin_size_ms * 1000
     nbursts = len(r_real.find_bursts())

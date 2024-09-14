@@ -33,18 +33,20 @@ n_stateses = np.arange(10, 51)
 
 print("Loading fitted HMMs and calculating consistency.")
 metricses = {}
+which_metrics = ["non_scaf_units", "mean_rate_ordering"]
 with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:
     rasters_real, rasters_rsm = {}, {}
     rasterses = dict(real=rasters_real, rsm=rasters_rsm)
     for exp in experiments:
-        metricses[exp] = load_metrics(exp)
+        metricses[exp] = load_metrics(exp, which_metrics)
         for surr, rs in rasterses.items():
-            rs[exp] = get_raster(source, exp, bin_size_ms, surr), []
-            rs[exp][0].burst_rms = 5.0
+            r, ms = rs[exp] = get_raster(source, exp, bin_size_ms, surr), []
+            r.unit_order = metricses[exp]["mean_rate_ordering"].flatten().astype(int) - 1
+            r.burst_rms = 5.0
             pbar.update()
             for n in n_stateses:
                 m = Model(source, exp, bin_size_ms, n)
-                m.compute_consistency(rs[exp][0], metricses[exp])
+                m.compute_consistency(rs[exp][0])
                 rs[exp][1].append(m)
                 pbar.update()
 
