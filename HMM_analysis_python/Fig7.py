@@ -15,9 +15,10 @@ from tqdm import tqdm
 from hmmsupport import Model, figure, get_raster, load_metrics
 
 source = "org_and_slice"
-group_name = {"L": "Organoid", "MO": "Mouse Organoid", "M": "Slice", "Pr": "Primary"}
+group_name = {"HO": "Organoid", "MO": "Mouse Organoid", "MS": "Slice", "Pr": "Primary"}
+name_group = {v: k for k, v in group_name.items()}
 groups = {
-    "L": [
+    "HO": [
         "L1_t_spk_mat_sorted",
         "L2_7M_t_spk_mat_sorted",
         "L3_7M_t_spk_mat_sorted",
@@ -38,7 +39,7 @@ groups = {
         "MO8_t_spk_mat_sorted",
         "MO9_t_spk_mat_sorted",
     ],
-    "M": [
+    "MS": [
         "M1S1_t_spk_mat_sorted",
         "M1S2_t_spk_mat_sorted",
         "M2S1_t_spk_mat_sorted",
@@ -58,17 +59,21 @@ groups = {
     ],
 }
 exp_rms = (
-    {exp: 5.0 for exp in groups["L"]}
+    {exp: 5.0 for exp in groups["HO"]}
     | {exp: 3.0 for exp in groups["MO"]}
-    | {exp: 6.0 for exp in groups["M"]}
+    | {exp: 6.0 for exp in groups["MS"]}
     | {exp: 3.0 for exp in groups["Pr"]}
     | {"MO1_t_spk_mat_sorted": 2.5, "MO2_t_spk_mat_sorted": 2.0}
 )
-experiments = sum(groups.values(), [])
-exp_to_group = {}
-for group, exps in groups.items():
-    for exp in exps:
-        exp_to_group[exp] = group_name[group]
+experiments = [exp for exps in groups.values() for exp in exps]
+short_name = {
+    exp: group + str(i+1)
+    for group, exps in groups.items()
+    for i, exp in enumerate(exps)
+}
+exp_to_group = {
+    exp: group_name[group] for group, exps in groups.items() for exp in exps
+}
 
 plt.ion()
 
@@ -322,6 +327,19 @@ separability_df = pd.DataFrame(
     ]
 )
 
+pd.DataFrame(
+    [
+        dict(
+            sample_type=name_group[exp_to_group[exp]],
+            sample_id=short_name[exp],
+            K=n_stateses[i],
+            value=(value - sep_on_fr[exp]) / (1 - sep_on_fr[exp]),
+        )
+        for exp, values in sep_on_states.items()
+        for i, value in enumerate(values)
+    ]
+).to_csv("separability.csv", index=False)
+
 # %%
 
 
@@ -400,17 +418,10 @@ with figure("Backbone Classifiability Across Models") as f:
 # %%
 # S21: showing that surrogate data has a linear manifold and real doesn't
 
-# Re-sort to get L10 to the end where it belongs.
-organoids = sorted(
-    (x for x in experiments if x.startswith("L")),
-    key=lambda x: int(x.split("_")[0][1:]),
-)
-
-Ls = "L1 L2 L3 L5 L7 L8 L9 L10".split()
 with figure("Shuffled vs Real PCA", figsize=(7.5, 9)) as f:
     subfs = f.subfigures(4, 2)
-    for exp, subf in zip(organoids, subfs.ravel()):
-        subf.suptitle(f"Organoid {1+Ls.index(exp.split('_')[0])}")
+    for i, (exp, subf) in enumerate(zip(groups["HO"], subfs.ravel())):
+        subf.suptitle(f"Organoid {i}")
         axes = subf.subplots(
             1,
             2,
@@ -439,7 +450,7 @@ dimensions["*"] = dimensions_required(
     experiments, xs, which_models=which_models, rsm=True
 )
 
-for a, b in [("L", "M"), ("M", "Pr"), ("L", "Pr")]:
+for a, b in [("HO", "MS"), ("MS", "Pr"), ("HO", "Pr")]:
     scores = stats.mannwhitneyu(dimensions[a], dimensions[b], axis=1).pvalue
     print(a, b, stats.gmean(scores[~np.isnan(scores)]))
 
