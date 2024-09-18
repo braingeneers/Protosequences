@@ -321,6 +321,8 @@ separability_df = pd.DataFrame(
             sample_type=name_group[exp_to_group[exp]],
             sample_id=short_name[exp],
             K=n_stateses[i],
+            sep_on_states=value,
+            sep_on_fr=sep_on_fr[exp],
             value=(value - sep_on_fr[exp]) / (1 - sep_on_fr[exp]),
         )
         for exp, values in sep_on_states.items()
