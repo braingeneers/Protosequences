@@ -67,7 +67,7 @@ exp_rms = (
 )
 experiments = [exp for exps in groups.values() for exp in exps]
 short_name = {
-    exp: group + str(i+1)
+    exp: group + str(i + 1)
     for group, exps in groups.items()
     for i, exp in enumerate(exps)
 }
@@ -317,18 +317,6 @@ sep_on_fr = {
 
 separability_df = pd.DataFrame(
     [
-        dict(group=exp_to_group[exp], value=value, by="State Structure")
-        for exp, values in sep_on_states.items()
-        for value in values
-    ]
-    + [
-        dict(group=exp_to_group[exp], value=value, by="Firing Rate")
-        for exp, value in sep_on_fr.items()
-    ]
-)
-
-pd.DataFrame(
-    [
         dict(
             sample_type=name_group[exp_to_group[exp]],
             sample_id=short_name[exp],
@@ -338,7 +326,9 @@ pd.DataFrame(
         for exp, values in sep_on_states.items()
         for i, value in enumerate(values)
     ]
-).to_csv("separability.csv", index=False)
+)
+separability_df.to_csv("separability.csv", index=False)
+separability_df["model"] = separability_df.sample_type.map(lambda g: group_name[g])
 
 # %%
 
@@ -407,13 +397,12 @@ with figure("Backbone Classifiability Across Models") as f:
     sns.boxplot(
         data=separability_df,
         y="value",
-        x="group",
-        hue="by",
+        x="model",
         ax=ax,
     )
-    ax.set_ylabel("Backbone Classification Accuracy")
+    ax.set_ylabel("Normalized Backbone Linear Separability")
     ax.set_xlabel("")
-    ax.legend()
+    ax.set_ylim(0, 1)
 
 # %%
 # S21: showing that surrogate data has a linear manifold and real doesn't
