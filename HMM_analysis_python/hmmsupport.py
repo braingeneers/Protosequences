@@ -64,14 +64,6 @@ def all_experiments(source):
     return sorted({os.path.splitext(os.path.basename(x))[0] for x in paths})
 
 
-def multi_source_experiments(*sources):
-    ret = []
-    for source in sources:
-        for experiment in all_experiments(source):
-            ret.append((source, experiment))
-    return ret
-
-
 CACHE_DIR = ".cache"
 S3_USER = os.environ.get("S3_USER")
 S3_CACHE = f"s3://braingeneers/personal/{S3_USER}/cache"
