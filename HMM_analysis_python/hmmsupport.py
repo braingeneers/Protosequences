@@ -22,6 +22,8 @@ from braingeneers.iot.messaging import MessageBroker
 from braingeneers.utils.memoize_s3 import memoize
 from braingeneers.utils.smart_open_braingeneers import open
 from scipy import ndimage, signal
+from sklearn.linear_model import SGDClassifier
+from sklearn.model_selection import train_test_split
 from ssm import HMM
 
 
@@ -652,6 +654,22 @@ class Raster(SpikeData):
         ret._init(self.source, self.experiment, self.bin_size_ms, sd.train, sd.length)
         ret.burst_rms = self.burst_rms
         return ret
+
+
+def separability(X, n_nonrigid, n_tries=100, validation=0.2):
+    """
+    Fit a linear classifier to the given features X and return its
+    performance separating packet and non-packet units.
+    """
+    clf = SGDClassifier(n_jobs=12)
+    y = np.arange(X.shape[0]) >= n_nonrigid
+    best, res = 0, 0
+    for _ in range(n_tries):
+        Xt, Xv, yt, yv = train_test_split(X, y, stratify=y, test_size=validation)
+        score = clf.fit(Xt, yt).score(Xv, yv)
+        if score > best:
+            best, res = score, clf.score(X, y)
+    return res
 
 
 class Job:

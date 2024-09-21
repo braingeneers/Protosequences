@@ -7,9 +7,6 @@ import seaborn as sns
 from matplotlib.ticker import PercentFormatter
 from scipy import stats
 from sklearn.decomposition import PCA
-from sklearn.linear_model import SGDClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import make_pipeline
 from tqdm import tqdm
 
 from hmmsupport import (
@@ -19,6 +16,7 @@ from hmmsupport import (
     figure,
     get_raster,
     load_metrics,
+    separability,
 )
 
 ORGANOIDS = GROUP_EXPERIMENTS["HO"]
@@ -62,36 +60,19 @@ consistency_real, consistency_rsm = [
 ]
 
 
-def separability(exp, X, pca=None, n_tries=100, validation=0.2):
-    """
-    Fit a linear classifier to the given features X and return its
-    performance separating packet and non-packet units.
-    """
-    clf = SGDClassifier(n_jobs=12)
-    if pca is not None and pca < X.shape[1]:
-        clf = make_pipeline(PCA(n_components=pca), clf)
-    y = ~(np.arange(X.shape[0]) < len(metricses[exp]["non_scaf_units"]))
-    if validation is None:
-        Xt = Xv = X
-        yt = yv = y
-    best, res = 0, 0
-    for _ in range(n_tries):
-        if validation is not None:
-            Xt, Xv, yt, yv = train_test_split(X, y, stratify=y, test_size=validation)
-        score = clf.fit(Xt, yt).score(Xv, yv)
-        if score > best:
-            best, res = score, clf.score(X, y)
-    return res
-
-
 sep_on_states = {
-    exp: [separability(exp, scores.T) for scores in scoreses]
+    exp: [
+        separability(scores.T, len(metricses[exp]["non_scaf_units"]))
+        for scores in scoreses
+    ]
     for exp, scoreses in consistency_real.items()
 }
 
 
 sep_on_fr = {
-    exp: separability(exp, r.rates("Hz").reshape((-1, 1)))
+    exp: separability(
+        r.rates("Hz").reshape((-1, 1)), len(metricses[exp]["non_scaf_units"])
+    )
     for exp, (r, _) in rasters_real.items()
 }
 
