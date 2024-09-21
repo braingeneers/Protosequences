@@ -23,7 +23,7 @@ from braingeneers.utils.memoize_s3 import memoize
 from braingeneers.utils.smart_open_braingeneers import open
 from scipy import ndimage, signal
 from sklearn.linear_model import SGDClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import LeaveOneOut, cross_validate
 from ssm import HMM
 
 
@@ -656,20 +656,15 @@ class Raster(SpikeData):
         return ret
 
 
-def separability(X, n_nonrigid, n_tries=100, validation=0.2):
+def separability(X, n_nonrigid):
     """
-    Fit a linear classifier to the given features X and return its
-    performance separating packet and non-packet units.
+    Fit a linear classifier to the given features X, assumed to correspond to n_nonrigid
+    nonrigid units first, followed by the backbone, and return its accuracy according to
+    leave-one-out cross-validation.
     """
-    clf = SGDClassifier(n_jobs=12)
+    clf, cv = SGDClassifier(), LeaveOneOut()
     y = np.arange(X.shape[0]) >= n_nonrigid
-    best, res = 0, 0
-    for _ in range(n_tries):
-        Xt, Xv, yt, yv = train_test_split(X, y, stratify=y, test_size=validation)
-        score = clf.fit(Xt, yt).score(Xv, yv)
-        if score > best:
-            best, res = score, clf.score(X, y)
-    return res
+    return cross_validate(clf, X, y, scoring="accuracy", cv=cv)["test_score"].mean()
 
 
 class Job:

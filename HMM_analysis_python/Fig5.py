@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from joblib import parallel_backend
 from matplotlib.ticker import PercentFormatter
 from scipy import stats
 from sklearn.decomposition import PCA
@@ -59,22 +60,17 @@ consistency_real, consistency_rsm = [
     for rs in rasterses.values()
 ]
 
+with parallel_backend("loky", n_jobs=12):
+    n_nonrigid = {exp: len(metricses[exp]["non_scaf_units"]) for exp in ORGANOIDS}
+    sep_on_states = {
+        exp: [separability(scores.T, n_nonrigid[exp]) for scores in scoreses]
+        for exp, scoreses in consistency_real.items()
+    }
 
-sep_on_states = {
-    exp: [
-        separability(scores.T, len(metricses[exp]["non_scaf_units"]))
-        for scores in scoreses
-    ]
-    for exp, scoreses in consistency_real.items()
-}
-
-
-sep_on_fr = {
-    exp: separability(
-        r.rates("Hz").reshape((-1, 1)), len(metricses[exp]["non_scaf_units"])
-    )
-    for exp, (r, _) in rasters_real.items()
-}
+    sep_on_fr = {
+        exp: separability(r.rates("Hz").reshape((-1, 1)), n_nonrigid[exp])
+        for exp, (r, _) in rasters_real.items()
+    }
 
 # %%
 

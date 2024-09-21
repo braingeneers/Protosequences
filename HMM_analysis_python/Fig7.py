@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from joblib import parallel_backend
 from matplotlib.ticker import PercentFormatter
 from scipy import stats
 from sklearn.decomposition import PCA
@@ -239,15 +240,21 @@ consistency_df = pd.DataFrame(
 )
 
 
-sep_on_states = {
-    exp: [separability(m.consistency.T, len(nonrigid[exp])) for m in ms]
-    for exp, (_, ms) in rasters_real.items()
-}
+with parallel_backend("loky", n_jobs=12):
+    sep_on_states = {
+        exp: [separability(m.consistency.T, len(nonrigid[exp])) for m in ms]
+        for exp, (_, ms) in rasters_real.items()
+    }
 
-sep_on_fr = {
-    exp: separability(r.rates("Hz").reshape((-1, 1)), len(nonrigid[exp]))
-    for exp, (r, _) in rasters_real.items()
-}
+    sep_on_states_rsm = {
+        exp: [separability(m.consistency.T, len(nonrigid[exp])) for m in ms]
+        for exp, (_, ms) in rasters_rsm.items()
+    }
+
+    sep_on_fr = {
+        exp: separability(r.rates("Hz").reshape((-1, 1)), len(nonrigid[exp]))
+        for exp, (r, _) in rasters_real.items()
+    }
 
 separability_df = pd.DataFrame(
     [
@@ -255,12 +262,12 @@ separability_df = pd.DataFrame(
             sample_type=EXPERIMENT_GROUP[exp],
             sample_id=EXPERIMENT_GROUP[exp] + str(i + 1),
             K=n_stateses[i],
-            sep_on_states=value,
+            sep_on_states=on_states,
+            sep_on_states_rsm=sep_on_states_rsm[exp][i],
             sep_on_fr=sep_on_fr[exp],
-            value=(value - sep_on_fr[exp]) / (1 - sep_on_fr[exp]),
         )
-        for exp, values in sep_on_states.items()
-        for i, value in enumerate(values)
+        for exp, on_stateses in sep_on_states.items()
+        for i, on_states in enumerate(on_stateses)
     ]
 )
 separability_df.to_csv("separability.csv", index=False)
@@ -328,17 +335,21 @@ with figure("Fig7", figsize=(8.5, 3.0), save_exts=["png", "svg"]) as f:
 # %%
 # Possible new figure showing classification of backbone across models.
 
+keep_vars = ["model", "sep_on_states", "sep_on_states_rsm", "sep_on_fr"]
+melted = separability_df[keep_vars].melt(id_vars="model")
+
 with figure("Backbone Classifiability Across Models") as f:
     ax = f.gca()
     sns.boxplot(
-        data=separability_df,
+        data=melted,
         y="value",
         x="model",
+        hue="variable",
         ax=ax,
     )
-    ax.set_ylabel("Normalized Backbone Linear Separability")
+    ax.set_ylabel("Backbone Classification Accuracy")
     ax.set_xlabel("")
-    ax.set_ylim(0, 1)
+    ax.set_ylim(0.5, 1)
 
 # %%
 # S21: showing that surrogate data has a linear manifold and real doesn't
