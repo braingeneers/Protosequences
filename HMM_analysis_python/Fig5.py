@@ -12,19 +12,16 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from tqdm import tqdm
 
-from hmmsupport import Model, figure, get_raster, load_metrics
+from hmmsupport import (
+    DATA_SOURCE,
+    GROUP_EXPERIMENTS,
+    Model,
+    figure,
+    get_raster,
+    load_metrics,
+)
 
-source = "org_and_slice"
-experiments = [
-    "L1_t_spk_mat_sorted",
-    "L2_7M_t_spk_mat_sorted",
-    "L3_7M_t_spk_mat_sorted",
-    "L5_t_spk_mat_sorted",
-    "well1_t_spk_mat_sorted",
-    "well4_t_spk_mat_sorted",
-    "well5_t_spk_mat_sorted",
-    "well6_t_spk_mat_sorted",
-]
+ORGANOIDS = GROUP_EXPERIMENTS["HO"]
 
 plt.ion()
 
@@ -34,20 +31,20 @@ n_stateses = np.arange(10, 51)
 print("Loading fitted HMMs and calculating consistency.")
 metricses = {}
 which_metrics = ["non_scaf_units", "mean_rate_ordering"]
-with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:
+with tqdm(total=2 * len(ORGANOIDS) * (1 + len(n_stateses))) as pbar:
     rasters_real, rasters_rsm = {}, {}
     rasterses = dict(real=rasters_real, rsm=rasters_rsm)
-    for exp in experiments:
+    for exp in ORGANOIDS:
         metricses[exp] = load_metrics(exp, which_metrics)
         for surr, rs in rasterses.items():
-            r, ms = rs[exp] = get_raster(source, exp, bin_size_ms, surr), []
+            r, ms = rs[exp] = get_raster(DATA_SOURCE, exp, bin_size_ms, surr), []
             r.unit_order = (
                 metricses[exp]["mean_rate_ordering"].flatten().astype(int) - 1
             )
             r.burst_rms = 5.0
             pbar.update()
             for n in n_stateses:
-                m = Model(source, exp, bin_size_ms, n)
+                m = Model(DATA_SOURCE, exp, bin_size_ms, n)
                 m.compute_consistency(rs[exp][0])
                 rs[exp][1].append(m)
                 pbar.update()
@@ -353,7 +350,7 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
     F.plot([], [], "C0s", ms=4.5, label="By State Structure")
     F.plot(sep_on_fr.values(), "C1D", ms=5, label="By Firing Rate")
     F.set_xlabel("Organoid")
-    F.set_xticks(range(len(experiments)), [f"{i+1}" for i in range(len(experiments))])
+    F.set_xticks(range(len(ORGANOIDS)), [f"{i+1}" for i in range(len(ORGANOIDS))])
     F.set_ylabel("Backbone Classification Accuracy")
     F.legend(loc="lower right")
     F.yaxis.set_major_formatter(PercentFormatter(1, 0))
@@ -376,7 +373,7 @@ print(
 
 with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
     axes = f.subplots(4, 2)
-    for i, (ax, exp) in enumerate(zip(axes.flat, experiments)):
+    for i, (ax, exp) in enumerate(zip(axes.flat, ORGANOIDS)):
         r = rasters_real[exp][0]
         scores = consistency_real[exp][10]
         ax.imshow(

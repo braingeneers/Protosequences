@@ -12,68 +12,25 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from tqdm import tqdm
 
-from hmmsupport import Model, figure, get_raster, load_metrics
+from hmmsupport import (
+    ALL_EXPERIMENTS,
+    DATA_SOURCE,
+    EXPERIMENT_GROUP,
+    GROUP_EXPERIMENTS,
+    GROUP_NAME,
+    Model,
+    figure,
+    get_raster,
+    load_metrics,
+)
 
-source = "org_and_slice"
-group_name = {"HO": "Organoid", "MO": "Mouse Organoid", "MS": "Slice", "Pr": "Primary"}
-name_group = {v: k for k, v in group_name.items()}
-groups = {
-    "HO": [
-        "L1_t_spk_mat_sorted",
-        "L2_7M_t_spk_mat_sorted",
-        "L3_7M_t_spk_mat_sorted",
-        "L5_t_spk_mat_sorted",
-        "well1_t_spk_mat_sorted",
-        "well4_t_spk_mat_sorted",
-        "well5_t_spk_mat_sorted",
-        "well6_t_spk_mat_sorted",
-    ],
-    "MO": [
-        "MO1_t_spk_mat_sorted",
-        "MO2_t_spk_mat_sorted",
-        "MO3_t_spk_mat_sorted",
-        "MO4_t_spk_mat_sorted",
-        "MO5_t_spk_mat_sorted",
-        "MO6_t_spk_mat_sorted",
-        "MO7_t_spk_mat_sorted",
-        "MO8_t_spk_mat_sorted",
-        "MO9_t_spk_mat_sorted",
-    ],
-    "MS": [
-        "M1S1_t_spk_mat_sorted",
-        "M1S2_t_spk_mat_sorted",
-        "M2S1_t_spk_mat_sorted",
-        "M2S2_t_spk_mat_sorted",
-        "M3S1_t_spk_mat_sorted",
-        "M3S2_t_spk_mat_sorted",
-    ],
-    "Pr": [
-        "Pr1_t_spk_mat_sorted",
-        "Pr2_t_spk_mat_sorted",
-        "Pr3_t_spk_mat_sorted",
-        "Pr4_t_spk_mat_sorted",
-        "Pr5_t_spk_mat_sorted",
-        "Pr6_t_spk_mat_sorted",
-        "Pr7_t_spk_mat_sorted",
-        "Pr8_t_spk_mat_sorted",
-    ],
-}
-exp_rms = (
-    {exp: 5.0 for exp in groups["HO"]}
-    | {exp: 3.0 for exp in groups["MO"]}
-    | {exp: 6.0 for exp in groups["MS"]}
-    | {exp: 3.0 for exp in groups["Pr"]}
+EXP_RMS = (
+    {exp: 5.0 for exp in GROUP_EXPERIMENTS["HO"]}
+    | {exp: 3.0 for exp in GROUP_EXPERIMENTS["MO"]}
+    | {exp: 6.0 for exp in GROUP_EXPERIMENTS["MS"]}
+    | {exp: 3.0 for exp in GROUP_EXPERIMENTS["Pr"]}
     | {"MO1_t_spk_mat_sorted": 2.5, "MO2_t_spk_mat_sorted": 2.0}
 )
-experiments = [exp for exps in groups.values() for exp in exps]
-short_name = {
-    exp: group + str(i + 1)
-    for group, exps in groups.items()
-    for i, exp in enumerate(exps)
-}
-exp_to_group = {
-    exp: group_name[group] for group, exps in groups.items() for exp in exps
-}
 
 plt.ion()
 
@@ -84,7 +41,7 @@ n_stateses = np.arange(10, 51)
 backbone, nonrigid, unit_orders = {}, {}, {}
 which_metrics = ["scaf_units", "non_scaf_units", "mean_rate_ordering"]
 print("Loading metrics files.")
-for exp in tqdm(experiments):
+for exp in tqdm(ALL_EXPERIMENTS):
     metrics = load_metrics(exp, only_include=which_metrics)
     backbone[exp] = np.int32(metrics["scaf_units"].ravel()) - 1
     nonrigid[exp] = np.int32(metrics["non_scaf_units"].ravel()) - 1
@@ -92,17 +49,17 @@ for exp in tqdm(experiments):
 
 
 print("Loading real and surrogate rasters and doing PCA on HMMs.")
-with tqdm(total=2 * len(experiments) * (1 + len(n_stateses))) as pbar:
+with tqdm(total=2 * len(ALL_EXPERIMENTS) * (1 + len(n_stateses))) as pbar:
     rasters_real, rasters_rsm = {}, {}
     _rs = dict(real=rasters_real, rsm=rasters_rsm)
-    for exp in experiments:
+    for exp in ALL_EXPERIMENTS:
         for surr in ["real", "rsm"]:
-            r, ms = _rs[surr][exp] = get_raster(source, exp, bin_size_ms, surr), []
-            r.burst_rms = exp_rms[exp]
+            r, ms = _rs[surr][exp] = get_raster(DATA_SOURCE, exp, bin_size_ms, surr), []
+            r.burst_rms = EXP_RMS[exp]
             r.unit_order = unit_orders[exp]
             pbar.update()
             for n in n_stateses:
-                m = Model(source, exp, bin_size_ms, n, surr)
+                m = Model(DATA_SOURCE, exp, bin_size_ms, n, surr)
                 m.compute_consistency(r)
                 m.pca = PCA().fit(np.exp(m._hmm.observations.log_lambdas))
                 ms.append(m)
@@ -286,19 +243,20 @@ def separability(exp, X, pca=None, n_tries=100, validation=0.2):
 
 
 consistencies = {
-    e: mean_consistency(all_the_scores(e, True, rsm=False)) for e in tqdm(experiments)
+    e: mean_consistency(all_the_scores(e, True, rsm=False))
+    for e in tqdm(ALL_EXPERIMENTS)
 }
 
 consistency_df = pd.DataFrame(
     [
         dict(
             experiment=exp,
-            model=exp_to_group[exp],
+            model=GROUP_NAME[EXPERIMENT_GROUP[exp]],
             consistency=c,
             label=label,
             backbone="Backbone" if label else "Non-Rigid",
         )
-        for exp in experiments
+        for exp in ALL_EXPERIMENTS
         for label, unitgroup in enumerate([nonrigid, backbone])
         for c in consistencies[exp][unitgroup[exp]]
     ]
@@ -318,8 +276,8 @@ sep_on_fr = {
 separability_df = pd.DataFrame(
     [
         dict(
-            sample_type=name_group[exp_to_group[exp]],
-            sample_id=short_name[exp],
+            sample_type=EXPERIMENT_GROUP[exp],
+            sample_id=EXPERIMENT_GROUP[exp] + str(i + 1),
             K=n_stateses[i],
             sep_on_states=value,
             sep_on_fr=sep_on_fr[exp],
@@ -330,7 +288,7 @@ separability_df = pd.DataFrame(
     ]
 )
 separability_df.to_csv("separability.csv", index=False)
-separability_df["model"] = separability_df.sample_type.map(lambda g: group_name[g])
+separability_df["model"] = separability_df.sample_type.map(lambda g: GROUP_NAME[g])
 
 # %%
 
@@ -356,12 +314,12 @@ with figure("Fig7", figsize=(8.5, 3.0), save_exts=["png", "svg"]) as f:
 
     # Subfigure G: dimensionality as a function of PC inclusion threshold.
     which_models = 10, 30
-    for i, (group, exps) in enumerate(groups.items()):
+    for i, (group, exps) in enumerate(GROUP_EXPERIMENTS.items()):
         plot_dimensions_required(
-            G, f"C{i}", exps, group_name[group], which_models=which_models
+            G, f"C{i}", exps, GROUP_NAME[group], which_models=which_models
         )
     plot_dimensions_required(
-        G, "C5", experiments, "Shuffled", rsm=True, which_models=which_models
+        G, "C5", ALL_EXPERIMENTS, "Shuffled", rsm=True, which_models=which_models
     )
     G.legend(loc="upper left")
     G.set_xlabel(r"Threshold $\theta$ (Percent Explained Variance)")
@@ -372,7 +330,7 @@ with figure("Fig7", figsize=(8.5, 3.0), save_exts=["png", "svg"]) as f:
 
     # Subfigure H:
     xs = np.linspace(0.5, 1, 100)
-    for model in group_name.values():
+    for model in GROUP_NAME.values():
         y_bb = fraction_above_xs(xs, consistency_df, True, model)
         y_nr = fraction_above_xs(xs, consistency_df, False, model)
         ys = y_bb - y_nr
@@ -411,7 +369,7 @@ with figure("Backbone Classifiability Across Models") as f:
 
 with figure("Shuffled vs Real PCA", figsize=(7.5, 9)) as f:
     subfs = f.subfigures(4, 2)
-    for i, (exp, subf) in enumerate(zip(groups["HO"], subfs.ravel())):
+    for i, (exp, subf) in enumerate(zip(GROUP_EXPERIMENTS["HO"], subfs.ravel())):
         subf.suptitle(f"Organoid {i}")
         axes = subf.subplots(
             1,
@@ -435,10 +393,10 @@ with figure("Shuffled vs Real PCA", figsize=(7.5, 9)) as f:
 which_models = 10, 50
 dimensions = {}
 xs = np.linspace(0, 1, num=100)[1:]
-for i, (group, exps) in enumerate(groups.items()):
+for i, (group, exps) in enumerate(GROUP_EXPERIMENTS.items()):
     dimensions[group] = dimensions_required(exps, xs, which_models=which_models)
 dimensions["*"] = dimensions_required(
-    experiments, xs, which_models=which_models, rsm=True
+    ALL_EXPERIMENTS, xs, which_models=which_models, rsm=True
 )
 
 for a, b in [("HO", "MS"), ("MS", "Pr"), ("HO", "Pr")]:
@@ -449,13 +407,13 @@ for a, b in [("HO", "MS"), ("MS", "Pr"), ("HO", "Pr")]:
 with figure("Fig 7G Expanded") as f:
     ax = f.gca()
     which_models = 10, 50
-    for i, prefix in enumerate(group_name):
-        expsub = [e for e in experiments if e.startswith(prefix)]
+    for i, prefix in enumerate(GROUP_NAME):
+        expsub = [e for e in ALL_EXPERIMENTS if e.startswith(prefix)]
         plot_dimensions_required(
-            ax, f"C{i}", expsub, group_name[prefix], which_models=which_models
+            ax, f"C{i}", expsub, GROUP_NAME[prefix], which_models=which_models
         )
     plot_dimensions_required(
-        ax, "red", experiments, "Shuffled", rsm=True, which_models=which_models
+        ax, "red", ALL_EXPERIMENTS, "Shuffled", rsm=True, which_models=which_models
     )
     ax.legend(loc="upper left")
     ax.set_xlabel("Explained Variance Threshold")

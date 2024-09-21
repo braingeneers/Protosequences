@@ -333,7 +333,6 @@ class Model:
         abs_margin = int(1e3 / self.bin_size_ms)
         self.burst_margins = -abs_margin, abs_margin
 
-
     def compute_consistency(self, raster):
         """
         Compute an n_states x n_units array indicating how likely a unit is
@@ -711,16 +710,16 @@ def become_worker(what, how):
 
 
 @memoize
-def cv_plateau_df(exps):
+def cv_plateau_df():
     """
     Generate a DataFrame of CV scores demonstrating the plateau that occurs
     with the total number of hidden states.
     """
-    return cv_df("org_and_slice", exps, [30], range(1, 51))
+    return cv_df(DATA_SOURCE, ALL_EXPERIMENTS, [30], range(1, 51))
 
 
 @memoize
-def cv_scores_df(exps):
+def cv_scores_df():
     """
     Generate a DataFrame of CV scores for overall cross-validation showing
     that different bin sizes don't have much effect on the distribution of
@@ -728,7 +727,7 @@ def cv_scores_df(exps):
     """
     bin_sizes_ms = [1, 3, 5, 10, 20, 30, 50, 70, 100]
     n_stateses = range(10, 51)
-    return cv_df("org_and_slice", exps, bin_sizes_ms, n_stateses)
+    return cv_df(DATA_SOURCE, ["L1_t_spk_mat_sorted"], bin_sizes_ms, n_stateses)
 
 
 def cv_df(source, experiments, bin_sizes_ms, n_stateses):
@@ -752,7 +751,7 @@ def cv_df(source, experiments, bin_sizes_ms, n_stateses):
         joblib.delayed(cache_params)(i, p) for i, p in enumerate(params)
     )
 
-    df = []
+    rows = []
     for (exp, bin_size_ms, num_states), scores in zip(params, scores):
         # Filter out the results that were missing above.
         if scores is None:
@@ -763,10 +762,9 @@ def cv_df(source, experiments, bin_sizes_ms, n_stateses):
 
         # Combine those into dataframe rows, per score rather than per file
         # like a db normalization because plotting will expect that.
-        df.extend(
+        rows.extend(
             dict(
                 experiment=exp,
-                organoid=experiments.index(exp),
                 bin_size=bin_size_ms,
                 length_bins=length_bins,
                 states=num_states,
@@ -780,7 +778,7 @@ def cv_df(source, experiments, bin_sizes_ms, n_stateses):
         )
 
     # Turn those into a dataframe, then add the computed columns.
-    df = pd.DataFrame(sorted(df, key=lambda row: row["organoid"]))
+    df = pd.DataFrame(rows)
     df["delta_ll"] = df["ll"] - df["surr_ll"]
     for col in ["ll", "surr_ll", "train_ll", "delta_ll"]:
         df["total_" + col] = df[col] * df.length_bins
@@ -789,23 +787,19 @@ def cv_df(source, experiments, bin_sizes_ms, n_stateses):
 
 @memoize
 def state_traversal_df():
-    source = "org_and_slice"
-    exps = all_experiments(source)
     n_stateses = range(10, 51)
-    subsets = {
-        "Mouse": [e for e in exps if e[0] == "M"],
-        "Organoid": [e for e in exps if e[0] in "Lw"],
-        "Primary": [e for e in exps if e[0] == "P"],
-    }
 
     only_include = ["scaf_window", "tburst"]
-    metrics = {exp: load_metrics(exp, only_include) for exp in exps}
+    metrics = {exp: load_metrics(exp, only_include) for exp in ALL_EXPERIMENTS}
     print("Loaded metrics")
 
-    models = {exp: [Model(source, exp, 30, K) for K in n_stateses] for exp in exps}
+    models = {
+        exp: [Model(DATA_SOURCE, exp, 30, K) for K in n_stateses]
+        for exp in ALL_EXPERIMENTS
+    }
     print("Loaded models")
 
-    rasters = {exp: get_raster(source, exp, 30) for exp in exps}
+    rasters = {exp: get_raster(DATA_SOURCE, exp, 30) for exp in ALL_EXPERIMENTS}
     print("Loaded rasters")
 
     def distinct_states_traversed(exp):
@@ -832,7 +826,57 @@ def state_traversal_df():
 
     return pd.DataFrame(
         dict(count=count, rate=rate, model=model, exp=exp, n_states=n_states)
-        for model, exps in subsets.items()
+        for model, exps in GROUP_EXPERIMENTS.items()
         for exp in exps
         for n_states, (count, rate) in zip(n_stateses, distinct_states_traversed(exp))
     )
+
+
+DATA_SOURCE = "org_and_slice"
+GROUP_NAME = {"HO": "Organoid", "MO": "Mouse Organoid", "MS": "Slice", "Pr": "Primary"}
+GROUP_EXPERIMENTS = {
+    "HO": [
+        "L1_t_spk_mat_sorted",
+        "L2_7M_t_spk_mat_sorted",
+        "L3_7M_t_spk_mat_sorted",
+        "L5_t_spk_mat_sorted",
+        "well1_t_spk_mat_sorted",
+        "well4_t_spk_mat_sorted",
+        "well5_t_spk_mat_sorted",
+        "well6_t_spk_mat_sorted",
+    ],
+    "MO": [
+        "MO1_t_spk_mat_sorted",
+        "MO2_t_spk_mat_sorted",
+        "MO3_t_spk_mat_sorted",
+        "MO4_t_spk_mat_sorted",
+        "MO5_t_spk_mat_sorted",
+        "MO6_t_spk_mat_sorted",
+        "MO7_t_spk_mat_sorted",
+        "MO8_t_spk_mat_sorted",
+        "MO9_t_spk_mat_sorted",
+    ],
+    "MS": [
+        "M1S1_t_spk_mat_sorted",
+        "M1S2_t_spk_mat_sorted",
+        "M2S1_t_spk_mat_sorted",
+        "M2S2_t_spk_mat_sorted",
+        "M3S1_t_spk_mat_sorted",
+        "M3S2_t_spk_mat_sorted",
+    ],
+    "Pr": [
+        "Pr1_t_spk_mat_sorted",
+        "Pr2_t_spk_mat_sorted",
+        "Pr3_t_spk_mat_sorted",
+        "Pr4_t_spk_mat_sorted",
+        "Pr5_t_spk_mat_sorted",
+        "Pr6_t_spk_mat_sorted",
+        "Pr7_t_spk_mat_sorted",
+        "Pr8_t_spk_mat_sorted",
+    ],
+}
+
+EXPERIMENT_GROUP = {
+    exp: group for group, exps in GROUP_EXPERIMENTS.items() for exp in exps
+}
+ALL_EXPERIMENTS = list(EXPERIMENT_GROUP.keys())

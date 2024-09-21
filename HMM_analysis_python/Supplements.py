@@ -11,22 +11,10 @@ from hmmsupport import cv_plateau_df, cv_scores_df, figure, state_traversal_df
 
 plt.ion()
 
-experiments = [
-    "L1_t_spk_mat_sorted",
-    "L2_7M_t_spk_mat_sorted",
-    "L3_7M_t_spk_mat_sorted",
-    "L5_t_spk_mat_sorted",
-    "well1_t_spk_mat_sorted",
-    "well4_t_spk_mat_sorted",
-    "well5_t_spk_mat_sorted",
-    "well6_t_spk_mat_sorted",
-]
-
 # %%
 # S15: The plateau that occurs above 10 states.
 
-cv_plateau = cv_plateau_df(experiments)
-cv_plateau["org_label"] = cv_plateau.organoid.map(lambda i: "Organoid " + str(i + 1))
+cv_plateau = cv_plateau_df()
 
 
 with figure("Cross-Validation Plateau") as f:
@@ -43,19 +31,13 @@ with figure("Cross-Validation Plateau") as f:
     ax.set_yscale("log")
 
 
-# %%
 # S16: Cross-validation proving that the model performance is better for
 # the real data than for the shuffled data.
 
-cv_scores = cv_scores_df(experiments)
-cv_scores["org_label"] = cv_scores.organoid.map(lambda i: "Or" + str(i + 1))
-
-# This figure looks the same without the limitation of bin sizes to 30ms, but this
-# version is easier to explain in the methods. :)
 with figure("Overall Model Validation") as f:
     ax = sns.boxplot(
-        data=cv_scores[cv_scores.bin_size == 30],
-        x="org_label",
+        data=cv_plateau[cv_plateau.bin_size >= 10],
+        x="short_label",
         y="total_delta_ll",
         ax=f.gca(),
     )
@@ -64,7 +46,10 @@ with figure("Overall Model Validation") as f:
     ax.set_xlabel("")
 
 
+# %%
 # S17: Cross-validation by bin size.
+
+cv_scores = cv_scores_df()
 
 with figure("Cross-Validation by Bin Size") as f:
     ax = f.gca()
