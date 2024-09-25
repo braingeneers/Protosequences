@@ -838,7 +838,12 @@ def state_traversal_df():
 
 
 DATA_SOURCE = "org_and_slice"
-GROUP_NAME = {"HO": "Organoid", "MO": "Mouse Organoid", "MS": "Slice", "Pr": "Primary"}
+GROUP_NAME = {
+    "HO": "Human Organoid",
+    "MO": "Murine Organoid",
+    "MS": "Murine Acute Slice",
+    "Pr": "Murine Primary Culture",
+}
 GROUP_EXPERIMENTS = {
     "HO": [
         "L1_t_spk_mat_sorted",
@@ -880,6 +885,14 @@ GROUP_EXPERIMENTS = {
         "Pr8_t_spk_mat_sorted",
     ],
 }
+
+SHORT_NAME = {
+    exp: group + str(i)
+    for group, exps in GROUP_EXPERIMENTS.items()
+    for i, exp in enumerate(exps)
+}
+
+LONG_NAME = { v: k for k, v in SHORT_NAME.items() }
 
 EXPERIMENT_GROUP = {
     exp: group for group, exps in GROUP_EXPERIMENTS.items() for exp in exps

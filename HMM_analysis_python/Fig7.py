@@ -16,7 +16,9 @@ from hmmsupport import (
     EXPERIMENT_GROUP,
     GROUP_EXPERIMENTS,
     GROUP_NAME,
+    SHORT_NAME,
     Model,
+    Raster,
     figure,
     get_raster,
     load_metrics,
@@ -49,8 +51,8 @@ for exp in tqdm(ALL_EXPERIMENTS):
 
 print("Loading real and surrogate rasters and doing PCA on HMMs.")
 with tqdm(total=2 * len(ALL_EXPERIMENTS) * (1 + len(n_stateses))) as pbar:
-    rasters_real, rasters_rsm = {}, {}
-    _rs = dict(real=rasters_real, rsm=rasters_rsm)
+    _rs: dict[str, dict[str, tuple[Raster, list[Model]]]] = dict(real={}, rsm={})
+    rasters_real, rasters_rsm = _rs["real"], _rs["rsm"]
     for exp in ALL_EXPERIMENTS:
         for surr in ["real", "rsm"]:
             r, ms = _rs[surr][exp] = get_raster(DATA_SOURCE, exp, bin_size_ms, surr), []
@@ -260,7 +262,7 @@ separability_df = pd.DataFrame(
     [
         dict(
             sample_type=EXPERIMENT_GROUP[exp],
-            sample_id=EXPERIMENT_GROUP[exp] + str(i + 1),
+            sample_id=SHORT_NAME[exp],
             K=n_stateses[i],
             sep_on_states=on_states,
             sep_on_states_rsm=sep_on_states_rsm[exp][i],
