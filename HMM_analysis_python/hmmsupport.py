@@ -807,6 +807,10 @@ def state_traversal_df():
     rasters = {exp: get_raster(DATA_SOURCE, exp, 30) for exp in ALL_EXPERIMENTS}
     print("Loaded rasters")
 
+    def mean_hold_time(seq):
+        changes = np.where(seq[1:] != seq[:-1])[0]
+        return np.diff(np.hstack((-1, changes, len(seq) - 1))).mean()
+
     def distinct_states_traversed(exp):
         """
         Calculate the average total number of distinct states as well
@@ -824,16 +828,21 @@ def state_traversal_df():
                 h[(bin0 := int((peak + start) / T)) : bin0 + length_bins]
                 for peak in metrics[exp]["tburst"].ravel()
             ]
-            distinct_states = [len(set(states)) for states in state_seqs]
-            count = np.mean(distinct_states)
-            rate = 1e3 * count / length_ms
-            yield count, rate
+            distinct_states = [len(set(seq)) for seq in state_seqs]
+            durations = [mean_hold_time(seq) for seq in state_seqs]
+            yield dict(
+                count=np.mean(distinct_states),
+                count_std=np.std(distinct_states),
+                duration=np.mean(durations),
+                duration_std=np.std(durations),
+                burst_length_ms=length_ms,
+            )
 
     return pd.DataFrame(
-        dict(count=count, rate=rate, model=model, exp=exp, n_states=n_states)
+        dict(model=model, exp=exp, n_states=n_states) | stats
         for model, exps in GROUP_EXPERIMENTS.items()
         for exp in exps
-        for n_states, (count, rate) in zip(n_stateses, distinct_states_traversed(exp))
+        for n_states, stats in zip(n_stateses, distinct_states_traversed(exp))
     )
 
 
@@ -892,7 +901,7 @@ SHORT_NAME = {
     for i, exp in enumerate(exps)
 }
 
-LONG_NAME = { v: k for k, v in SHORT_NAME.items() }
+LONG_NAME = {v: k for k, v in SHORT_NAME.items()}
 
 EXPERIMENT_GROUP = {
     exp: group for group, exps in GROUP_EXPERIMENTS.items() for exp in exps
