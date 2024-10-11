@@ -80,62 +80,22 @@ def figdir(path=None):
     return os.path.abspath(_figdir_dir)
 
 
-FIT_ATOL = 1e-3
-FIT_N_ITER = 5000
-
-
 @memoize
-def _fit_hmm(
-    source,
-    exp,
-    bin_size_ms,
-    n_states,
-    surrogate,
-    verbose=False,
-    atol=FIT_ATOL,
-    n_iter=FIT_N_ITER,
-):
+def _fit_hmm(source, exp, bin_size_ms, n_states, surrogate):
     "Fit an HMM to data with SSM and return the model."
     r = get_raster(source, exp, bin_size_ms, surrogate)
     hmm = HMM(K=n_states, D=r._raster.shape[1], observations="poisson")
-    hmm.fit(r._raster, verbose=2 if verbose else 0, tolerance=atol, num_iters=n_iter)
+    hmm.fit(r._raster, verbose=2, tolerance=1e-3, num_iters=5000)
     return hmm
 
 
-def normalize_types(f):
-    """
-    Transforms a function with the following signature:
-
-        f(source, exp, bin_size_ms, n_states, surrogate, *args, **kwargs)
-
-    so that before the function is actually called, `source`, `exp`, and `surrogate` are
-    converted to Python native strings, `bin_size_ms` becomes a float, and `n_states`
-    becomes an int. This is necessary because joblib's argument hashing gives different
-    results for the Python native types than for the numpy equivalents.
-    """
-
-    @functools.wraps(f)
-    def wrapped(source, exp, bin_size_ms, n_states, surrogate, *args, **kwargs):
-        return f(
-            str(source),
-            str(exp),
-            float(bin_size_ms),
-            int(n_states),
-            str(surrogate),
-            *args,
-            **kwargs,
-        )
-
-    return wrapped
-
-
-@normalize_types
 def is_cached(source, exp, bin_size_ms, n_states, surrogate="real"):
     "Return whether the given model is cached."
-    return _fit_hmm.check_call_in_cache(source, exp, bin_size_ms, n_states, surrogate)
+    return _fit_hmm.check_call_in_cache(
+        str(source), str(exp), float(bin_size_ms), int(n_states), str(surrogate)
+    )
 
 
-@normalize_types
 def get_fitted_hmm(
     source,
     exp,
@@ -143,13 +103,15 @@ def get_fitted_hmm(
     n_states,
     surrogate="real",
     recompute_ok=True,
-    verbose=False,
 ) -> HMM | None:
-    if verbose:
+    if not is_cached(source, exp, bin_size_ms, n_states, surrogate):
+        if not recompute_ok:
+            return None
         print(f"Running {source}/{exp}:{bin_size_ms}ms, K={n_states}")
-    if recompute_ok or is_cached(source, exp, bin_size_ms, n_states, surrogate):
-        return _fit_hmm(source, exp, bin_size_ms, n_states, surrogate, verbose=verbose)
-    return None
+
+    return _fit_hmm(
+        str(source), str(exp), float(bin_size_ms), int(n_states), str(surrogate)
+    )
 
 
 @memoize
@@ -198,8 +160,8 @@ def cv_scores(source, exp, bin_size_ms, n_states, n_folds=5):
         hmm.fit(
             data,
             masks=train_mask,
-            tolerance=FIT_ATOL,
-            num_iters=FIT_N_ITER,
+            tolerance=1e-3,
+            num_iters=5000,
             verbose=2,
         )
 
@@ -227,7 +189,6 @@ class Model:
         bin_size_ms,
         n_states,
         surrogate="real",
-        verbose=False,
         recompute_ok=False,
     ):
         # Retrieve the (hopefully cached) model.
@@ -237,7 +198,6 @@ class Model:
             bin_size_ms,
             n_states,
             surrogate,
-            verbose=verbose,
             recompute_ok=recompute_ok,
         )
 

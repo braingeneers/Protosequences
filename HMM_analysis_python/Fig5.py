@@ -29,7 +29,7 @@ n_stateses = np.arange(10, 51)
 
 print("Loading fitted HMMs and calculating consistency.")
 metricses = {}
-which_metrics = ["non_scaf_units", "mean_rate_ordering"]
+which_metrics = ["non_scaf_units", "scaf_units", "mean_rate_ordering", "burst_window"]
 with tqdm(total=2 * len(ORGANOIDS) * (1 + len(n_stateses))) as pbar:
     rasters_real, rasters_rsm = {}, {}
     rasterses = dict(real=rasters_real, rsm=rasters_rsm)

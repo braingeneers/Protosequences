@@ -113,7 +113,6 @@ if __name__ == "__main__":
                 bin_size_ms,
                 n_states,
                 surrogate,
-                verbose=True,
             )
         sys.exit()
 
