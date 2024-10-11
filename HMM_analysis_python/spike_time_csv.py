@@ -38,9 +38,7 @@ if __name__ == "__main__":
     # where each row is a single spike.
     r = get_raster("org_and_slice", args.exp, 30)
     idces, times = r.idces_times()
-    pd.DataFrame(
-        dict(unit=idces + 1, time=times)
-    ).to_csv(csvname, index=False)
+    pd.DataFrame(dict(unit=idces + 1, time=times)).to_csv(csvname, index=False)
 
     # Load the metrics and generate a CSV out of the metrics as well.
     metrics = load_metrics(args.exp, only_include=["scaf_units"])
