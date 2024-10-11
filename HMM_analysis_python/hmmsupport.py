@@ -2,9 +2,7 @@ import functools
 import glob
 import math
 import os
-import pickle
 import queue
-import sys
 from contextlib import contextmanager
 from io import BytesIO
 from typing import Any
@@ -66,103 +64,6 @@ def all_experiments(source):
     return sorted({os.path.splitext(os.path.basename(x))[0] for x in paths})
 
 
-CACHE_DIR = ".cache"
-S3_USER = os.environ.get("S3_USER")
-S3_CACHE = f"s3://braingeneers/personal/{S3_USER}/cache"
-CACHE_ROOTS = [
-    root_path
-    for (root_path, valid) in [
-        (CACHE_DIR, os.path.isdir(CACHE_DIR)),
-        (S3_CACHE, S3_USER is not None),
-    ]
-    if valid
-]
-
-
-def _store(obj, path):
-    """
-    Pickle an object to a path.
-
-    If the path is local, ensure that it exists before trying to open the
-    file.
-    """
-    iss3 = path.startswith("s3://")
-    try:
-        if not iss3:
-            dirname = os.path.dirname(path)
-            os.makedirs(dirname, exist_ok=True)
-        with open(path, "wb") as f:
-            pickle.dump(obj, f)
-    except Exception as e:
-        verb = "upload" if iss3 else "save"
-        print(f"Failed to {verb} {path}: {e}", file=sys.stderr)
-
-
-class Cache:
-    def __init__(self, func):
-        self.wrapped = func
-        self.__name__ = func.__name__
-        functools.update_wrapper(self, func)
-
-    def _cache_names(self, source, exp, bin_size_ms, n_states, surrogate):
-        "Local cache file and S3 object cache path."
-        key = f"{source}_{exp}_{bin_size_ms}ms_{n_states}S_{surrogate}.pkl"
-        file = os.path.join(CACHE_DIR, self.__name__, key)
-        s3_object = "/".join((S3_CACHE, self.__name__, key))
-        return file, s3_object
-
-    def _cache_path(self, *args):
-        "The nearest possible cache path to read from, None if uncached."
-        filename, s3_object = self._cache_names(*args)
-
-        if os.path.isdir(CACHE_DIR) and os.path.isfile(filename):
-            return filename
-        elif S3_USER and awswrangler.s3.does_object_exist(s3_object):
-            return s3_object
-        else:
-            return None
-
-    def is_cached(self, *args):
-        "Whether the given parameters are cached."
-        return self._cache_path(*args) is not None
-
-    def get_cached(self, *args):
-        """
-        Get the cached object, or None if unavailable.
-
-        Additionally, if restoring the object from S3 when a local cache is
-        present, add the object to the local cache.
-        """
-        path = self._cache_path(*args)
-
-        if path is None:
-            return None
-
-        with open(path, "rb") as f:
-            ret = pickle.load(f)
-
-        if path.startswith("s3://") and os.path.isdir(CACHE_DIR):
-            _store(ret, self._cache_names(*args)[0])
-
-        return ret
-
-    def __call__(self, *args, **kw):
-        ret = self.get_cached(*args)
-
-        if ret is None:
-            ret = self.wrapped(*args, **kw)
-
-            filename, s3_object = self._cache_names(*args)
-
-            if os.path.isdir(CACHE_DIR):
-                _store(ret, filename)
-
-            if S3_USER is not None:
-                _store(ret, s3_object)
-
-        return ret
-
-
 _figdir_dir = "figures"
 
 
@@ -183,8 +84,8 @@ FIT_ATOL = 1e-3
 FIT_N_ITER = 5000
 
 
-@Cache
-def _ssm_hmm(
+@memoize
+def _fit_hmm(
     source,
     exp,
     bin_size_ms,
@@ -201,11 +102,40 @@ def _ssm_hmm(
     return hmm
 
 
+def normalize_types(f):
+    """
+    Transforms a function with the following signature:
+
+        f(source, exp, bin_size_ms, n_states, surrogate, *args, **kwargs)
+
+    so that before the function is actually called, `source`, `exp`, and `surrogate` are
+    converted to Python native strings, `bin_size_ms` becomes a float, and `n_states`
+    becomes an int. This is necessary because joblib's argument hashing gives different
+    results for the Python native types than for the numpy equivalents.
+    """
+
+    @functools.wraps(f)
+    def wrapped(source, exp, bin_size_ms, n_states, surrogate, *args, **kwargs):
+        return f(
+            str(source),
+            str(exp),
+            float(bin_size_ms),
+            int(n_states),
+            str(surrogate),
+            *args,
+            **kwargs,
+        )
+
+    return wrapped
+
+
+@normalize_types
 def is_cached(source, exp, bin_size_ms, n_states, surrogate="real"):
     "Return whether the given model is cached."
-    return _ssm_hmm.is_cached(source, exp, bin_size_ms, n_states, surrogate)
+    return _fit_hmm.check_call_in_cache(source, exp, bin_size_ms, n_states, surrogate)
 
 
+@normalize_types
 def get_fitted_hmm(
     source,
     exp,
@@ -217,10 +147,9 @@ def get_fitted_hmm(
 ) -> HMM | None:
     if verbose:
         print(f"Running {source}/{exp}:{bin_size_ms}ms, K={n_states}")
-    if recompute_ok:
-        return _ssm_hmm(source, exp, bin_size_ms, n_states, surrogate, verbose=verbose)
-    else:
-        return _ssm_hmm.get_cached(source, exp, bin_size_ms, n_states, surrogate)
+    if recompute_ok or is_cached(source, exp, bin_size_ms, n_states, surrogate):
+        return _fit_hmm(source, exp, bin_size_ms, n_states, surrogate, verbose=verbose)
+    return None
 
 
 @memoize
