@@ -487,8 +487,13 @@ class Raster(SpikeData):
                 raise FileNotFoundError(f"Experiment {source}/{experiment} not found")
             units, length = sd.train, sd.length
 
-        # Delegate out to the part that's useful to extract for subclass
-        # constructors.
+        # If this recording is supposed to be trimmed, cut all the spike trains and the
+        # reported length down to that value.
+        if duration := KEEP_DURATION.get(experiment):
+            units = [ts[ts <= duration] for ts in units]
+            length = duration
+
+        # Delegate out to the part that's useful to extract for subclass constructors.
         self._init(source, experiment, bin_size_ms, units, length)
 
     def _init(self, source, experiment, bin_size_ms, units, length):
@@ -907,3 +912,6 @@ EXPERIMENT_GROUP = {
     exp: group for group, exps in GROUP_EXPERIMENTS.items() for exp in exps
 }
 ALL_EXPERIMENTS = list(EXPERIMENT_GROUP.keys())
+
+_long_exps = set(GROUP_EXPERIMENTS["HO"][4:] + GROUP_EXPERIMENTS["MO"])
+KEEP_DURATION = {exp: 600e3 if exp in _long_exps else 180e3 for exp in ALL_EXPERIMENTS}

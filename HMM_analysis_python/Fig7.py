@@ -1,10 +1,12 @@
 # Fig7.py
 # Generate my two rows of figure 7 of the final manuscript.
+from itertools import chain
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from joblib import parallel_backend
+from joblib import Parallel, delayed, parallel_backend
 from matplotlib.ticker import PercentFormatter
 from scipy import stats
 from sklearn.decomposition import PCA
@@ -274,6 +276,39 @@ separability_df = pd.DataFrame(
 )
 separability_df.to_csv("separability.csv", index=False)
 separability_df["model"] = separability_df.sample_type.map(lambda g: GROUP_NAME[g])
+
+
+def where_bb(exp, A, B):
+    ret = A.copy()
+    ret[:, backbone[exp]] = B[:, backbone[exp]]
+    return ret
+
+
+def _el(exp, r_real, r_rsm, models):
+    return [
+        dict(
+            sample_type=EXPERIMENT_GROUP[exp],
+            sample_id=SHORT_NAME[exp],
+            K=n_stateses[i],
+            ll_real=model._hmm.log_likelihood(r_real),
+            ll_rsm=model._hmm.log_likelihood(r_rsm),
+            ll_backbone=model._hmm.log_likelihood(where_bb(exp, r_rsm, r_real)),
+            ll_nonrigid=model._hmm.log_likelihood(where_bb(exp, r_real, r_rsm)),
+        )
+        for i, model in enumerate(models)
+    ]
+
+
+ll_df = pd.DataFrame(
+    chain.from_iterable(
+        Parallel(n_jobs=12)(
+            delayed(_el)(exp, r._raster, rasters_rsm[exp][0]._raster, models)
+            for exp, (r, models) in rasters_real.items()
+        ),
+    )
+)
+
+ll_df.to_csv('ll.csv', index=False)
 
 # %%
 
