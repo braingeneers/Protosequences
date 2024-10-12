@@ -53,6 +53,11 @@ if __name__ == "__main__":
         action="store_true",
         help="clear the queue before adding new jobs",
     )
+    parser.add_argument(
+        "--no-check",
+        action="store_true",
+        help="queue all jobs without checking the cache",
+    )
     args = parser.parse_args()
 
     if not os.environ.get("S3_USER"):
@@ -60,10 +65,10 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Turn a list whose entries may contain wildcards into a simple list.
-    all_exps = all_experiments(args.source)
     exps = []
     for exp in args.exp:
         if "*" in exp:
+            all_exps = all_experiments(args.source)
             exps.extend(fnmatch.filter(all_exps, exp))
         else:
             exps.append(exp)
@@ -75,33 +80,34 @@ if __name__ == "__main__":
     print("Will use K in", args.n_stateses)
     print("Will use T in", args.bin_sizes)
 
-    # Check which parameters actually need re-run.
-    print("Must fit...")
-    all_params = [
+    job_params = [
         (exp, bin_size_ms, n_states)
         for exp in exps
         for bin_size_ms in args.bin_sizes
         for n_states in args.n_stateses
     ]
 
-    with tqdm(total=len(all_params)) as pbar:
+    # Check which parameters actually need re-run.
+    if not args.no_check:
+        print("Must fit...")
+        with tqdm(total=len(job_params)) as pbar:
 
-        def is_missing(p):
-            missing = not cv_scores.check_call_in_cache(args.source, *p)
-            pbar.update()
-            if missing:
-                tqdm.write(f"  {args.source}/{p[0]} with T={p[1]}ms, K={p[2]}.")
-            return missing
+            def is_missing(p):
+                missing = not cv_scores.check_call_in_cache(args.source, *p)
+                pbar.update()
+                if missing:
+                    tqdm.write(f"  {args.source}/{p[0]} with T={p[1]}ms, K={p[2]}.")
+                return missing
 
-        needs_run = Parallel(n_jobs=-1, backend="threading")(
-            delayed(is_missing)(p) for p in all_params
-        )
+            needs_run = Parallel(n_jobs=-1, backend="threading")(
+                delayed(is_missing)(p) for p in job_params
+            )
 
-    job_params = [p for p, missing in zip(all_params, needs_run) if missing]
+        job_params = [p for p, missing in zip(job_params, needs_run) if missing]
 
-    if not job_params:
-        print("Nothing. All CV jobs are already done.")
-        sys.exit()
+        if not job_params:
+            print("Nothing. All CV jobs are already done.")
+            sys.exit()
 
     # If this is a dry run, don't actually bother queueing anything.
     if args.dryrun:
