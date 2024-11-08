@@ -307,8 +307,30 @@ ll_df = pd.DataFrame(
         ),
     )
 )
-
 ll_df.to_csv("ll.csv", index=False)
+
+
+dreq_df = pd.DataFrame(
+    [
+        dict(
+            sample_type=EXPERIMENT_GROUP[exp],
+            sample_id=SHORT_NAME[exp],
+            theta=x,
+            K=K,
+            dims=d,
+            dims_rsm=dr,
+        )
+        for exp in ALL_EXPERIMENTS
+        for x in [0.75, 0.8, 0.9]
+        for K, d, dr in zip(
+            n_stateses,
+            components_required(exp, x),
+            components_required(exp, x, rsm=True),
+        )
+    ]
+)
+dreq_df.to_csv("dimensions.csv", index=False)
+
 
 # %%
 
