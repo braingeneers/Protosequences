@@ -790,7 +790,7 @@ GROUP_EXPERIMENTS = {
 }
 
 SHORT_NAME = {
-    exp: group + str(i)
+    exp: group + str(i + 1)
     for group, exps in GROUP_EXPERIMENTS.items()
     for i, exp in enumerate(exps)
 }
