@@ -7,14 +7,13 @@ import numpy as np
 import seaborn as sns
 from scipy import stats
 
-from hmmsupport import cv_plateau_df, cv_scores_df, figure, state_traversal_df
-
-plt.ion()
+from hmmsupport import SHORT_NAME, cv_plateau_df, cv_scores_df, figure, state_traversal_df
 
 # %%
 # S15: The plateau that occurs above 10 states.
 
 cv_plateau = cv_plateau_df()
+cv_plateau["short_label"] = cv_plateau.experiment.map(SHORT_NAME.get)
 
 
 with figure("Cross-Validation Plateau") as f:
@@ -22,7 +21,7 @@ with figure("Cross-Validation Plateau") as f:
         data=cv_plateau,
         x="states",
         y="total_delta_ll",
-        hue="org_label",
+        hue="short_label",
         errorbar="sd",
     )
     ax.set_ylabel("Total $\\Delta$ Log Likelihood Real vs. Shuffled")
@@ -38,6 +37,7 @@ with figure("Overall Model Validation") as f:
     ax = sns.boxplot(
         data=cv_plateau[cv_plateau.bin_size >= 10],
         x="short_label",
+        hue="short_label",
         y="total_delta_ll",
         ax=f.gca(),
     )
