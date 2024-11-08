@@ -25,7 +25,7 @@ ORGANOIDS = GROUP_EXPERIMENTS["HO"]
 plt.ion()
 
 bin_size_ms = 30
-n_stateses = np.arange(10, 51)
+n_stateses = np.arange(10, 31)
 
 print("Loading fitted HMMs and calculating consistency.")
 metricses = {}

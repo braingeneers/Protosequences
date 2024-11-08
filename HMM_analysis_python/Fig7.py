@@ -38,7 +38,7 @@ EXP_RMS = (
 plt.ion()
 
 bin_size_ms = 30
-n_stateses = np.arange(10, 51)
+n_stateses = np.arange(10, 31)
 
 
 backbone, nonrigid, unit_orders = {}, {}, {}
@@ -394,7 +394,7 @@ with figure("Fig7", figsize=(8.5, 3.0), save_exts=["png", "svg"]) as f:
 # %%
 # Possible new figure showing classification of backbone across models.
 
-keep_vars = ["model", "sep_on_states", "sep_on_states_rsm", "sep_on_fr"]
+keep_vars = ["model", "sep_on_states", "sep_on_fr"]
 melted = separability_df[keep_vars].melt(id_vars="model")
 
 with figure("Backbone Classifiability Across Models") as f:
@@ -453,13 +453,12 @@ for a, b in [("HO", "MS"), ("MS", "Pr"), ("HO", "Pr")]:
 with figure("Fig 7G Expanded") as f:
     ax = f.gca()
     which_models = 10, 50
-    for i, prefix in enumerate(GROUP_NAME):
-        expsub = [e for e in ALL_EXPERIMENTS if e.startswith(prefix)]
+    for i, (group, exps) in enumerate(GROUP_EXPERIMENTS.items()):
         plot_dimensions_required(
-            ax, f"C{i}", expsub, GROUP_NAME[prefix], which_models=which_models
+            ax, f"C{i}", exps, GROUP_NAME[group], which_models=which_models
         )
     plot_dimensions_required(
-        ax, "red", ALL_EXPERIMENTS, "Shuffled", rsm=True, which_models=which_models
+        ax, "C5", ALL_EXPERIMENTS, "Shuffled", rsm=True, which_models=which_models
     )
     ax.legend(loc="upper left")
     ax.set_xlabel("Explained Variance Threshold")
@@ -486,7 +485,7 @@ with figure("Backbone vs Non-Rigid Poisson Scores") as f:
     for label in ax.get_xticklabels():
         model = label.get_text()
         subdf = consistency_df[consistency_df.model == model]
-        labels.append(f"{model} ($n = {len(subdf)}$)")
+        labels.append(f"{model}\n($n = {len(subdf)}$)")
         print(label.get_text())
         p = stats.ks_2samp(
             subdf[subdf.backbone == "Backbone"].consistency,
