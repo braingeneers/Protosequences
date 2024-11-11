@@ -416,7 +416,7 @@ with figure("Backbone Classifiability Across Models") as f:
 with figure("Shuffled vs Real PCA", figsize=(7.5, 9)) as f:
     subfs = f.subfigures(4, 2)
     for i, (exp, subf) in enumerate(zip(GROUP_EXPERIMENTS["HO"], subfs.ravel())):
-        subf.suptitle(f"Organoid {i}")
+        subf.suptitle(f"Organoid {i+1}")
         axes = subf.subplots(
             1,
             2,
