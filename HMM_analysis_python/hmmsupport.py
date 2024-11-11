@@ -618,14 +618,14 @@ def cv_plateau_df():
 
 
 @memoize
-def cv_scores_df():
+def cv_binsize_df():
     """
     Generate a DataFrame of CV scores for overall cross-validation showing
     that different bin sizes don't have much effect on the distribution of
     CV scores.
     """
     bin_sizes_ms = [1, 3, 5, 10, 20, 30, 50, 70, 100]
-    n_stateses = range(10, 51)
+    n_stateses = range(10, 31)
     return cv_df(DATA_SOURCE, ["L1_t_spk_mat_sorted"], bin_sizes_ms, n_stateses)
 
 

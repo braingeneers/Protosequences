@@ -7,7 +7,15 @@ import numpy as np
 import seaborn as sns
 from scipy import stats
 
-from hmmsupport import SHORT_NAME, cv_plateau_df, cv_scores_df, figure, state_traversal_df
+from hmmsupport import (
+    SHORT_NAME,
+    cv_plateau_df,
+    cv_binsize_df,
+    figure,
+    state_traversal_df,
+)
+
+plt.ion()
 
 # %%
 # S15: The plateau that occurs above 10 states.
@@ -49,12 +57,12 @@ with figure("Overall Model Validation") as f:
 # %%
 # S17: Cross-validation by bin size.
 
-cv_scores = cv_scores_df()
+cv_binsize = cv_binsize_df()
 
 with figure("Cross-Validation by Bin Size") as f:
     ax = f.gca()
     sns.boxplot(
-        data=cv_scores,
+        data=cv_binsize,
         x="bin_size",
         y="total_delta_ll",
         ax=ax,
@@ -68,10 +76,11 @@ with figure("Cross-Validation by Bin Size") as f:
 # S26: State traversal by model.
 
 traversed = state_traversal_df()
+traversed["rate"] = traversed["count"] / traversed["burst_length_ms"] * 1000
 
 with figure("States Traversed by Model") as f:
     bins = np.arange(1, 38, 3)
-    axes = f.subplots(3, 1)
+    axes = f.subplots(4, 1)
     for (i, ax), (model, dfsub) in zip(enumerate(axes), traversed.groupby("model")):
         sns.histplot(
             dfsub,
@@ -85,7 +94,7 @@ with figure("States Traversed by Model") as f:
             label=model,
         )
         ax.set_xlim(0, 40)
-        if i == 2:
+        if i == len(axes) - 1:
             ax.set_xlabel("Average States Traversed in Per Second in Backbone Window")
         else:
             ax.set_xlabel("")
