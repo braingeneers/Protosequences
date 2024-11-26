@@ -114,17 +114,6 @@ def dimensions_required(experiments, xs, rsm=False, which_models=None):
     )
 
 
-def plot_dimensions_required(
-    ax, color, experiments, label, rsm=False, which_models=None
-):
-    xs = np.linspace(0.705, 1)
-    dreq = dimensions_required(experiments, xs, rsm, which_models)
-    ys = np.mean(dreq, axis=1)
-    ystd = np.std(dreq, axis=1)
-    ax.fill_between(xs, ys - ystd, ys + ystd, alpha=0.2, color=color, label=label)
-    ax.plot(xs, ys, color=color)
-
-
 def poisson_test(data, mean=None):
     """
     Test the null hypothesis that the given data of shape (N,K) has no less
@@ -315,22 +304,22 @@ dreq_df = pd.DataFrame(
         dict(
             sample_type=EXPERIMENT_GROUP[exp],
             sample_id=SHORT_NAME[exp],
-            theta=x,
+            theta=theta,
             K=K,
             dims=d,
             dims_rsm=dr,
+            dims_norm=(d - dr) / (d + dr),
         )
         for exp in ALL_EXPERIMENTS
-        for x in [0.75, 0.8, 0.9]
+        for theta in np.linspace(0.5, 1, num=51)
         for K, d, dr in zip(
             n_stateses,
-            components_required(exp, x),
-            components_required(exp, x, rsm=True),
+            components_required(exp, theta),
+            components_required(exp, theta, rsm=True),
         )
     ]
 )
 dreq_df.to_csv("dimensions.csv", index=False)
-
 
 # %%
 
@@ -351,44 +340,52 @@ def fraction_above_xs(xs, data, backbone=None, model=None):
     )
 
 
-with figure("Fig7", figsize=(8.5, 3.0), save_exts=["png", "svg"]) as f:
-    G, H = f.subplots(1, 2, gridspec_kw=dict(width_ratios=[2, 3]))
+# %%
+# Supplemement to figure 7E showing the dimensions required as a function of that
+# threshold, and significance scores for each of the comparisons.
+#
+# Make sure to run lmem.R first!
 
-    # Subfigure G: dimensionality as a function of PC inclusion threshold.
+def plot_dimensions_required(
+    ax, color, experiments, label, rsm=False, which_models=None
+):
+    xs = np.linspace(0.5, 1)
+    dreq = dimensions_required(experiments, xs, rsm, which_models)
+    ys = np.mean(dreq, axis=1)
+    ystd = np.std(dreq, axis=1)
+    ax.fill_between(xs, ys - ystd, ys + ystd, alpha=0.2, color=color, label=label)
+    ax.plot(xs, ys, color=color)
+
+
+with figure("p Value Comparison", figsize=[6.4, 6.4]) as f:
+    A, B = f.subplots(2, 1)
+
     which_models = 10, 30
     for i, (group, exps) in enumerate(GROUP_EXPERIMENTS.items()):
         plot_dimensions_required(
-            G, f"C{i}", exps, GROUP_NAME[group], which_models=which_models
+            A, f"C{i}", exps, GROUP_NAME[group], which_models=which_models
         )
     plot_dimensions_required(
-        G, "C5", ALL_EXPERIMENTS, "Shuffled", rsm=True, which_models=which_models
+        A, "C5", ALL_EXPERIMENTS, "Shuffled", rsm=True, which_models=which_models
     )
-    G.legend(loc="upper left")
-    G.set_xlabel(r"Threshold $\theta$ (Percent Explained Variance)")
-    G.set_ylabel("Dimensions Required")
-    G.set_ylim(1, 6)
-    G.set_xlim(0.7, 1)
-    G.xaxis.set_major_formatter(PercentFormatter(1, 0))
 
-    # Subfigure H:
-    xs = np.linspace(0.5, 1, 100)
-    for model in GROUP_NAME.values():
-        y_bb = fraction_above_xs(xs, consistency_df, True, model)
-        y_nr = fraction_above_xs(xs, consistency_df, False, model)
-        ys = y_bb - y_nr
-        H.semilogy(xs, ys.mean(0), label=model)
-        H.fill_between(
-            xs,
-            ys.mean(0) - ys.std(0),
-            ys.mean(0) + ys.std(0),
-            alpha=0.5,
-            color=H.get_lines()[-1].get_color(),
-        )
-    H.set_ylim(1e-3, 1)
-    H.set_xlim(0.5, 1)
-    H.legend()
-    H.set_xlabel("Non-Poisson Threshold")
-    H.set_ylabel("Fraction of Non-Poisson States by Unit")
+    A.legend(loc="upper left")
+    A.set_ylabel("Dimensions Required")
+    A.set_ylim(1, 6)
+    A.set_xlim(0.5, 1)
+    A.set_xticks([])
+    A.xaxis.set_major_formatter(PercentFormatter(1, 0))
+
+    pval_df = pd.read_csv("pvalues.csv")
+    sns.lineplot(data=pval_df, x="theta", y="p.value", hue="contrast", ax=B)
+    B.set_yscale("log")
+    B.axhline(0.05, c="k", ls=":", label="$p$ = 5\\%")
+    B.set_xlim(0.5, 1)
+    B.set_xlabel(r"Threshold $\theta$ (Percent Explained Variance)")
+    B.set_ylabel("LMEM Significance $p$-value")
+    B.legend(title="Comparison")
+
+    f.align_ylabels([A, B])
 
 
 # %%
