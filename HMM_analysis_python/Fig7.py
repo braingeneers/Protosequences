@@ -471,7 +471,7 @@ with figure("Fig 7G Expanded") as f:
 # %%
 # S27: backbone units are less likely to be Poisson than non-rigid units
 
-with figure("Backbone vs Non-Rigid Poisson Scores") as f:
+with figure("Backbone vs Non-Rigid Poisson Scores", figsize=(7, 2.5)) as f:
     ax = sns.boxplot(
         consistency_df,
         x="model",
@@ -479,13 +479,14 @@ with figure("Backbone vs Non-Rigid Poisson Scores") as f:
         hue="backbone",
         width=0.5,
         ax=f.gca(),
+        legend=False,
     )
     ax.set_xlabel("")
     labels = []
     for label in ax.get_xticklabels():
         model = label.get_text()
         subdf = consistency_df[consistency_df.model == model]
-        labels.append(f"{model}\n($n = {len(subdf)}$)")
+        labels.append(f"{model}\n({len(subdf)} Units)")
         print(label.get_text())
         p = stats.ks_2samp(
             subdf[subdf.backbone == "Backbone"].consistency,
@@ -494,5 +495,5 @@ with figure("Backbone vs Non-Rigid Poisson Scores") as f:
         ).pvalue
         print(model, len(subdf), p)
     ax.set_xticklabels(labels)
-    ax.set_ylabel("Fraction of Non-Poisson States by Unit")
-    ax.legend()
+    ax.set_ylabel("Fraction of Significantly\nNon-Poisson States")
+    ax.spines[['right', 'top']].set_visible(False)
