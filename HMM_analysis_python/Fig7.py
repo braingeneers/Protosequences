@@ -322,27 +322,50 @@ dreq_df = pd.DataFrame(
 dreq_df.to_csv("dimensions.csv", index=False)
 
 # %%
+# Figure 7E: distribution of HMM dimensionality (to explain 75% of variance)
+# compared between all the models.
 
+dsub = dreq_df[dreq_df.theta == 0.75]
+dsub.to_csv("dimensions_0.75.csv", index=False)
 
-def fraction_above_xs(xs, data, backbone=None, model=None):
-    """
-    Compute the fraction of data points above each threshold in `xs`.
-    """
-    if backbone is not None:
-        data = data[data.label == int(backbone)]
-    if model is not None:
-        data = data[data.model == model]
-    return np.array(
-        [
-            [(dsub.consistency >= x).mean() for x in xs]
-            for _, dsub in data.groupby("experiment")
-        ]
+with figure("Fig7E", figsize=(4.0, 3.0), save_exts=["png", "svg"]) as f:
+    axes = f.subplots(4, 1)
+    for (i, group), ax in zip(enumerate(GROUP_NAME), axes):
+        sns.histplot(
+            data=dsub[dsub.sample_type == group],
+            x="dims",
+            stat="count",
+            discrete=True,
+            color=f"C{i}",
+            ax=ax,
+        )
+        ax.set_xlim(0.35, 7.65)
+        ax.set_ylabel(group)
+        ax.set_xticks([])
+        ax.set_xlabel("")
+    ax.set_xlabel("Dimensions to Explain 75\\% of Variance")
+    ax.set_xticks(np.arange(1, 8))
+
+with figure("Fig7E Alternate") as f:
+    ax = f.gca()
+    sns.violinplot(
+        data=dsub, x="sample_type", y="dims", bw=0.6, cut=0, inner=None, ax=ax
     )
+    ax.set_ylim(*ax.get_ylim())
+    sections = [
+        dsub[dsub.sample_type == label.get_text()] for label in ax.get_xticklabels()
+    ]
+    means = [section["dims"].mean() for section in sections]
+    stds = [section["dims"].std() for section in sections]
+    ax.errorbar(ax.get_xticks(), means, yerr=stds, fmt="ko")
+    ax.set_xlabel("")
+    ax.set_ylabel("Dimensions to Explain 75\\% of Variance")
+
 
 
 # %%
-# Supplemement to figure 7E showing the dimensions required as a function of that
-# threshold, and significance scores for each of the comparisons.
+# S25: supplemement to figure 7E showing the dimensions required and the
+# significance as a function of threshold θ.
 #
 # Make sure to run lmem.R first!
 
@@ -428,41 +451,6 @@ with figure("Shuffled vs Real PCA", figsize=(7.5, 9)) as f:
             points = model.pca.transform(raster._raster)[:, :2]
             ax.set_aspect("equal")
             ax.scatter(points[:, 1], points[:, 0], s=1, alpha=0.5, c=h, cmap="rainbow")
-
-
-# %%
-# S25: dimensionality as a function of PC inclusion threshold
-
-which_models = 10, 50
-dimensions = {}
-xs = np.linspace(0, 1, num=100)[1:]
-for i, (group, exps) in enumerate(GROUP_EXPERIMENTS.items()):
-    dimensions[group] = dimensions_required(exps, xs, which_models=which_models)
-dimensions["*"] = dimensions_required(
-    ALL_EXPERIMENTS, xs, which_models=which_models, rsm=True
-)
-
-for a, b in [("HO", "MS"), ("MS", "Pr"), ("HO", "Pr")]:
-    scores = stats.mannwhitneyu(dimensions[a], dimensions[b], axis=1).pvalue
-    print(a, b, stats.gmean(scores[~np.isnan(scores)]))
-
-
-with figure("Fig 7G Expanded") as f:
-    ax = f.gca()
-    which_models = 10, 50
-    for i, (group, exps) in enumerate(GROUP_EXPERIMENTS.items()):
-        plot_dimensions_required(
-            ax, f"C{i}", exps, GROUP_NAME[group], which_models=which_models
-        )
-    plot_dimensions_required(
-        ax, "C5", ALL_EXPERIMENTS, "Shuffled", rsm=True, which_models=which_models
-    )
-    ax.legend(loc="upper left")
-    ax.set_xlabel("Explained Variance Threshold")
-    ax.set_ylabel("Dimensions Required")
-    ax.set_ylim(1, 6)
-    ax.set_xlim(0.7, 1)
-    ax.xaxis.set_major_formatter(PercentFormatter(1, 0))
 
 
 # %%
