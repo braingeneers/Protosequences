@@ -35,8 +35,6 @@ EXP_RMS = (
     | {"MO1_t_spk_mat_sorted": 2.5, "MO2_t_spk_mat_sorted": 2.0}
 )
 
-plt.ion()
-
 bin_size_ms = 30
 n_stateses = np.arange(10, 31)
 

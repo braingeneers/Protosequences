@@ -64,22 +64,6 @@ def all_experiments(source):
     return sorted({os.path.splitext(os.path.basename(x))[0] for x in paths})
 
 
-_figdir_dir = "figures"
-
-
-def figdir(path=None):
-    global _figdir_dir
-    if path is not None:
-        path = os.path.expanduser(path.strip())
-        if path.startswith("/"):
-            _figdir_dir = path
-        else:
-            _figdir_dir = os.path.join("figures", path)
-        if not os.path.exists(_figdir_dir):
-            os.makedirs(_figdir_dir)
-    return os.path.abspath(_figdir_dir)
-
-
 @memoize
 def _fit_hmm(source, exp, bin_size_ms, n_states, surrogate):
     "Fit an HMM to data with SSM and return the model."
@@ -255,7 +239,7 @@ def figure(name, save_args={}, save=True, save_exts=["png"], **kwargs):
         for ext in save_exts:
             if ext[0] != ".":
                 ext = "." + ext
-            path = os.path.join(figdir(), fname + ext)
+            path = os.path.join("figures", fname + ext)
             f.savefig(path, **save_args)  # type: ignore
 
 

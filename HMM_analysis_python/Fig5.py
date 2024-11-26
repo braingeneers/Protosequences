@@ -22,8 +22,6 @@ from hmmsupport import (
 
 ORGANOIDS = GROUP_EXPERIMENTS["HO"]
 
-plt.ion()
-
 bin_size_ms = 30
 n_stateses = np.arange(10, 31)
 

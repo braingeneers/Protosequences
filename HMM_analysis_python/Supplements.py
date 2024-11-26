@@ -15,8 +15,6 @@ from hmmsupport import (
     state_traversal_df,
 )
 
-plt.ion()
-
 # %%
 # S15: The plateau that occurs above 10 states.
 
