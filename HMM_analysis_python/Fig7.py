@@ -360,12 +360,12 @@ with figure("Fig7E Alternate") as f:
     ax.set_ylabel("Dimensions to Explain 75\\% of Variance")
 
 
-
 # %%
 # S25: supplemement to figure 7E showing the dimensions required and the
 # significance as a function of threshold θ.
 #
 # Make sure to run lmem.R first!
+
 
 def plot_dimensions_required(
     ax, color, experiments, label, rsm=False, which_models=None
@@ -454,7 +454,7 @@ with figure("Shuffled vs Real PCA", figsize=(7.5, 9)) as f:
 # %%
 # S27: backbone units are less likely to be Poisson than non-rigid units
 
-with figure("Backbone vs Non-Rigid Poisson Scores", figsize=(7, 2.5)) as f:
+with figure("Poisson Test", figsize=(7, 2.5), save_exts=["png", "svg"]) as f:
     ax = sns.boxplot(
         consistency_df,
         x="model",
@@ -479,4 +479,4 @@ with figure("Backbone vs Non-Rigid Poisson Scores", figsize=(7, 2.5)) as f:
         print(model, len(subdf), p)
     ax.set_xticklabels(labels)
     ax.set_ylabel("Fraction of Significantly\nNon-Poisson States")
-    ax.spines[['right', 'top']].set_visible(False)
+    ax.spines[["right", "top"]].set_visible(False)
