@@ -1,6 +1,7 @@
 # Supplements.py
 # Generate various miscellaneous supplemental figures.
 import numpy as np
+import pandas as pd
 import seaborn as sns
 from scipy import stats
 
@@ -36,17 +37,32 @@ with figure("Cross-Validation Plateau") as f:
 # S16: Cross-validation proving that the model performance is better for
 # the real data than for the shuffled data.
 
-with figure("Overall Model Validation") as f:
-    ax = sns.boxplot(
-        data=cv_plateau[cv_plateau.bin_size >= 10],
+subdata = cv_plateau[(cv_plateau.states >= 10) & (cv_plateau.states <= 30)]
+melted = pd.melt(
+    subdata, id_vars=["short_label"], value_vars=["total_ll", "total_surr_ll"]
+)
+melted.variable = melted.variable.map(
+    dict(total_ll="Real", total_surr_ll="Shuffled").get
+)
+
+with figure("Overall Model Validation", figsize=(6.4, 6.4)) as f:
+    raw, delta = f.subplots(2, 1)
+    sns.boxplot(
+        data=melted,
         x="short_label",
-        hue="short_label",
-        y="total_delta_ll",
-        ax=f.gca(),
+        hue="variable",
+        y="value",
+        width=1.0,
+        ax=raw,
     )
-    ax.set_ylabel("Total $\\Delta$ Log Likelihood Real vs. Shuffled")
-    ax.set_yscale("log")
-    ax.set_xlabel("")
+    raw.set_ylabel("Total Log Likelihood")
+    raw.legend()
+    raw.set_xlabel("")
+    sns.boxplot(data=subdata, x="short_label", y="total_delta_ll", ax=delta)
+    delta.set_ylabel("Total $\\Delta$ Log Likelihood Real vs. Shuffled")
+    delta.set_xlabel("")
+    delta.set_yscale("log")
+    f.align_ylabels()
 
 
 # %%
@@ -71,7 +87,7 @@ with figure("Cross-Validation by Bin Size") as f:
 # S26: State traversal by model.
 
 traversal = state_traversal_df()
-traversal.to_csv('traversal.csv')
+traversal.to_csv("traversal.csv")
 
 with figure("States Traversed by Model") as f:
     bins = np.arange(1, 38, 3)
