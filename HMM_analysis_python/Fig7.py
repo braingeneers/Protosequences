@@ -2,7 +2,6 @@
 # Generate my two rows of figure 7 of the final manuscript.
 from itertools import chain
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns

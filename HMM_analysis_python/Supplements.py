@@ -1,8 +1,5 @@
 # Supplements.py
 # Generate various miscellaneous supplemental figures.
-import itertools
-
-import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from scipy import stats
@@ -116,11 +113,11 @@ with figure("States Traversed by K") as f:
     ax.set_ylabel("Average States Traversed in Per Second in Backbone Window")
     ax.set_xlabel("Number of Hidden States")
     ax.set_xlim(ax.get_xlim())
-    ax.set_ylim(0, 40)
+    ax.set_ylim(0, 30)
+    ax.set_xticks([10, 15, 20, 25, 30])
     reg = stats.linregress(traversal.K, traversal.rate)
-    x = np.array([9, 51])
     ax.plot(
-        x,
+        [9.5, 30.5],
         reg.intercept + reg.slope * x,
         color="k",
         linestyle="--",
