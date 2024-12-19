@@ -9,8 +9,8 @@ from scipy import stats
 
 from hmmsupport import (
     SHORT_NAME,
-    cv_plateau_df,
     cv_binsize_df,
+    cv_plateau_df,
     figure,
     state_traversal_df,
 )
@@ -73,13 +73,15 @@ with figure("Cross-Validation by Bin Size") as f:
 # %%
 # S26: State traversal by model.
 
-traversed = state_traversal_df()
-traversed["rate"] = traversed["count"] / traversed["burst_length_ms"] * 1000
+traversal = state_traversal_df()
+traversal.to_csv('traversal.csv')
 
 with figure("States Traversed by Model") as f:
     bins = np.arange(1, 38, 3)
     axes = f.subplots(4, 1)
-    for (i, ax), (model, dfsub) in zip(enumerate(axes), traversed.groupby("model")):
+    for (i, ax), (model, dfsub) in zip(
+        enumerate(axes), traversal.groupby("sample_type")
+    ):
         sns.histplot(
             dfsub,
             x="rate",
@@ -104,18 +106,18 @@ with figure("States Traversed by Model") as f:
 
 with figure("States Traversed by K") as f:
     ax = sns.lineplot(
-        traversed,
-        x="n_states",
+        traversal,
+        x="K",
         y="rate",
         ax=f.gca(),
-        hue="model",
+        hue="sample_type",
         errorbar="sd",
     )
     ax.set_ylabel("Average States Traversed in Per Second in Backbone Window")
     ax.set_xlabel("Number of Hidden States")
     ax.set_xlim(ax.get_xlim())
     ax.set_ylim(0, 40)
-    reg = stats.linregress(traversed.n_states, traversed.rate)
+    reg = stats.linregress(traversal.K, traversal.rate)
     x = np.array([9, 51])
     ax.plot(
         x,
@@ -125,13 +127,3 @@ with figure("States Traversed by K") as f:
         label=f"Trendline ($r^2 = {reg.rvalue**2:.2}$)",
     )
     ax.legend(loc="lower right")
-
-
-groups = {k: vs.rate for k, vs in traversed.groupby("model")}
-for a, b in itertools.combinations(groups.keys(), 2):
-    ks = stats.ks_2samp(groups[a], groups[b])
-    if (p := ks.pvalue) < 1e-3:
-        stat = ks.statistic
-        print(f"{a} vs. {b} is significant at ks = {stat:.2}, p = {100*p:.1e}% < 0.1%")
-    else:
-        print(f"{a} vs. {b} is insignificant ({p = :.2%})")

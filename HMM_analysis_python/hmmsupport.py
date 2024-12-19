@@ -670,7 +670,7 @@ def cv_df(source, experiments, bin_sizes_ms, n_stateses):
 
 @memoize
 def state_traversal_df():
-    n_stateses = range(10, 51)
+    n_stateses = range(10, 31)
 
     only_include = ["scaf_window", "tburst"]
     metrics = {exp: load_metrics(exp, only_include) for exp in ALL_EXPERIMENTS}
@@ -708,16 +708,18 @@ def state_traversal_df():
             ]
             distinct_states = [len(set(seq)) for seq in state_seqs]
             durations = [mean_hold_time(seq) for seq in state_seqs]
+            count = np.mean(distinct_states)
             yield dict(
-                count=np.mean(distinct_states),
+                count=count,
                 count_std=np.std(distinct_states),
                 duration=np.mean(durations),
                 duration_std=np.std(durations),
                 burst_length_ms=length_ms,
+                rate=count/length_ms * 1e3
             )
 
     return pd.DataFrame(
-        dict(model=model, exp=exp, n_states=n_states) | stats
+        dict(sample_type=model, sample_id=exp, K=n_states) | stats
         for model, exps in GROUP_EXPERIMENTS.items()
         for exp in exps
         for n_states, stats in zip(n_stateses, distinct_states_traversed(exp))

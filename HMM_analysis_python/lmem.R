@@ -3,8 +3,8 @@ library('lme4')
 library('lmerTest')
 library('emmeans')
 
-data <- read.csv("dimensions.csv")
-df <- do.call(rbind, lapply(split(data, data$theta), function(dsub) {
+dimensions <- read.csv("dimensions.csv")
+df <- do.call(rbind, lapply(split(dimensions, dimensions$theta), function(dsub) {
 		# Make a LMEM of this current subset of the data.
 		sample_type <- factor(dsub$sample_type)
 		sample_id <- factor(dsub$sample_id)
@@ -16,3 +16,12 @@ df <- do.call(rbind, lapply(split(data, data$theta), function(dsub) {
 		ret
 }))
 write.csv(df, "pvalues.csv", row.names=FALSE)
+
+
+# Check the state traversal rates
+traversal <- read.csv("traversal.csv")
+sample_type <- factor(traversal$sample_type)
+sample_id <- factor(traversal$sample_id)
+K <- factor(traversal$K)
+model <- lmer(traversal$rate ~ sample_type + K + (1 | sample_id))
+emmeans(model, pairwise ~ sample_type)
