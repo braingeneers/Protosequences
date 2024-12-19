@@ -22,6 +22,8 @@ from braingeneers.utils.smart_open_braingeneers import open
 from scipy import ndimage, signal
 from sklearn.linear_model import SGDClassifier
 from sklearn.model_selection import LeaveOneOut, cross_validate
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 from ssm import HMM
 
 
@@ -540,7 +542,8 @@ def separability(X, n_nonrigid):
     nonrigid units first, followed by the backbone, and return its accuracy according to
     leave-one-out cross-validation.
     """
-    clf, cv = SGDClassifier(), LeaveOneOut()
+    cv = LeaveOneOut()
+    clf = Pipeline([("scale", StandardScaler()), ("svm", SGDClassifier())])
     y = np.arange(X.shape[0]) >= n_nonrigid
     return cross_validate(clf, X, y, scoring="accuracy", cv=cv)["test_score"].mean()
 
@@ -715,7 +718,7 @@ def state_traversal_df():
                 duration=np.mean(durations),
                 duration_std=np.std(durations),
                 burst_length_ms=length_ms,
-                rate=count/length_ms * 1e3
+                rate=count / length_ms * 1e3,
             )
 
     return pd.DataFrame(
