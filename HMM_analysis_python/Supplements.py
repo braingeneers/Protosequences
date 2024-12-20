@@ -1,12 +1,9 @@
 # Supplements.py
 # Generate supplementary figures 22, 23, 24, 26, 28, 32, 33D, and 34, as well as some
 # data files used for statistical analyses (and figure 7F).
-from itertools import chain
-
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from joblib import Parallel, delayed, parallel_backend
 from matplotlib.ticker import PercentFormatter
 from scipy import stats
 from sklearn.decomposition import PCA
@@ -26,7 +23,6 @@ from hmmsupport import (
     figure,
     get_raster,
     load_metrics,
-    separability,
     state_traversal_df,
 )
 
@@ -69,6 +65,8 @@ with tqdm(total=2 * len(ALL_EXPERIMENTS) * (1 + len(n_stateses))) as pbar:
                 ms.append(m)
                 pbar.update()
 
+
+# Quick data loading sanity check.
 for exp, (r_real, _) in rasters_real.items():
     nunits = r_real._raster.shape[1]
     meanfr = r_real._raster.mean() / r_real.bin_size_ms * 1000
@@ -135,40 +133,7 @@ def poisson_test(data, mean=None):
     return stats.chi2(data.shape[0] - 1).cdf(statistic)
 
 
-def all_the_scores(exp, only_burst=False, rsm=False):
-    """
-    Gather all the consistency scores and observation counts across all states of
-    all models. Don't differentiate between states or models, yielding a 2D array
-    with some large number of rows and one column per unit.
-    """
-    r, models = (rasters_rsm if rsm else rasters_real)[exp]
-    scores_nobs = [unit_consistency(model, r, only_burst) for model in models]
-    scores = np.vstack([s for s, _ in scores_nobs])
-    nobs = np.hstack([n for _, n in scores_nobs])
-    return scores, nobs
-
-
-def mean_consistency(scores_nobs, include_nan=True, weight=True):
-    """
-    Combine p-values for the Poisson null hypothesis all states of all models,
-    reducing an array of size (M,N) to (N,) so that there is just one score per
-    unit. Returns a vector of shape (n_units,) giving the fraction of all states
-    across all models where the unit is too consistent to be Poisson.
-
-    If `include_nan` is True, then (state, unit) combinations with zero events
-    are included in the calculation and considered indistinguishable from
-    Poisson. Otherwise, they are excluded from the calculation entirely.
-    """
-    scores, nobs = scores_nobs
-    if not include_nan:
-        scores = np.ma.array(scores, mask=np.isnan(scores))
-    # Compare in the correct sense so that NaNs are treated as "not
-    # consistent", i.e. potentially Poisson, then invert.
-    weights = nobs if weight else None
-    return np.ma.average(scores < 0.01, axis=0, weights=weights)
-
-
-def unit_consistency(model, raster, only_burst=False):
+def unit_consistency(model, raster):
     """
     Compute the consistency of each unit within each state of the given model,
     by grouping the time bins of the raster according to the state assigned by
@@ -182,40 +147,34 @@ def unit_consistency(model, raster, only_burst=False):
     K = model.n_states
     h = model.states(raster)
 
-    if only_burst:
-        peaks, bounds = raster.find_burst_edges()
-        edges = np.int64(np.round((peaks[:, None] + bounds) / raster.bin_size_ms))
-        ok = np.zeros_like(h, dtype=bool)
-        for start, end in edges:
-            ok[start:end] = True
-        h[~ok] = -1
+    peaks, bounds = raster.find_burst_edges()
+    edges = np.int64(np.round((peaks[:, None] + bounds) / raster.bin_size_ms))
+    ok = np.zeros_like(h, dtype=bool)
+    for start, end in edges:
+        ok[start:end] = True
+    h[~ok] = -1
 
     rsubs = [raster._raster[h == state, :] for state in range(K)]
     ret = [poisson_test(rsub) for rsub in rsubs]
     return np.array(ret), np.array([rsub.shape[0] for rsub in rsubs])
 
 
-def auc_pval(auc, labels):
+def mean_consistency(exp):
     """
-    Calculate a p-value for the given classifier AUC.
+    Returns a vector of shape (n_units,) giving the fraction of all states across all
+    models where the unit is too consistent to be Poisson, weighted by how frequently
+    that state was observed. Units which never fire in a given state are considered
+    trivially Poisson.
     """
-    ep = (labels != 0).sum()
-    en = len(labels) - ep
+    # Gather consistency scores and observation counts across all states of all models.
+    r, models = rasters_real[exp]
+    scores_nobs = [unit_consistency(model, r) for model in models]
+    scores = np.vstack([s for s, _ in scores_nobs])
+    nobs = np.hstack([n for _, n in scores_nobs])
+    # Compare in the correct sense so that NaNs are treated as "not
+    # consistent", i.e. potentially Poisson, then invert.
+    return np.ma.average(scores < 0.01, axis=0, weights=nobs)
 
-    # The Mann-Whitney statistic is normally distributed under the null
-    # hypothesis, with the following parameters.
-    μ = ep * en / 2
-    σ = np.sqrt(ep * en * (1 + ep + en) / 12)
-
-    # The Mann-Whitney statistic is equal to ep*en*(1 - AUC), so use the SF
-    # directly to calculate the p-value of an AUC this large.
-    return stats.norm(μ, σ).cdf((1 - auc) * ep * en)
-
-
-consistencies = {
-    e: mean_consistency(all_the_scores(e, True, rsm=False))
-    for e in tqdm(ALL_EXPERIMENTS)
-}
 
 consistency_df = pd.DataFrame(
     [
@@ -228,75 +187,9 @@ consistency_df = pd.DataFrame(
         )
         for exp in ALL_EXPERIMENTS
         for label, unitgroup in enumerate([nonrigid, backbone])
-        for c in consistencies[exp][unitgroup[exp]]
+        for c in mean_consistency(exp)[unitgroup[exp]]
     ]
 )
-
-
-with parallel_backend("loky", n_jobs=12):
-    sep_on_states = {
-        exp: [separability(m.consistency.T, len(nonrigid[exp])) for m in ms]
-        for exp, (_, ms) in rasters_real.items()
-    }
-
-    sep_on_states_rsm = {
-        exp: [separability(m.consistency.T, len(nonrigid[exp])) for m in ms]
-        for exp, (_, ms) in rasters_rsm.items()
-    }
-
-    sep_on_fr = {
-        exp: separability(r.rates("Hz").reshape((-1, 1)), len(nonrigid[exp]))
-        for exp, (r, _) in rasters_real.items()
-    }
-
-separability_df = pd.DataFrame(
-    [
-        dict(
-            sample_type=EXPERIMENT_GROUP[exp],
-            sample_id=SHORT_NAME[exp],
-            K=n_stateses[i],
-            sep_on_states=on_states,
-            sep_on_states_rsm=sep_on_states_rsm[exp][i],
-            sep_on_fr=sep_on_fr[exp],
-        )
-        for exp, on_stateses in sep_on_states.items()
-        for i, on_states in enumerate(on_stateses)
-    ]
-)
-separability_df.to_csv("separability.csv", index=False)
-separability_df["model"] = separability_df.sample_type.map(lambda g: GROUP_NAME[g])
-
-
-def where_bb(exp, A, B):
-    ret = A.copy()
-    ret[:, backbone[exp]] = B[:, backbone[exp]]
-    return ret
-
-
-def _el(exp, r_real, r_rsm, models):
-    return [
-        dict(
-            sample_type=EXPERIMENT_GROUP[exp],
-            sample_id=SHORT_NAME[exp],
-            K=n_stateses[i],
-            ll_real=model._hmm.log_likelihood(r_real),
-            ll_rsm=model._hmm.log_likelihood(r_rsm),
-            ll_backbone=model._hmm.log_likelihood(where_bb(exp, r_rsm, r_real)),
-            ll_nonrigid=model._hmm.log_likelihood(where_bb(exp, r_real, r_rsm)),
-        )
-        for i, model in enumerate(models)
-    ]
-
-
-ll_df = pd.DataFrame(
-    chain.from_iterable(
-        Parallel(n_jobs=12)(
-            delayed(_el)(exp, r._raster, rasters_rsm[exp][0]._raster, models)
-            for exp, (r, models) in rasters_real.items()
-        ),
-    )
-)
-ll_df.to_csv("ll.csv", index=False)
 
 # This is used by lmem.R to generate the p-values for S32.
 dreq_df = pd.DataFrame(
@@ -519,8 +412,9 @@ with figure("States Traversed by K") as f:
     ax.set_ylim(0, 30)
     ax.set_xticks([10, 15, 20, 25, 30])
     reg = stats.linregress(traversal.K, traversal.rate)
+    x = np.array([9.5, 30.5])
     ax.plot(
-        [9.5, 30.5],
+        x,
         reg.intercept + reg.slope * x,
         color="k",
         linestyle="--",

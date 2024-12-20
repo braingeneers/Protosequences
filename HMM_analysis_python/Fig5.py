@@ -8,6 +8,10 @@ from joblib import parallel_backend
 from matplotlib.ticker import PercentFormatter
 from scipy import stats
 from sklearn.decomposition import PCA
+from sklearn.linear_model import SGDClassifier
+from sklearn.model_selection import LeaveOneOut, cross_validate
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 from hmmsupport import (
@@ -17,7 +21,6 @@ from hmmsupport import (
     figure,
     get_raster,
     load_metrics,
-    separability,
 )
 
 ORGANOIDS = GROUP_EXPERIMENTS["HO"]
@@ -57,6 +60,19 @@ consistency_real, consistency_rsm = [
     {exp: [m.consistency for m in ms] for exp, (_, ms) in rs.items()}
     for rs in rasterses.values()
 ]
+
+
+def separability(X, n_nonrigid):
+    """
+    Fit a linear classifier to the given features X, assumed to correspond to n_nonrigid
+    nonrigid units first, followed by the backbone, and return its accuracy according to
+    leave-one-out cross-validation.
+    """
+    cv = LeaveOneOut()
+    clf = make_pipeline(StandardScaler(), SGDClassifier())
+    y = np.arange(X.shape[0]) >= n_nonrigid
+    return cross_validate(clf, X, y, scoring="accuracy", cv=cv)["test_score"].mean()
+
 
 with parallel_backend("loky", n_jobs=12):
     n_nonrigid = {exp: len(metricses[exp]["non_scaf_units"]) for exp in ORGANOIDS}

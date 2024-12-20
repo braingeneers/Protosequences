@@ -20,10 +20,6 @@ from braingeneers.iot.messaging import MessageBroker
 from braingeneers.utils.memoize_s3 import memoize
 from braingeneers.utils.smart_open_braingeneers import open
 from scipy import ndimage, signal
-from sklearn.linear_model import SGDClassifier
-from sklearn.model_selection import LeaveOneOut, cross_validate
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
 from ssm import HMM
 
 
@@ -218,7 +214,6 @@ class Model:
         self.consistency = scores[:, raster.unit_order][self.state_order, :]
 
     def states(self, raster):
-        assert self._hmm is not None
         return self._hmm.most_likely_states(raster._raster)
 
 
@@ -419,11 +414,6 @@ class Raster(SpikeData):
 
         return ret
 
-    def average_burst_bounds_ms(self, rms=None):
-        "Average peak-relative start and end across all bursts."
-        _, edges = self.find_burst_edges(rms=rms)
-        return edges.mean(0)
-
     def find_burst_edges(self, rms=None):
         "Find the edges of the bursts in units of ms."
         # Find the peaks of the coarse rate.
@@ -534,18 +524,6 @@ class Raster(SpikeData):
         ret._init(self.source, self.experiment, self.bin_size_ms, sd.train, sd.length)
         ret.burst_rms = self.burst_rms
         return ret
-
-
-def separability(X, n_nonrigid):
-    """
-    Fit a linear classifier to the given features X, assumed to correspond to n_nonrigid
-    nonrigid units first, followed by the backbone, and return its accuracy according to
-    leave-one-out cross-validation.
-    """
-    cv = LeaveOneOut()
-    clf = make_pipeline(StandardScaler(), SGDClassifier())
-    y = np.arange(X.shape[0]) >= n_nonrigid
-    return cross_validate(clf, X, y, scoring="accuracy", cv=cv)["test_score"].mean()
 
 
 class Job:
