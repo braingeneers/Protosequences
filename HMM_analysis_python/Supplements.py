@@ -112,7 +112,7 @@ def dimensions_required(experiments, xs, rsm=False, which_models=None):
     )
 
 
-def poisson_test(data, mean=None):
+def poisson_test(data):
     """
     Test the null hypothesis that the given data of shape (N,K) has no less
     variance than a K-dimensional multivariate Poisson distribution with the same
@@ -126,11 +126,11 @@ def poisson_test(data, mean=None):
         return np.full(data.sum(0).shape, np.nan)
 
     # Dividing by the expected variance, which for Poisson is the mean.
-    mean = data.mean(0) if mean is None else mean
-    statistic = (data.shape[0] - 1) * data.var(0) / mean
+    dof = data.shape[0] - 1
+    statistic = dof * data.var(0) / data.mean(0)
     # Use the CDF to get the p-value: how likely a χ² sample is to be smaller
     # than the observed test statistic.
-    return stats.chi2(data.shape[0] - 1).cdf(statistic)
+    return stats.chi2(dof).cdf(statistic)
 
 
 def unit_consistency(model, raster):
@@ -217,6 +217,10 @@ dreq_df.to_csv("dimensions.csv", index=False)
 # This subset is used to generate 7F.
 dreq_df[dreq_df.theta == 0.75].to_csv("dimensions_0.75.csv", index=False)
 
+# lmem.R also uses this one.
+state_traversal_df().to_csv("traversal.csv")
+
+print("CSV files available for lmem.R.")
 
 # %%
 # S22: Cross-validation by bin size.
@@ -286,6 +290,37 @@ with figure("Overall Model Validation", figsize=(6.4, 6.4)) as f:
     delta.set_xlabel("")
     delta.set_yscale("log")
     f.align_ylabels()
+
+
+# %%
+# S26: State traversal by number of states.
+
+traversal = state_traversal_df()
+
+with figure("States Traversed by K") as f:
+    ax = sns.lineplot(
+        traversal,
+        x="K",
+        y="rate",
+        ax=f.gca(),
+        hue="sample_type",
+        errorbar="sd",
+    )
+    ax.set_ylabel("Average States Traversed in Per Second in Backbone Window")
+    ax.set_xlabel("Number of Hidden States")
+    ax.set_xlim(ax.get_xlim())
+    ax.set_ylim(0, 30)
+    ax.set_xticks([10, 15, 20, 25, 30])
+    reg = stats.linregress(traversal.K, traversal.rate)
+    x = np.array([9.5, 30.5])
+    ax.plot(
+        x,
+        reg.intercept + reg.slope * x,
+        color="k",
+        linestyle="--",
+        label=f"Trendline ($r^2 = {reg.rvalue**2:.2}$)",
+    )
+    ax.legend(loc="lower right")
 
 
 # %%
@@ -392,37 +427,9 @@ with figure("Poisson Test", figsize=(7, 2.5), save_exts=["png", "svg"]) as f:
 
 
 # %%
-# S26: State traversal by number of states.
+# S34: State traversal by model.
 
 traversal = state_traversal_df()
-traversal.to_csv("traversal.csv")
-
-with figure("States Traversed by K") as f:
-    ax = sns.lineplot(
-        traversal,
-        x="K",
-        y="rate",
-        ax=f.gca(),
-        hue="sample_type",
-        errorbar="sd",
-    )
-    ax.set_ylabel("Average States Traversed in Per Second in Backbone Window")
-    ax.set_xlabel("Number of Hidden States")
-    ax.set_xlim(ax.get_xlim())
-    ax.set_ylim(0, 30)
-    ax.set_xticks([10, 15, 20, 25, 30])
-    reg = stats.linregress(traversal.K, traversal.rate)
-    x = np.array([9.5, 30.5])
-    ax.plot(
-        x,
-        reg.intercept + reg.slope * x,
-        color="k",
-        linestyle="--",
-        label=f"Trendline ($r^2 = {reg.rvalue**2:.2}$)",
-    )
-    ax.legend(loc="lower right")
-
-# S34: State traversal by model.
 
 with figure("States Traversed by Model") as f:
     bins = np.arange(1, 38, 3)
