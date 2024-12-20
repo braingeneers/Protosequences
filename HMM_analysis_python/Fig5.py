@@ -70,6 +70,11 @@ with parallel_backend("loky", n_jobs=12):
         for exp, (r, _) in rasters_real.items()
     }
 
+
+for e in ORGANOIDS:
+    states_fr = stats.ttest_1samp(sep_on_states[e], sep_on_fr[e])
+    print(e, "\tStates > FR, p =", states_fr.pvalue)
+
 # %%
 
 # The figure plots results for one example HMM first before comparing
@@ -314,7 +319,7 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
 
     sns.violinplot(
         cut=0,
-        scale="width",
+        density_norm="width",
         data=df,
         y="value",
         x="experiment",
@@ -331,16 +336,6 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
     F.yaxis.set_major_formatter(PercentFormatter(1, 0))
     F.spines["top"].set_visible(False)
     F.spines["right"].set_visible(False)
-
-
-# Also print the accuracy stats for part F.
-all_sep_fr = np.array(list(sep_on_fr.values()))
-all_sep_states = np.hstack(list(sep_on_states.values()))
-print(f"Separability by FR: {all_sep_fr.mean():.2%} +/- {all_sep_fr.std():.2%}")
-print(
-    f"Separability by structure: {all_sep_states.mean():.2%} "
-    f"+/- {all_sep_states.std():.2%}"
-)
 
 
 # %%

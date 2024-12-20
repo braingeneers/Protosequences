@@ -22,7 +22,7 @@ from braingeneers.utils.smart_open_braingeneers import open
 from scipy import ndimage, signal
 from sklearn.linear_model import SGDClassifier
 from sklearn.model_selection import LeaveOneOut, cross_validate
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from ssm import HMM
 
@@ -543,7 +543,7 @@ def separability(X, n_nonrigid):
     leave-one-out cross-validation.
     """
     cv = LeaveOneOut()
-    clf = Pipeline([("scale", StandardScaler()), ("svm", SGDClassifier())])
+    clf = make_pipeline(StandardScaler(), SGDClassifier())
     y = np.arange(X.shape[0]) >= n_nonrigid
     return cross_validate(clf, X, y, scoring="accuracy", cv=cv)["test_score"].mean()
 
