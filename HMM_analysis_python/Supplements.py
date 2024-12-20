@@ -183,10 +183,10 @@ consistency_df = pd.DataFrame(
             model=GROUP_NAME[EXPERIMENT_GROUP[exp]],
             consistency=c,
             label=label,
-            backbone="Backbone" if label else "Non-Rigid",
+            backbone="Non-Rigid" if label else "Backbone",
         )
         for exp in ALL_EXPERIMENTS
-        for label, unitgroup in enumerate([nonrigid, backbone])
+        for label, unitgroup in enumerate([backbone, nonrigid])
         for c in mean_consistency(exp)[unitgroup[exp]]
     ]
 )
@@ -414,11 +414,10 @@ with figure("Poisson Test", figsize=(7, 2.5), save_exts=["png", "svg"]) as f:
         model = label.get_text()
         subdf = consistency_df[consistency_df.model == model]
         labels.append(f"{model}\n({len(subdf)} Units)")
-        print(label.get_text())
-        p = stats.ks_2samp(
+        p = stats.ttest_ind(
             subdf[subdf.backbone == "Backbone"].consistency,
             subdf[subdf.backbone == "Non-Rigid"].consistency,
-            alternative="less",
+            equal_var=False,
         ).pvalue
         print(model, len(subdf), p)
     ax.set_xticklabels(labels)
