@@ -1,5 +1,5 @@
 # Supplements.py
-# Generate various miscellaneous supplemental figures.
+# Generate supplementary figures 22, 23, 24, 26, and 34.
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -14,7 +14,25 @@ from hmmsupport import (
 )
 
 # %%
-# S15: The plateau that occurs above 10 states.
+# S22: Cross-validation by bin size.
+
+cv_binsize = cv_binsize_df()
+
+with figure("Cross-Validation by Bin Size") as f:
+    ax = f.gca()
+    sns.boxplot(
+        data=cv_binsize,
+        x="bin_size",
+        y="total_delta_ll",
+        ax=ax,
+    )
+    ax.set_ylabel("Total $\\Delta$ Log Likelihood Real vs. Shuffled")
+    ax.set_xlabel("Bin Size (ms)")
+    ax.set_yscale("log")
+
+
+# %%
+# S23: The plateau that occurs above 10 states.
 
 cv_plateau = cv_plateau_df()
 cv_plateau["short_label"] = cv_plateau.experiment.map(SHORT_NAME.get)
@@ -34,7 +52,7 @@ with figure("Cross-Validation Plateau") as f:
     ax.set_yscale("log")
 
 
-# S16: Cross-validation proving that the model performance is better for
+# S24: Cross-validation proving that the model performance is better for
 # the real data than for the shuffled data.
 
 subdata = cv_plateau[(cv_plateau.states >= 10) & (cv_plateau.states <= 30)]
@@ -66,28 +84,36 @@ with figure("Overall Model Validation", figsize=(6.4, 6.4)) as f:
 
 
 # %%
-# S17: Cross-validation by bin size.
-
-cv_binsize = cv_binsize_df()
-
-with figure("Cross-Validation by Bin Size") as f:
-    ax = f.gca()
-    sns.boxplot(
-        data=cv_binsize,
-        x="bin_size",
-        y="total_delta_ll",
-        ax=ax,
-    )
-    ax.set_ylabel("Total $\\Delta$ Log Likelihood Real vs. Shuffled")
-    ax.set_xlabel("Bin Size (ms)")
-    ax.set_yscale("log")
-
-
-# %%
-# S26: State traversal by model.
+# S26: State traversal by number of states.
 
 traversal = state_traversal_df()
 traversal.to_csv("traversal.csv")
+
+with figure("States Traversed by K") as f:
+    ax = sns.lineplot(
+        traversal,
+        x="K",
+        y="rate",
+        ax=f.gca(),
+        hue="sample_type",
+        errorbar="sd",
+    )
+    ax.set_ylabel("Average States Traversed in Per Second in Backbone Window")
+    ax.set_xlabel("Number of Hidden States")
+    ax.set_xlim(ax.get_xlim())
+    ax.set_ylim(0, 30)
+    ax.set_xticks([10, 15, 20, 25, 30])
+    reg = stats.linregress(traversal.K, traversal.rate)
+    ax.plot(
+        [9.5, 30.5],
+        reg.intercept + reg.slope * x,
+        color="k",
+        linestyle="--",
+        label=f"Trendline ($r^2 = {reg.rvalue**2:.2}$)",
+    )
+    ax.legend(loc="lower right")
+
+# S34: State traversal by model.
 
 with figure("States Traversed by Model") as f:
     bins = np.arange(1, 38, 3)
@@ -113,30 +139,3 @@ with figure("States Traversed by Model") as f:
             ax.set_xlabel("")
             ax.set_xticklabels([])
     f.legend(loc=(0.775, 0.5))
-
-
-# S19: State traversal by number of states.
-
-with figure("States Traversed by K") as f:
-    ax = sns.lineplot(
-        traversal,
-        x="K",
-        y="rate",
-        ax=f.gca(),
-        hue="sample_type",
-        errorbar="sd",
-    )
-    ax.set_ylabel("Average States Traversed in Per Second in Backbone Window")
-    ax.set_xlabel("Number of Hidden States")
-    ax.set_xlim(ax.get_xlim())
-    ax.set_ylim(0, 30)
-    ax.set_xticks([10, 15, 20, 25, 30])
-    reg = stats.linregress(traversal.K, traversal.rate)
-    ax.plot(
-        [9.5, 30.5],
-        reg.intercept + reg.slope * x,
-        color="k",
-        linestyle="--",
-        label=f"Trendline ($r^2 = {reg.rvalue**2:.2}$)",
-    )
-    ax.legend(loc="lower right")

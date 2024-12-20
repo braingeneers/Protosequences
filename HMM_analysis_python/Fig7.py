@@ -1,5 +1,5 @@
 # Fig7.py
-# Generate my two rows of figure 7 of the final manuscript.
+# Generate figure 7F and supplementary figures 28, 32, and 33D.
 from itertools import chain
 
 import numpy as np
@@ -318,14 +318,16 @@ dreq_df = pd.DataFrame(
 )
 dreq_df.to_csv("dimensions.csv", index=False)
 
+
 # %%
-# Figure 7E: distribution of HMM dimensionality (to explain 75% of variance)
-# compared between all the models.
+# Figure 7F: distribution of HMM dimensionality (to explain 75% of variance) compared
+# between all the models. This version is not used in the final paper; instead, Mattia
+# made a discrete violin plot using the output CSV.
 
 dsub = dreq_df[dreq_df.theta == 0.75]
 dsub.to_csv("dimensions_0.75.csv", index=False)
 
-with figure("Fig7E", figsize=(4.0, 3.0), save_exts=["png", "svg"]) as f:
+with figure("Fig7F", figsize=(4.0, 3.0), save_exts=["png", "svg"]) as f:
     axes = f.subplots(4, 1)
     for (i, group), ax in zip(enumerate(GROUP_NAME), axes):
         sns.histplot(
@@ -343,25 +345,33 @@ with figure("Fig7E", figsize=(4.0, 3.0), save_exts=["png", "svg"]) as f:
     ax.set_xlabel("Dimensions to Explain 75\\% of Variance")
     ax.set_xticks(np.arange(1, 8))
 
-with figure("Fig7E Alternate") as f:
-    ax = f.gca()
-    sns.violinplot(
-        data=dsub, x="sample_type", y="dims", bw=0.6, cut=0, inner=None, ax=ax
-    )
-    ax.set_ylim(*ax.get_ylim())
-    sections = [
-        dsub[dsub.sample_type == label.get_text()] for label in ax.get_xticklabels()
-    ]
-    means = [section["dims"].mean() for section in sections]
-    stds = [section["dims"].std() for section in sections]
-    ax.errorbar(ax.get_xticks(), means, yerr=stds, fmt="ko")
-    ax.set_xlabel("")
-    ax.set_ylabel("Dimensions to Explain 75\\% of Variance")
+
+# %%
+# S28: surrogate data has a linear manifold, whereas real data is more complicated.
+
+with figure("Shuffled vs Real PCA", figsize=(7.5, 9)) as f:
+    subfs = f.subfigures(4, 2)
+    for i, (exp, subf) in enumerate(zip(GROUP_EXPERIMENTS["HO"], subfs.ravel())):
+        subf.suptitle(f"Organoid {i+1}")
+        axes = subf.subplots(
+            1,
+            2,
+            sharex=True,
+            sharey=True,
+            gridspec_kw=dict(wspace=0, left=0.1, right=0.9, top=0.9, bottom=0.1),
+        )
+        for ax, rasters in zip(axes, [rasters_real, rasters_rsm]):
+            raster = rasters[exp][0]
+            model = rasters[exp][1][0]
+            h = model.states(raster)
+            points = model.pca.transform(raster._raster)[:, :2]
+            ax.set_aspect("equal")
+            ax.scatter(points[:, 1], points[:, 0], s=1, alpha=0.5, c=h, cmap="rainbow")
 
 
 # %%
-# S25: supplemement to figure 7E showing the dimensions required and the
-# significance as a function of threshold θ.
+# S32: supplemement to figure 7F showing the dimensions required and the significance as
+# a function of threshold θ.
 #
 # Make sure to run lmem.R first!
 
@@ -409,49 +419,7 @@ with figure("p Value Comparison", figsize=[6.4, 6.4]) as f:
 
 
 # %%
-# Possible new figure showing classification of backbone across models.
-
-keep_vars = ["model", "sep_on_states", "sep_on_fr"]
-melted = separability_df[keep_vars].melt(id_vars="model")
-
-with figure("Backbone Classifiability Across Models") as f:
-    ax = f.gca()
-    sns.boxplot(
-        data=melted,
-        y="value",
-        x="model",
-        hue="variable",
-        ax=ax,
-    )
-    ax.set_ylabel("Backbone Classification Accuracy")
-    ax.set_xlabel("")
-    ax.set_ylim(0.5, 1)
-
-# %%
-# S21: showing that surrogate data has a linear manifold and real doesn't
-
-with figure("Shuffled vs Real PCA", figsize=(7.5, 9)) as f:
-    subfs = f.subfigures(4, 2)
-    for i, (exp, subf) in enumerate(zip(GROUP_EXPERIMENTS["HO"], subfs.ravel())):
-        subf.suptitle(f"Organoid {i+1}")
-        axes = subf.subplots(
-            1,
-            2,
-            sharex=True,
-            sharey=True,
-            gridspec_kw=dict(wspace=0, left=0.1, right=0.9, top=0.9, bottom=0.1),
-        )
-        for ax, rasters in zip(axes, [rasters_real, rasters_rsm]):
-            raster = rasters[exp][0]
-            model = rasters[exp][1][0]
-            h = model.states(raster)
-            points = model.pca.transform(raster._raster)[:, :2]
-            ax.set_aspect("equal")
-            ax.scatter(points[:, 1], points[:, 0], s=1, alpha=0.5, c=h, cmap="rainbow")
-
-
-# %%
-# S27: backbone units are less likely to be Poisson than non-rigid units
+# S33D: backbone units are less likely to be Poisson than non-rigid units
 
 with figure("Poisson Test", figsize=(7, 2.5), save_exts=["png", "svg"]) as f:
     ax = sns.boxplot(

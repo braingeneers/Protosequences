@@ -1,5 +1,5 @@
 # Fig5.py
-# Generate figure 5 of the final manuscript.
+# Generate figure 5 and supplementary figures 25 and 27.
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -339,33 +339,7 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
 
 
 # %%
-# S20: as 5D but for all organoids.
-
-with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
-    axes = f.subplots(4, 2)
-    for i, (ax, exp) in enumerate(zip(axes.flat, ORGANOIDS)):
-        r = rasters_real[exp][0]
-        scores = consistency_real[exp][10]
-        ax.imshow(
-            scores[:, ::-1],
-            aspect="auto",
-            interpolation="nearest",
-            vmin=0,
-            vmax=1,
-            extent=[1, r.N, 20.5, 0.5],
-            cmap="Greys",
-        )
-        n_rigid = len(metricses[exp]["scaf_units"])
-        ax.set_xticks(np.array([1, n_rigid, r.N]))
-        ax.set_yticks([1, 20])
-        ax.set_xlabel(r"Backbone \hspace{1.6cm} Non-Rigid")
-        ax.set_ylabel("State")
-        ax.yaxis.set_label_coords(-0.08, 0.5)
-        ax.set_title(f"Organoid {i+1}")
-
-
-# %%
-# S18: temporal spread of states within bursts.
+# S25: temporal spread of states within bursts.
 
 df = []
 burst_margins = -20, 40
@@ -421,3 +395,29 @@ with figure("Temporal Spread of States") as f:
     ax.set_ylabel("Standard Deviation (ms)")
     ticks = ax.get_xticks()[::2]
     ax.set_xticks(ticks)
+
+
+# %%
+# S27: as 5D but for all organoids.
+
+with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
+    axes = f.subplots(4, 2)
+    for i, (ax, exp) in enumerate(zip(axes.flat, ORGANOIDS)):
+        r = rasters_real[exp][0]
+        scores = consistency_real[exp][10]
+        ax.imshow(
+            scores[:, ::-1],
+            aspect="auto",
+            interpolation="nearest",
+            vmin=0,
+            vmax=1,
+            extent=[1, r.N, 20.5, 0.5],
+            cmap="Greys",
+        )
+        n_rigid = len(metricses[exp]["scaf_units"])
+        ax.set_xticks(np.array([1, n_rigid, r.N]))
+        ax.set_yticks([1, 20])
+        ax.set_xlabel(r"Backbone \hspace{1.6cm} Non-Rigid")
+        ax.set_ylabel("State")
+        ax.yaxis.set_label_coords(-0.08, 0.5)
+        ax.set_title(f"Organoid {i+1}")
