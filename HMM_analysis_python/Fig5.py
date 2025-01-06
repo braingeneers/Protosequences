@@ -87,9 +87,16 @@ with parallel_backend("loky", n_jobs=12):
     }
 
 
+print("\nSeparability significance:")
 for e in ORGANOIDS:
     states_fr = stats.ttest_1samp(sep_on_states[e], sep_on_fr[e])
     print(e, "\tStates > FR, p =", states_fr.pvalue)
+
+reals = np.hstack(list(sep_on_states.values()))
+frs = np.array(list(sep_on_fr.values()))
+print("\nOverall separability:")
+print(f"by state: {reals.mean():.1%} ± {reals.std():.1%}")
+print(f"by FR:    {frs.mean():.1%} ± {frs.std():.1%}")
 
 # %%
 
