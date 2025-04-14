@@ -445,3 +445,32 @@ with figure("Supplement to Fig5", figsize=(6.4, 6.4)) as f:
         ax.set_ylabel("State")
         ax.yaxis.set_label_coords(-0.08, 0.5)
         ax.set_title(f"Organoid {i+1}")
+
+
+# %%
+# S??: entropy throughout bursts
+
+hsprobs = {}
+with tqdm(total=len(ORGANOIDS) * len(n_stateses)) as pbar:
+    for exp, (r, models) in rasters_real.items():
+        hsprobs[exp] = []
+        for model in models:
+            probs = r.observed_state_probs(model.states(r), model.burst_margins)
+            hsprobs[exp].append(probs)
+            pbar.update()
+
+with figure("Entropy of Hidden State Distribution", figsize=(6, 8)) as f:
+    axes = f.subplots(8, 1)
+    t_sec = np.arange(lmargin_h, rmargin_h+1) * bin_size_ms / 1000
+    for i, (exp, ax) in enumerate(zip(ORGANOIDS, axes)):
+        entropies = [stats.entropy(probs) for probs in hsprobs[exp]]
+        for entropy in entropies:
+            ax.plot(t_sec, entropy, alpha=0.15, color=f'C{i}')
+        mean_entropy = np.mean(entropies, axis=0)
+        ax.plot(t_sec, mean_entropy, label=exp, color=f'C{i}')
+        ax.set_xlim(-0.3, 0.6)
+        ax.set_ylabel(f"Organoid {i+1}\nEntropy (bits)")
+        if i + 1 == 8:
+            ax.set_xlabel("Time Relative to Burst Peak (sec)")
+        else:
+            ax.set_xticks([])
