@@ -114,6 +114,8 @@ interesting_states = [10, 11, 12]
 # which states happen at which peak-relative times.
 h = model.states(r)
 lmargin_h, rmargin_h = model.burst_margins
+lmargin_sec = lmargin_h * bin_size_ms / 1000
+rmargin_sec = rmargin_h * bin_size_ms / 1000
 peaks = r.find_bursts(margins=model.burst_margins)
 state_prob = r.observed_state_probs(h, burst_margins=model.burst_margins)
 state_order = r.state_order(h, model.burst_margins, n_states=n_states)
@@ -145,7 +147,6 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
         when = slice(peak + lmargin_h, peak + rmargin_h + 1)
         rsub = r._raster[when, :] / bin_size_ms
         hsub = np.array([np.nonzero(state_order == s)[0][0] for s in h[when]])
-        t_sec = (np.ogrid[when] - peak) * bin_size_ms / 1000
         ax.imshow(
             hsub.reshape((1, -1)),
             interpolation="nearest",
@@ -154,7 +155,7 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
             aspect="auto",
             vmin=0,
             vmax=n_states - 1,
-            extent=[t_sec[0], t_sec[-1], 0.5, rsub.shape[1] + 0.5],
+            extent=[lmargin_sec, rmargin_sec, 0.5, r.N + 0.5],
         )
         idces, times_ms = r.subtime(
             when.start * bin_size_ms, when.stop * bin_size_ms
@@ -269,7 +270,7 @@ with figure("Fig5", figsize=(8.5, 7.5), save_exts=["png", "svg"]) as f:
         interpolation="nearest",
         vmin=0,
         vmax=1,
-        extent=[t_sec[0], t_sec[-1], n_states + 0.5, 0.5],
+        extent=[lmargin_sec, rmargin_sec, n_states + 0.5, 0.5],
         aspect="auto",
         cmap="Greys",
     )
