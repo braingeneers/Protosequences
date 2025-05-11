@@ -2,18 +2,22 @@
 
 % % specify which organoid to analyse
 % rec_paths = [paths to folders with files]; % !!! adjust path and file names for loading data
-
+    
 % make empty cell arrays for results
 av_rate = cell(1,length(rec_paths));
 spk_count = cell(1,length(rec_paths));
 scaf_units = cell(1,length(rec_paths));
 non_scaf_units = cell(1,length(rec_paths));
+act_times = cell(1,length(rec_paths));
 av_btb_corr_scores = cell(1,length(rec_paths));
 all_pw_corr_vals = cell(1,length(rec_paths));
+all_pw_corr_lags = cell(1,length(rec_paths));
 var_vals = cell(1,length(rec_paths));
 
+act_times_all_shuf = cell(1,length(rec_paths));
 av_btb_corr_scores_rand = cell(1,length(rec_paths));
 all_pw_corr_vals_rand = cell(1,length(rec_paths));
+all_pw_corr_lags_rand = cell(1,length(rec_paths));
 var_vals_rand = cell(1,length(rec_paths));
 
 % for each array
@@ -26,36 +30,41 @@ for array = 1:length(rec_paths)
     
     % load single recording data for organoid
     s_rec_met = load(sprintf('%s/single_recording_metrics.mat', rec_paths(array)));
-    s_rec_met_rand = load(sprintf('%s/single_recording_metrics_rand.mat', rec_paths(array)));
+    s_rec_met_rand = load(sprintf('%s/single_recording_metrics_shuff.mat', rec_paths(array)));
     
     % store results in cell array
     av_rate{array} = s_rec_met.spk_count / (size(s_rec_met.rate_mat,1)/1000);
     spk_count{array} = s_rec_met.spk_count;
     scaf_units{array} = s_rec_met.scaf_units;
     non_scaf_units{array} = s_rec_met.non_scaf_units;
+    act_times{array} = s_rec_met.act_times;
     av_btb_corr_scores{array} = s_rec_met.av_btb_corr_scores;
     all_pw_corr_vals{array} = s_rec_met.all_pw_corr_vals;
+    all_pw_corr_lags{array} = s_rec_met.all_pw_corr_lags;
     var_vals{array} = s_rec_met.vars;
     
     % store shuffled results in cell array
-    av_btb_corr_scores_rand{array} = s_rec_met_rand.av_btb_corr_scores_rand;
-    all_pw_corr_vals_rand{array} = s_rec_met_rand.all_pw_corr_vals_rand;
-    var_vals_rand{array} = s_rec_met_rand.vars_rand;
+    act_times_all_shuf{array} = s_rec_met_rand.act_times_all_shuf;
+    av_btb_corr_scores_rand{array} = s_rec_met_rand.av_btb_corr_scores_av_shuf;
+    all_pw_corr_vals_rand{array} = s_rec_met_rand.all_pw_corr_vals_av_shuf;
+    all_pw_corr_lags_rand{array} = s_rec_met_rand.all_pw_corr_lags_av_shuf;
+    var_vals_rand{array} = s_rec_met_rand.vars_all_shuf;
     
 end % array
 
 
 %% set recording names
-% rec_names = ["Or1", "Or2", "Or3", "Or4", "Or5", "Or6", "Or7", "Or8"];
+% rec_names = ["HO1", "HO2", "HO3", "HO4", "HO5", "HO6", "HO7", "HO8"];
 % rec_names = ["M1S1", "M1S2", "M2S1", "M2S2", "M3S1", "M3S2"];
-rec_names = ["Or1", "Or2", "Or3", "Or4", "Or5", "Or6", "Or7", "Or8", "M1S1", ...
+rec_names = ["HO1", "HO2", "HO3", "HO4", "HO5", "HO6", "HO7", "HO8", "MO1", ...
+    "MO2", "MO3", "MO4", "MO5", "MO6", "MO7", "MO8", "MO9", "M1S1", ...
     "M1S2", "M2S1", "M2S2", "M3S1", "M3S2", "Pr1", "Pr2", "Pr3", "Pr4", ...
-    "Pr5", "Pr6", "Pr7", "Pr8", "Pr9", "Pr10"];
+    "Pr5", "Pr6", "Pr7", "Pr8"];
 
 
 %% compare average burst to burst correlation
-% (Fig S8)
-% S8 = Load all recordings
+% (Fig S14)
+% S14 = Load all recordings
 
 % only plot results for units with at least MIN_SPIKES in recording
 MIN_SPIKES = 30;
@@ -181,9 +190,168 @@ set(gca, 'ticklength', [0.003,0.003])
 box off
 
 
+%% compute and plot rank order statistics
+% (Fig S11D, S15B)
+% S11D = Load gabazine
+% S15B = Load all intrinsic recordings
+
+% make empty result arrays
+boxplot_data_norm = [];
+boxplot_groups_norm = [];
+
+% make emtpy result cell matrices
+all_array_rho = cell(1,length(act_times));
+all_array_rho_shuff = cell(1,length(act_times));
+
+all_rec_groups = [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,3,3,3,3,3,3,3,3];
+% all_rec_groups = [0,1,0,1,0,1,0,1,0,1]; % use this for gabazine dataset
+
+% for each array
+for array = 1:length(act_times)
+        
+    % select act times for backbone units
+    act_time_scaf = act_times{array}(:,scaf_units{array});
+    
+    % compute rank correlations
+    [rho, p] = corr(act_time_scaf', "Type", "Spearman");
+    
+    % initiate empty result array for shuffled datasets
+    all_rho_shuff = NaN(size(act_times{array},1), size(act_times{array},1), ...
+        size(act_times_all_shuf{array},3));
+    
+    % for each shuffled dataset
+    for shuf = 1:size(act_times_all_shuf{array},3)
+    
+        % select act times for backbone units
+        act_time_scaf_shuf = act_times_all_shuf{array}(:,scaf_units{array},shuf);
+    
+        % compute rank correlations
+        [rho_shuff, p_shuff] = corr(act_time_scaf_shuf', "Type", "Spearman");
+        
+        % store results
+        all_rho_shuff(:,:,shuf) = rho_shuff;
+        
+    end % shuf
+    
+    % compute mean and std over all shuffled values
+    av_all_rho_shuff = mean(all_rho_shuff, 3, "omitnan");
+    std_all_rho_shuff = std(all_rho_shuff, [], 3, "omitnan");
+    
+    % get values below diagonal
+    below_d = rho(triu(true(size(rho)),1))';
+    below_d_av_shuff = av_all_rho_shuff(triu(true(size(av_all_rho_shuff)),1))';
+    below_d_std_shuff = std_all_rho_shuff(triu(true(size(std_all_rho_shuff)),1))';
+    
+    % store normalized results
+    boxplot_data_norm = [boxplot_data_norm, (below_d-below_d_av_shuff)./below_d_std_shuff];
+    boxplot_groups_norm = [boxplot_groups_norm, all_rec_groups(array) * ones(1,length(below_d))];
+       
+end % array
+ 
+
+% intiate figure
+fig = figure(4);
+clf
+
+% adjust size of figure
+set(gcf,'PaperPositionMode','auto')
+set(fig, 'Position', [100 100 300 400])
+set(fig, 'Renderer', 'painters')
+hold on
+
+% plot boxplot of consistency scores
+bhTemp = boxplot(boxplot_data_norm, boxplot_groups_norm);
+
+% add marker for 0
+yline(0,"k--");
+
+% add y-axis label
+ylabel("Norm. Spearman rank corr.")
+
+% adjust ticks
+xticks(1:4)
+xticklabels(["HO", "MO", "MS", "Pr"])
+% xticks(1:2) % use this for gabazine dataset
+% xticklabels(["Baseline", "Gabazine"])
+
+set(gca,'linewidth',3)
+set(gca, 'fontsize', 14)
+box off
+
+
+%% compare correlation lags
+% (Fig S17)
+% S17 = Load all recordings
+
+% make empty result arrays
+tick_locs_all = zeros(1,length(all_pw_corr_lags));
+violin_results_all = cell(1,3*length(all_pw_corr_lags));
+
+% for each array
+for array = 1:length(all_pw_corr_lags)
+    
+    % make copy of data    
+    x_corr_lags = abs(all_pw_corr_lags{array});
+    x_corr_lags_av_shuff = abs(all_pw_corr_lags_av_shuff{array});
+    
+    % set diagonal values to NaN
+    x_corr_lags(logical(eye(size(x_corr_lags,1)))) = NaN;
+    x_corr_lags_av_shuff(logical(eye(size(x_corr_lags_av_shuff,1)))) = NaN;
+    
+    % obtain correlation values for backbone pairs
+    x_corr_lags(scaf_units{array}, scaf_units{array});
+    x_corr_lags_av_shuff = x_corr_lags_av_shuff(scaf_units{array}, scaf_units{array});
+      
+    % store data
+    violin_results_all{1+(array-1)*3} = x_corr_lags(:);
+    violin_results_all{2+(array-1)*3} = x_corr_vals_av_shuff(:);
+    violin_results_all{3+(array-1)*3} = -100;
+    
+    % store tick location
+    tick_locs_all(array) = 1.5+(array-1)*3;
+    
+end % array
+
+% fill empty cells for violin_results_all
+for v_cell_all = 1:length(violin_results_all)
+    if isempty(violin_results_all{v_cell_all})
+        violin_results_all{v_cell_all} = -100;
+    end % if
+end % v_cell
+
+
+% intiate figure
+fig = figure(4);
+clf
+
+% adjust size of figure
+set(gcf,'PaperPositionMode','auto')
+set(fig, 'Position', [100 100 1000 350])
+set(fig, 'Renderer', 'painters')
+
+% specify violin plot colors
+violin_color_mat_all = repmat([0,0,1 ; 1,0,0 ; 1,1,1], length(all_pw_corr_lags), 1);
+
+% plot boxplot of consistency scores
+violin(violin_results_all, 'mc','r','medc','','plotlegend',0,'facecolor',...
+    violin_color_mat_all,'bw',5);
+
+% adjust y-axis 
+ylim([0,350])
+ylabel("Correlation lag (ms)")
+
+% adjust x-ticks
+xticks(tick_locs_all)
+xticklabels(rec_names)
+
+set(gca,'linewidth',3)
+set(gca, 'fontsize', 14)
+set(gca, 'ticklength', [0.003,0.003])
+box off
+
 %% compare correlation scores
-% (Fig S11)
-% S11 = Load all recordings
+% (Fig S18)
+% S18 = Load all recordings
 
 % only plot results for units with at least MIN_SPIKES in recording
 MIN_SPIKES = 30;
@@ -360,8 +528,8 @@ box off
  
 
 %% Compare variance explained by PCA components
-% (Fig S14)
-% S14 = Load all recordings
+% (Fig S21)
+% S21 = Load all recordings
 
 % define number of components to include in analysis
 NUM_COMP = 3;

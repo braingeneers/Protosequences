@@ -1,24 +1,25 @@
 %% load data
 
 load('single_recording_metrics.mat')
-load('single_recording_metrics_rand.mat')
+load('single_recording_metrics_shuff.mat')
  
 
 %% plot raster plot with multi unit activity 
-% (Fig 1A, 6A, S3A, S7A, S9A, S22A)
-% 1A = Or1 with PLOT_RANGE set to [48000, 63500]
+% (Fig 1A, 6A, S3A, S13A, S16A, S29A, S31A)
+% 1A = HO1 with PLOT_RANGE set to [48000, 63500]
 % 6A = M2S2 with PLOT_RANGE set to [190000, 240000]
-% S3A = Or5 with PLOT_RANGE set to [870000, 930000]
-% S7A = Or1 (randomized data, see line 17-18) with PLOT_RANGE set to [48000, 63500]
-% S9A = Pr1 with PLOT_RANGE set to [23000, 31000]
-% S22A = M3S1 with PLOT_RANGE set to [87000, 120000]
+% S3A = HO5 with PLOT_RANGE set to [197000,207000]
+% S13A = HO1 (randomized data, see line 17-19) with PLOT_RANGE set to [48000, 63500]
+% S16A = Pr1 with PLOT_RANGE set to [23000, 31000]
+% S29A = M3S1 with PLOT_RANGE set to [87000, 120000]
+% S31A = MO1 with PLOT_RANGE set to [50500,60500]
 
 % select random spike times for plotting (uncomment for random data, overwrites non-random data)
 % spk_times = spk_times_rand;
 % spk_times_id = spk_times_id_rand;
 
 % define parameters
-PLOT_RANGE = [48000, 63500]; % select range for example plot in ms 
+PLOT_RANGE = [197000,207000];%[48000, 63500]; % select range for example plot in ms 
 BURSTS_OI = 1:size(edges,1); % highlight bursts in figure
 
 % initiate figure
@@ -78,28 +79,27 @@ plot(1:length(pop_rate), pop_rate, '-r', "LineWidth", 2)
 % set axis labels
 ylabel('Population rate (kHz)')
 
-% define axis limits
-
-
+% final updates to figure
 set(fig,'defaultAxesColorOrder',[left_color; right_color]);
 ax = gca;
 ax.FontSize = 14;
 
 
 %% plot firing rate plot with multi unit activity for selection of recording
-% (Fig 1B, 2A, 6B, S3B, S7B, S9B, S22B) 
-% 1B = Or1 with PLOT_RANGE set to [48000, 63500] and ORDERING set to NaN
-% 2A = Or1 with PLOT_RANGE set to [48000, 63500]
+% (Fig 1B, 2A, 6B, S3B, S13B, S16B, S29B, S31B) 
+% 1B = HO1 with PLOT_RANGE set to [48000, 63500] and ORDERING set to NaN
+% 2A = HO1 with PLOT_RANGE set to [48000, 63500]
 % 6B = M2S2 with PLOT_RANGE set to [190000, 240000]
-% S3B = Or5 with PLOT_RANGE set to [870000, 930000]
-% S7B = Or1 (randomized data, see line 105) with PLOT_RANGE set to [48000, 63500]
-% S9B = Pr1 with PLOT_RANGE set to [23000, 31000]
-% S22B = M3S1 with PLOT_RANGE set to [87000, 120000]
+% S3B = HO5 with PLOT_RANGE set to [197000,207000]
+% S13B = HO1 (randomized data, see line 105) with PLOT_RANGE set to [48000, 63500]
+% S16B = Pr1 with PLOT_RANGE set to [23000, 31000]
+% S29B = M3S1 with PLOT_RANGE set to [87000, 120000]
+% S31B = MO1 with PLOT_RANGE set to [50500,60500]
 
 % define parameters
 PLOT_RANGE = [48000, 63500]; % select range for example plot in ms
 ORDERING = mean_rate_ordering; % unit ordering method, set to NaN for no ordering
-SHOW_COLORBAR = false; % whether colorbar should be plotted
+SHOW_COLORBAR = true; % whether colorbar should be plotted
 
 % make copy of data to plot
 rate_mat_copy = rate_mat; % select rate_mat_rand for random data
@@ -290,13 +290,14 @@ box off
 
 
 %% plot burst peak centered mean rate for scaff and non scaff
-% (Fig 2C, 6C, S3C, S7C, S9C, S22C) 
-% 2C = Or1
+% (Fig 2C, 6C, S3C, S13C, S16C, S29C, S31C) 
+% 2C = HO1
 % 6C = M2S2 
-% S3C = Or5
-% S7C = Or1 (randomized data, see line 302) 
-% S9C = Pr1 
-% S22C = M3S1
+% S3C = HO5
+% S13C = HO1 (randomized data, see line 302) 
+% S16C = Pr1 
+% S29C = M3S1
+% S31C = MO1
 
 % select random rates for plotting (uncomment for random data, overwrites non-random data)
 % av_rate = av_rate_rand;
@@ -355,7 +356,7 @@ box off
 % (Fig 2D, 6D, S7D)
 % 2D = Or1 SORTED_UNIT_OI 7, 27 and 66
 % 6D = M2S2 SORTED_UNIT_OI 12 and 126
-% S7D = Or1 (randomized data, see line 361-363) SORTED_UNIT_OI 7, 27 and 66
+% S13D = Or1 (randomized data, see line 361-363) SORTED_UNIT_OI 7, 27 and 66
 
 % select random rates for plotting (uncomment for random data, overwrites non-random data)
 % cut_spk_mat = cut_spk_mat_rand;
@@ -450,8 +451,8 @@ ax.FontSize = 14;
 
 
 %% plot results for pairwise correlation scores of whole culture
-% (Fig 3D+S10, 6E)
-% 3G+S10 = Or1
+% (Fig 3CD, 6E)
+% 3CD = Or1
 % 6E = M2S2 (only subplot 1 is needed)
 
 MIN_SPIKES = 30;
@@ -466,13 +467,14 @@ set(fig, 'Position', [0 20 700 300])
 set(fig, 'Renderer', 'painters')
  
 % prepare plot data
-corr_plot_data = all_pw_corr_vals(fliplr(mean_rate_ordering), fliplr(mean_rate_ordering));
+corr_plot_data = all_pw_corr_vals_ll(fliplr(mean_rate_ordering), fliplr(mean_rate_ordering));
 corr_plot_data(spk_count(fliplr(mean_rate_ordering)) < MIN_SPIKES,:) = [];
 corr_plot_data(:,spk_count(fliplr(mean_rate_ordering)) < MIN_SPIKES) = [];
 
-lag_plot_data = all_pw_corr_lags(fliplr(mean_rate_ordering), fliplr(mean_rate_ordering));
+lag_plot_data = all_pw_corr_lags_ll(fliplr(mean_rate_ordering), fliplr(mean_rate_ordering));
 lag_plot_data(spk_count(fliplr(mean_rate_ordering)) < MIN_SPIKES,:) = [];
 lag_plot_data(:,spk_count(fliplr(mean_rate_ordering)) < MIN_SPIKES) = [];
+lag_plot_data(isnan(lag_plot_data)) = 0;
 
 % make subplot for correlation values
 xcorr_h = subplot(1,2,1);
@@ -516,7 +518,7 @@ xline(length(scaf_units)+0.5, "k", "LineWidth", 3);
 cb = colorbar;
 colormap(xlagg_h, redblue)
 ylabel(cb, "Lag (ms)", "FontSize", 14)
-caxis([-50, 50])
+caxis([-150, 150])
 
 % adjust axes
 xlabel("Unit")
@@ -526,9 +528,9 @@ ax.FontSize = 14;
 
 
 %% Plot centered pop rate and burst similarity
-% (Fig 1D, 4A-E)
-% 1C = Or1 set PLOT_BURST_SIM to true
-% 4A-E = Or1 set PLOT_BURST_SIM to false
+% (Fig 1C, 4A-E)
+% 1C = Or1 set PLOT_BURST_SIM to false
+% 4A-E = Or1 set PLOT_BURST_SIM to true
 
 % specify plot parameters
 POP_RATE_THRESH = 0.03; % threshold for plotting window as fraction of pop_rate peak
@@ -762,10 +764,10 @@ end % if
 
 
 %% compute average burst similarity relative to burst peak for subsets of neurons
-% (Fig S12A, S12B)
-% S12A = Or1 set SMALLER to false
-% S12B = Or1 set SMALLER to true
-% computations take some time so plotting is done is separate cell below this one
+% (Fig S19A, S19B)
+% S19A = Or1 set SMALLER to false
+% S19B = Or1 set SMALLER to true
+% computations take some time so plotting is done in separate cells below this one
 
 % compute average correlation
 av_xcorr = mean(all_pw_corr_vals, "omitnan");
@@ -775,7 +777,7 @@ z_rate_mat = zscore(rate_mat);
 
 % set parameters
 WINDOW = burst_window; % time relative to burst peak to consider
-SMALLER = false;
+SMALLER = true;
 
 if SMALLER == true
     PERC_RANGE = linspace(20,95,76);
@@ -858,8 +860,14 @@ for thresh = 1:length(PERC_RANGE)
     
 end % thresh
 
+if SMALLER == true
+    thresh_mean_cos_sim_smaller = thresh_mean_cos_sim;
+else
+    thresh_mean_cos_sim_larger = thresh_mean_cos_sim;
+end
 
-%% plot results
+
+%% plot results smaller or larger
 % continuation from previous cell
 
 % initiate figure
@@ -873,9 +881,6 @@ set(fig, 'Renderer', 'painters')
 
 % set colors
 colors = jet(size(thresh_mean_cos_sim,1));
-
-% set line styles for plotting
-line_styles = ["-", "--", ":"];
 
 if SMALLER == false
     colors = fliplr(colors);
@@ -915,11 +920,55 @@ ylim([0,1])
 xlim(WINDOW)
 set(gca,'FontSize',14)
 set(gca,'linewidth',3)
+   
+
+%% plot results for comparison
+% continuation from previous cell
+
+% initiate figure
+fig = figure(9);
+clf
+
+% adjust size of figure
+set(gcf,'PaperPositionMode','auto')
+set(fig, 'Position', [100 100 250 150])
+set(fig, 'Renderer', 'painters')
+
+% define start and end frame to consider
+st_frame = scaf_window(1)-burst_window(1);
+end_frame = scaf_window(2)-burst_window(1);
+
+% define percentage of electrodes considered
+cons_perc = linspace(20,95,76);
+
+% make empty result array
+diff_sim_score = zeros(1, size(thresh_mean_cos_sim,1));
+
+for thresh = 1:size(thresh_mean_cos_sim,1) 
     
+    % compute difference between top and bottom perc
+    diff_sim_score(thresh) = sum(thresh_mean_cos_sim_larger(end-(thresh-1),st_frame:end_frame), "all") - ...
+        sum(thresh_mean_cos_sim_smaller(thresh,st_frame:end_frame), "all");
+    
+end % thresh
+
+% plot results
+plot(cons_perc, diff_sim_score./max(diff_sim_score), "k", "LineWidth", 2)
+
+% add axis labels
+ylabel("Diff. (norm.)")
+xlabel("Top/bottom %")
+yticks([0,1])
+
+% adjust axes
+set(gca,'FontSize',14)
+set(gca,'linewidth',3)
+box off
+
 
 %% compute statistical difference with main
-% (Fig S12C)
-% S12C = Or1 
+% (Fig S19C)
+% S19C = Or1 
 % First run cell for processing data of the previous figure (previous 2 
 % cells). Then compute pvals with data in this cell and rename results to
 % pval_smaller or pval_larger depending on whether SMALLER is true or false

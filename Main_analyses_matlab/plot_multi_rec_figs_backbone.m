@@ -1,8 +1,5 @@
 %% load data
 
-% % add relevant toolboxes to path
-addpath(genpath("/home/vandermolen/matlab/firing_chains/final_scripts"))
-
 % % specify which organoid to analyse
 % rec_paths = [paths to folders with files]; % !!! adjust path and file names for loading data
 
@@ -24,14 +21,13 @@ scaf_windows = cell(1,length(rec_paths));
 mean_cos_sim = cell(1,length(rec_paths));
 mean_rate_ordering = cell(1,length(rec_paths));
 var_vals = cell(1,length(rec_paths));
+sbsc = cell(1,length(rec_paths));
 
 % for each array
 for array = 1:length(rec_paths)
         
     % split file identifier
     split_name = split(rec_paths(array), "/");
-    
-    % % load data of first treatment
     
     % load single recording data for organoid
     s_rec_met = load(sprintf('%s/single_recording_metrics.mat', rec_paths(array)));
@@ -53,18 +49,24 @@ for array = 1:length(rec_paths)
     scaf_windows{array} = s_rec_met.scaf_window;
     mean_cos_sim{array} = s_rec_met.mean_cos_sim;
     mean_rate_ordering{array} = s_rec_met.mean_rate_ordering;
-    var_vals{array} = s_rec_met.vars;
+    var_vals{array} = s_rec_met.vars{1};
+    sbsc{array} = s_rec_met.sbsc{1};
 
 end % array
 
 
 %% set recording names
-% rec_names = ["Or1", "Or2", "Or3", "Or4", "Or5", "Or6", "Or7", "Or8"];
+% rec_names = ["HO1", "HO2", "HO3", "HO4", "HO5", "HO6", "HO7", "HO8"];
 % rec_names = ["M1S1", "M1S2", "M2S1", "M2S2", "M3S1", "M3S2"];
-rec_names = ["Or1", "Or2", "Or3", "Or4", "Or5", "Or6", "Or7", "Or8", "M1S1", ...
-    "M1S2", "M2S1", "M2S2", "M3S1", "M3S2", "Pr1", "Pr2", "Pr3", "Pr4", ...
-    "Pr5", "Pr6", "Pr7", "Pr8", "Pr9", "Pr10"];
+% rec_names = ["Pr1", "Pr2", "Pr3", "Pr4", "Pr5", "Pr6", "Pr7", "Pr8"];
 
+rec_names = ["HO1", "HO2", "HO3", "HO4", "HO5", "HO6", "HO7", "HO8", "MO1", ...
+    "MO2", "MO3", "MO4", "MO5", "MO6", "MO7", "MO8", "MO9", "M1S1", ...
+    "M1S2", "M2S1", "M2S2", "M3S1", "M3S2", "Pr1", "Pr2", "Pr3", "Pr4", ...
+    "Pr5", "Pr6", "Pr7", "Pr8"];
+
+% rec_names = ["MO10 B", "MO10 G", "MO11 B", "MO11 G", "MO12 B", "MO12 G", "MO13 B", "MO13 G", "MO14 B", "MO14 G"];
+% rec_names = ["10 B", "10 G", "11 B", "11 G", "12 B", "12 G", "13 B", "13 G", "14 B", "14 G"];
 
 %% Show Log-Normal fit to firing rate distribution
 % (Fig S1A-C)
@@ -93,10 +95,9 @@ av_rate = cell(1,length(spk_count));
 for array = 1:length(spk_count)
     
     % compute average firing rate per unit
-    av_rate{array} = spk_count{array}./(size(rate_mat{array},1)/1000);
+    av_rate{array} = spk_count{array}./(size(rate_mat{array},1)/1000)';
     
 end % array
-
 
 % initiate figure
 cm = figure(1);
@@ -112,7 +113,7 @@ r_squared_vals = zeros(1, size(av_rate, 2));
 
 % for each array
 for array = 1:size(av_rate, 2)
-    
+        
     % obtain hist counts
     counts = histcounts(av_rate{array}, BIN_EDGES,'Normalization','probability');
     
@@ -141,7 +142,7 @@ for array = 1:size(av_rate, 2)
     
     % make histogram of log(rate) values
     [log_counts, edges] = histcounts(log(av_rate{array}), ceil(length(log(av_rate{array}))^0.4), 'Normalization','probability');
-    
+
     % compute bin centers for ln data
     bin_centers_ln_plot = edges(2:end)-diff(edges);
     
@@ -150,9 +151,9 @@ for array = 1:size(av_rate, 2)
     
     % combine x and y values in table
     tbl = table(bin_centers_ln_plot(1:max_index)', log_counts(1:max_index)');
-    
+        
     % fit normal distribution
-    mdl = fitnlm(tbl, norm_dist, est_initial_norm_dist);
+    mdl = fitnlm(tbl, norm_dist, est_initial_norm_dist);        
     
     % Extract the coefficient values from the the model object.
     coefficients = mdl.Coefficients{:, 'Estimate'};
@@ -180,7 +181,6 @@ for array = 1:size(av_rate, 2)
     end % if
     
 end % array
-
 
 % % general figure layout
         
@@ -271,9 +271,9 @@ box off
 
 
 %% compare average firing rate
-% (Fig S1D, S23)
+% (Fig S1D, S30A)
 % S1D = Load organoid recordings only
-% S23 = Load all recordings
+% S30A = Load all recordings
 
 % only plot results for units with at least MIN_SPIKES in recording
 MIN_SPIKES = 30;
@@ -316,7 +316,7 @@ clf
 
 % adjust size of figure
 set(gcf,'PaperPositionMode','auto')
-set(fig, 'Position', [100 100 400 300])
+set(fig, 'Position', [100 100 1400 300])
 set(fig, 'Renderer', 'painters')
 
 % plot boxplot of consistency scores
@@ -343,11 +343,147 @@ set(gca, 'fontsize', 14)
 set(gca, 'YScale', 'log')
 box off
 
+%% Show Log-Normal fit to firing rate distribution
+% (Fig S18C-E, S30B-D)
+% S18C-E = Load all recordings, select row 362 and not 361
+% S30B-D = Load all recordings, select row 361 and not 362
+
+% select parameters
+FIT_LN_RANGE = [-5,2]; % fitting range for ln of rate
+COLOR_SELEC = ["r", "b", "g", "m"];
+
+% make empty result cell array for average firing rates
+plot_metric = cell(1,length(spk_count));
+
+% for each array
+for array = 1:length(spk_count)
+    
+    % compute average firing rate per unit
+    plot_metric{array} = (spk_count{array}./(size(rate_mat{array},1)/1000)')';
+%     plot_metric{array} = all_pw_corr_vals{array}(tril(true(size(all_pw_corr_vals{array})),-1));
+    
+end % array
+
+% initiate figure
+cm = figure(1);
+clf
+
+% adjust size of figure
+set(gcf,'PaperPositionMode','auto')
+set(cm, 'Position', [0 20 1300 300])
+set(cm, 'Renderer', 'painters')
+
+% initiate first subplot
+subplot(1,3,1)
+hold on
+ 
+% initiate empty result arrays
+plot_colors = strings(1, size(plot_metric, 2));
+log_likelihood = zeros(1, size(plot_metric, 2));
+means = zeros(1, size(plot_metric, 2));
+sigmas = zeros(1, size(plot_metric, 2));
+
+
+% for each array
+for array = 1:size(plot_metric, 2)
+        
+    % make char array of rec name
+    char_ar = char(rec_names(array));
+    
+    % determine plot color
+    if char_ar(1) == "H"
+        plot_colors(array) = COLOR_SELEC(1);
+    elseif char_ar(1) == "M"
+        if char_ar(2) == "O"
+            plot_colors(array) = COLOR_SELEC(2);
+        else
+            plot_colors(array) = COLOR_SELEC(3);
+        end
+    elseif char_ar(1) == "P"
+        plot_colors(array) = COLOR_SELEC(4);
+    end
+        
+    % fit normal distribution
+    pd = fitdist(log(plot_metric{array}), "Normal");
+    
+    % obtain model parameters and store
+    means(array) = pd.mu;
+    sigmas(array) = pd.sigma;
+    
+    % compute log_likelihood of fitted distribution and store
+    log_likelihood(array) = sum(log(pdf(pd, log(plot_metric{array})))); % log likelihood
+    
+    % plot fitted model
+    x = linspace(min(log(plot_metric{array})), max(log(plot_metric{array})), 1000);
+    y = pdf(pd, x);
+    plot(x, y, "Color", plot_colors(array), "LineWidth", 1)
+    
+end % array
+
+% add axes labels
+xlabel("Log(Rate)")
+ylabel("Probability density")
+
+% adjust axes
+ax = gca;
+ax.FontSize = 14;
+set(gca,'linewidth',3)
+box off
+
+% initiate subplot for r_squared values
+subplot(1,3,2)
+
+% plot results
+boxplot(log_likelihood, plot_colors)
+
+% color boxplots
+h = findobj(gca,'Tag','Box');
+for j=1:length(h)
+    patch(get(h(j),'XData'),get(h(j),'YData'),COLOR_SELEC(end-(j-1)),'FaceAlpha',.5);
+end
+
+% adjust labels
+xticks([1:size(COLOR_SELEC, 2)])
+xticklabels(["HO", "MO", "MS", "Pr"])
+ylabel("log-likelihood of fit")
+
+% adjust axes
+ax = gca;
+ax.FontSize = 14;
+set(gca,'linewidth',3)
+box off
+
+% initiate subplot for r_squared values
+subplot(1,3,3)
+hold on
+
+% for each data point
+for dp = 1:length(means)
+    
+    % plot mean and std of distributions
+    scatter(means(dp), sigmas(dp), 100, plot_colors(dp), "o", "filled")
+    
+end
+
+% add axes labels
+xlabel("Mean")
+ylabel("STD")
+
+% adjust axes
+ax = gca;
+ax.FontSize = 14;
+set(gca,'linewidth',3)
+box off
+
+xlim_curr = xlim;
+ylim_curr = ylim;
+xlim([xlim_curr(1)*1.1, xlim_curr(2)*1.1])
+
 
 %% plot scaffold units
-% (Fig S2A-B, S5A)
+% (Fig S2A-B, S12A)
 % S2A-B = Load all recordings
-% S6A = Load Or2_8M and Or2_8M_4H from the side_experiments folder
+% S12A = Load Or2_8M and Or2_8M_4H from the side_experiments folder
 
 % initiate figure
 fig = figure(3);
@@ -360,7 +496,8 @@ bar_error = zeros(length(frac_per_unit), 2);
 
 % adjust size of figure
 set(fig,'PaperPositionMode','auto')
-set(fig, 'Position', [100 100 1400 700])
+% set(fig, 'Position', [100 100 1800 700])
+set(fig, 'Position', [100 100 800 700])
 set(fig, 'Renderer', 'painters')
 
 % make subplot with fraction of bursts with at least MIN_SPIKES spikes
@@ -383,11 +520,11 @@ for array = 1:length(frac_per_unit)
     
     % plot datapoints for array
     scatter(array*ones(1,length(frac_per_unit{array}(non_scaf_units{array}))), ...
-        frac_per_unit{array}(non_scaf_units{array}), 200, "r", ".", 'jitter','on', 'jitterAmount',0.15);
+        frac_per_unit{array}(non_scaf_units{array}), 200, "k", ".", 'jitter','on', 'jitterAmount',0.15); %"r"
     
     % plot datapoints for array
     sh1 = scatter(array*ones(1,length(frac_per_unit{array}(scaf_units{array}))), ...
-        frac_per_unit{array}(scaf_units{array}), 200, "b", ".", 'jitter','on', 'jitterAmount',0.15);
+        frac_per_unit{array}(scaf_units{array}), 200, "k", ".", 'jitter','on', 'jitterAmount',0.15); %"b"
     
 end % array
 
@@ -453,7 +590,7 @@ clf
 
 % adjust size of figure
 set(gcf,'PaperPositionMode','auto')
-set(fig, 'Position', [100 100 1400 600])
+set(fig, 'Position', [100 100 1800 600])
 set(fig, 'Renderer', 'painters')
 
 % initate empty results arrays
@@ -587,12 +724,11 @@ ax.FontSize = 14;
 
 
 %% compare average burst to burst correlation scaf vs non-scaf
-% (Fig 2E, 6F, S1D)
+% (Fig 2E, 6F)
 % 2E = Load organoid L1, L2, L3 and L5 recordings only, set plot metric (line 595) to av_btb_corr_scores and choose ylabel (line 654, 655) accordingly
 % 6F = Load mouse slice recordings (all) only, set plot metric (line 595) to av_btb_corr_scores and choose ylabel (line 654, 655) accordingly
-% S1D = Load organoid recordings (all) only, set plot metric (line 595) to av_rate and choose ylabel (line 654, 655) accordingly, unset ylim (line 696), set yaxis to log (line 704)
 
-plot_metric = av_btb_corr_scores; % av_rate
+plot_metric = av_btb_corr_scores;
 
 % only plot results for units with at least MIN_SPIKES in recording
 MIN_SPIKES = 30;
@@ -652,7 +788,6 @@ end
 
 % add y-axis label
 ylabel("Av. burst to burst corr.")
-% ylabel("Av. firing rate (Hz)")
 ylim([0,1])
 
 % adjust ticks
@@ -661,7 +796,6 @@ xticklabels(rec_names)
 
 set(gca,'linewidth',3)
 set(gca, 'fontsize', 14)
-% set(gca, 'YScale', 'log')
 box off
 
 
@@ -801,9 +935,9 @@ linkaxes([ax1, ax2], 'y')
 
 
 %% Plot cosine similarity per organoid
-% (Fig 4E, S12D)
+% (Fig 4E, S19D)
 % 4E = Load organoid Or1-4 recordings only
-% S12D = Load organoid recordings (all) only
+% S19D = Load organoid recordings (all) only
 
 % specify plot parameters
 WIND_BEFORE = 0;
@@ -827,6 +961,14 @@ leg_selection = zeros(1,length(mean_cos_sim));
 
 % for each organoid
 for array = 1:length(mean_cos_sim)
+    array
+    
+    if NORM_WIND{array}(1) < -449
+        NORM_WIND{array}(1) = -449;
+    end
+    if NORM_WIND{array}(1) > 1000
+        NORM_WIND{array}(1) = 1000;
+    end
     
     % select start and end time of plot window
     plot_start = ceil(NORM_WIND{array}(1))-ceil(diff(NORM_WIND{array})*WIND_BEFORE);
@@ -859,7 +1001,7 @@ wind_start = WIND_BEFORE/total_winds;
 wind_end = (WIND_BEFORE+1)/total_winds;
 
 % add legend
-legend(leg_selection, rec_names, "Location", "SouthEast", "NumColumns", 4)
+legend(leg_selection, rec_names, "Location", "SouthEast", "NumColumns", 2)
 legend("boxoff")
 
 % adjust axes
@@ -873,11 +1015,11 @@ set(gca, "LineWidth", 3)
 
 
 %% Plot PCA manifolds colored by burst peak
-% (Fig 4G, S13)
+% (Fig 4G, S20)
 % you will have to manually flip some axes to make the manifolds look most
 % similar between the different columns
 % 4F = Load organoid Or1 recording only
-% S13 = Load organoid Or1-4 recordings only
+% S20 = Load organoid Or1-4 recordings only
 
 % initiate result cell array
 peak_rels = cell(1,length(sbsc));
@@ -909,7 +1051,7 @@ end % array
 cm = figure(9); 
 clf
 set(gcf,'PaperPositionMode','auto')
-set(cm, 'Position', [0 20 1450 300*length(sbsc)])
+set(cm, 'Position', [0 20 1600 300*length(sbsc)])
 set(cm, 'Renderer', 'painters')
 
 % set colormap
@@ -1070,3 +1212,4 @@ function ysc = interp_diff(x, y)
     ysc = ysc - x.';
     
 end    
+
