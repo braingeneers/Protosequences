@@ -42,7 +42,7 @@ organoid_names = ["L2", "L3"];
 
 
 %% compute fraction of overlapping scaffold units for confusion matrix
-% (Fig S6A table values)
+% (Fig S12A table values)
 
 % initiate empty result arrays
 both_scaf = zeros(1,size(organoids,1));
@@ -107,9 +107,9 @@ end % array
 
 
 %% plot burst to burst similarity
-% (Fig S6B-E requires running previous cell)
-% Fig S6B = Set UNIT_OI to 2
-% Fig S6C = Set UNIT_OI to 62
+% (Fig S12B-E requires running previous cell)
+% Fig S12B = Set UNIT_OI to 2
+% Fig S12C = Set UNIT_OI to 62
 
 ARRAY_OI = 1; % array index from which to select example unit
 UNIT_OI = 2; % index of example unit to use
